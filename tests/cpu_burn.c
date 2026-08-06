@@ -38,9 +38,11 @@ int main(int argc, char **argv)
 	};
 	unsigned long seconds = 1;
 	uint64_t value = 0x9e3779b97f4a7c15ULL;
+	uint64_t iterations = 0;
 	int original_policy;
 	int option;
 	double deadline;
+	double next_progress;
 
 	while ((option = getopt_long(argc, argv, "s:h", options, NULL)) != -1) {
 		switch (option) {
@@ -65,12 +67,22 @@ int main(int argc, char **argv)
 	signal(SIGINT, request_stop);
 	signal(SIGTERM, request_stop);
 	deadline = monotonic_seconds() + (double)seconds;
+	next_progress = monotonic_seconds() + 0.25;
 	while (!stop && monotonic_seconds() < deadline) {
 		value ^= value << 13;
 		value ^= value >> 7;
 		value ^= value << 17;
+		iterations++;
+		if (monotonic_seconds() >= next_progress) {
+			printf("progress workload=cpu_burn iterations=%llu elapsed_seconds=%.3f\n",
+			       (unsigned long long)iterations,
+			       (double)seconds - (deadline - monotonic_seconds()));
+			fflush(stdout);
+			next_progress += 0.25;
+		}
 	}
-	printf("cpu_burn checksum=%llu original_policy=%d\n",
-	       (unsigned long long)value, original_policy);
+	printf("result workload=cpu_burn checksum=%llu iterations=%llu original_policy=%d\n",
+	       (unsigned long long)value, (unsigned long long)iterations,
+	       original_policy);
 	return EXIT_SUCCESS;
 }

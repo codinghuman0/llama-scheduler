@@ -17,10 +17,10 @@ dump data after link destruction triggers the exit callback. It opens the BPF ob
 because local bpftool 7.7 generates a skeleton requiring a newer libbpf than
 the installed 1.3.0.
 
-The non-privileged check is `make check`, which runs
-`build/bin/cpu_burn --seconds 1` without changing scheduling policy. The
-workload's `--ext` option is explicit and reserved for a later, user-approved
-load checkpoint; it is never used by automated tests.
+The non-privileged check is `make check`, which runs finite CPU-bound and
+sleeping/waking workloads plus dry-run validation tests without changing any
+scheduling policy. The manual `scripts/run_validation.sh` suite is blocked
+until an operator has explicitly started the partial-switching loader.
 
 No scheduler load, attachment, system configuration, kernel, bootloader, or
 systemd change is part of this milestone. A future privileged checkpoint must

@@ -10,6 +10,8 @@ Generated files are confined to ignored `build/` and recreated by `make all`.
   and cannot attach a scheduler.
 - `build/bin/cpu_burn` — finite CPU-bound workload that does not change its
   own scheduling policy.
+- `build/bin/sleep_wake` — finite sleeping/waking workload that does not change
+  its own scheduling policy.
 
-`include/llama_sched_uapi.h`, `tests/test_scx_child.sh`, and the files in
+`include/llama_sched_uapi.h`, `tests/test_scx_child.sh`, `scripts/`, and the files in
 `docs/` are tracked source/documentation, not generated output.

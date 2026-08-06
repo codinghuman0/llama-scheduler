@@ -1,18 +1,15 @@
 # Generated build artifacts
 
-Generated files are intentionally confined to ignored `build/` and are
-recreated by `make all`.
+Generated files are confined to ignored `build/` and recreated by `make all`.
 
-- `build/include/vmlinux.h` — C type and enum declarations emitted from the
-  running kernel's `/sys/kernel/btf/vmlinux` by bpftool. It must never be
-  committed because it is specific to the running kernel BTF.
-- `build/llama_scx_simple.bpf.o` — Clang's BPF ELF object compiled from
-  `src/llama_scx_simple.bpf.c`; this is the object the loader opens.
-- `build/bin/llama_scx_simple` — userspace C/libbpf loader linked from
-  `src/llama_scx_simple.c`.
-- `build/bin/cpu_burn` — bounded synthetic CPU workload linked from
-  `tests/cpu_burn.c`.
+- `build/include/vmlinux.h` — C declarations emitted from the running kernel
+  BTF; never commit it.
+- `build/llama_scx_simple.bpf.o` — BPF ELF compiled from the scheduler source.
+- `build/bin/llama_scx_simple` — foreground scheduler loader.
+- `build/bin/llama_scx_child` — selected-child launcher; it is not a loader
+  and cannot attach a scheduler.
+- `build/bin/cpu_burn` — finite CPU-bound workload that does not change its
+  own scheduling policy.
 
-No skeleton header is generated. The installed bpftool 7.7 emits skeleton code
-for a newer libbpf ABI than the installed libbpf 1.3.0, so the loader uses the
-stable direct object APIs available in 1.3.0.
+`include/llama_sched_uapi.h`, `tests/test_scx_child.sh`, and the files in
+`docs/` are tracked source/documentation, not generated output.

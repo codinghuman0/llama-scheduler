@@ -1,62 +1,66 @@
 # Status
 
-## Milestone: sched_ext ABI compatibility repair
+## Milestone: selected-child SCHED_EXT test
 
-Status: built and ready for one further user-run manual load attempt. This
-repair did not load, attach, or otherwise change sched_ext. The final read-only
-state is `disabled` and `/sys/kernel/sched_ext/enable_seq` is `0`.
+Status: built and ready for user-run manual testing. The verified
+partial-switching baseline remains unchanged; no scheduler was loaded or
+attached while implementing this milestone. The prior compatibility-repair
+record is preserved in `docs/STATUS.compatibility-repair.md`.
 
-### Root cause and target
+### Implementation
 
-- Recorded running kernel: `7.0.0-28-generic` (`docs/environment.txt`).
-- First-load evidence: `results/manual/first-load.log` reports incompatible
-  extern kfunc `scx_bpf_dsq_insert` BTF prototypes.
-- Failing object declaration: `bool scx_bpf_dsq_insert(struct task_struct *,
-  u64, u64, u64)`.
-- Running-kernel BTF declaration: `void scx_bpf_dsq_insert(struct task_struct *,
-  u64, u64, u64)`.
-- The incompatible return type is the root cause; the argument list was
-  already correct. The bool-returning form is the newer `___v2` API, not the
-  kfunc exposed under `scx_bpf_dsq_insert` by this kernel.
+- Added `build/bin/llama_scx_child`, built from `src/llama_scx_child.c`.
+  It checks that sched_ext is enabled, forks once, prints the parent and child
+  PIDs before the child proceeds, and calls `sched_setattr(SCHED_EXT)` only in
+  that child before `execvp()`.
+- The parent records its existing policy, never calls `sched_setattr`, waits
+  for the child, verifies its policy is unchanged, and propagates the child
+  exit status.
+- The launcher reports a clear inactive-scheduler error before forking, and a
+  clear child `SCHED_EXT` transition error with exit status `126` if the
+  transition fails. `execvp()` errors return `127`.
+- `cpu_burn` is now policy-neutral and finite: it accepts only
+  `--seconds N`, never changes its own policy, and returns success after its
+  bounded workload completes. The launcher is the sole userspace policy
+  transition path.
 
-### Compatibility change
+### Kernel UAPI and scheduler invariants
 
-- Replaced the v7.0 reference with exact Linux v6.17 `scx_simple` BPF and
-  userspace sources under `third_party/linux-v6.17/`, tag object
-  `6063257da111c7639d020c5f15bfb37fb839d8b6`, peeled commit
-  `e5f0a698b34ed76002dc5cff3804a61c80233a7a`.
-- SHA-256: `scx_simple.bpf.c`
-  `f8b2d3ab08a326b09e3e7c8a6eeea43991a5b5265ff9bfb4444bf459e36e3f59`;
-  `scx_simple.c`
-  `f9a1c7a648575d4415377f7bba668c9064e89519b5b0ec05fd45c8edcc89e59f`.
-- In `src/llama_scx_simple.bpf.c`, changed only DSQ insertion ABI use:
-  `scx_bpf_dsq_insert()` now has the matching void return type and weighted
-  vtime enqueue calls the v6.17 `void scx_bpf_dsq_insert_vtime(p, dsq, slice,
-  vtime, flags)` kfunc instead of the newer two-argument wrapper.
-- The shared DSQ, FIFO option, weighted-vtime calculation, dispatch ordering,
-  callbacks, and `SCX_OPS_SWITCH_PARTIAL` are unchanged. No phase-aware logic
-  or scheduler queues were added.
-- Also updated `docs/PLAN.md` and the vendored-reference README provenance.
+- Target kernel: `7.0.0-28-generic` from `docs/environment.txt`.
+- `include/llama_sched_uapi.h` imports `SCHED_EXT` and `struct sched_attr`
+  from `/lib/modules/7.0.0-28-generic/build` UAPI headers. A compile-time
+  assertion verifies the recorded UAPI policy value; project sources do not
+  define a fallback numeric policy.
+- `Makefile` adds `check-sched-uapi`, which compiles a source that includes the
+  shared UAPI header against those matching headers.
+- `SCX_OPS_SWITCH_PARTIAL` remains unchanged in
+  `src/llama_scx_simple.bpf.c`. Scheduler queues, CPU selection, dispatch
+  order, and slices are unchanged. Ordinary `SCHED_NORMAL`, `SCHED_BATCH`, and
+  `SCHED_IDLE` tasks remain under the Linux fair scheduler; only the forked,
+  explicitly selected child can request `SCHED_EXT`.
 
-### BTF verification
+### Non-privileged tests
 
-The rebuilt object's five sched_ext externs match the live BTF by return type
-and parameter count/type:
+- `make check` runs the existing sched_ext ABI guard and matching-UAPI check,
+  then executes finite `cpu_burn --seconds 1`.
+- `tests/test_scx_child.sh` uses `timeout` and temporary fake state files only
+  with launcher `--dry-run`; dry run never calls `sched_setattr`.
+- The script covers argument parsing, disabled-state handling, invalid
+  state-file override handling, child exit propagation (`23`), PID/policy
+  output, and finite child workload execution.
 
-```text
-scx_bpf_select_cpu_dfl:  s32 (task_struct *, s32, u64, bool *)
-scx_bpf_dsq_insert:      void (task_struct *, u64, u64, u64)
-scx_bpf_dsq_insert_vtime:void (task_struct *, u64, u64, u64, u64)
-scx_bpf_dsq_move_to_local: bool (u64)
-scx_bpf_create_dsq:      s32 (u64, s32)
-```
+### Manual checkpoint
 
-The object and live BTF both expose `struct sched_ext_ops` as 448 bytes with
-42 fields. The project uses only matching `select_cpu`, `enqueue`, `dispatch`,
-`running`, `stopping`, `enable`, `init`, and `exit` callbacks. The live BTF
-also confirms `SCX_OPS_SWITCH_PARTIAL = 8`.
+Follow `docs/MANUAL_SELECTED_CHILD.md` exactly. It documents the disabled
+precondition, foreground loader start, finite selected-child launch, `/proc`
+policy inspection for the child and protected processes, child wait, Ctrl+C
+unload, and disabled-state confirmation.
 
-### Build and checks
+Known issue: the selected-child manual test has not been run by the agent and
+requires explicit user approval for the documented load commands. Preserve
+loader output, verifier errors, and scheduler exit dumps when performing it.
+
+### Final build result
 
 Commands run without sudo:
 
@@ -66,20 +70,6 @@ make -j"$(nproc)"
 make check
 ```
 
-Results: all targets built successfully; `make check` completed the bounded
-CPU workload under original policy `0` (`SCHED_NORMAL`). `git diff --check`
-also passed. No verifier output exists because loading is deliberately outside
-this milestone.
-
-### Next manual checkpoint
-
-After explicit approval, the user may run this exact foreground load command:
-
-```text
-sudo ./build/bin/llama_scx_simple -v
-```
-
-This command was not run by the agent. Before it is run, keep the current
-shell, SSH daemon, systemd, and desktop tasks out of `SCHED_EXT`; do not enable
-switch-all behavior. Preserve the loader's libbpf output and any scheduler exit
-dump for the next status update.
+All targets built successfully. `make check` passed the sched_ext ABI guard,
+matching-UAPI compilation check, finite one-second workload, and timeout-based
+selected-child dry-run script. The final read-only sched_ext state is `disabled`.

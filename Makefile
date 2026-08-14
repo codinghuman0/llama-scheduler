@@ -24,7 +24,7 @@ VMLINUX_BTF ?= /sys/kernel/btf/vmlinux
 ARCH := x86
 BPF_CFLAGS := -target bpf -D__TARGET_ARCH_$(ARCH) -O2 -g -Wall -Werror \
 	-Wno-missing-declarations \
-	-I$(INCLUDE_DIR) -I/usr/include/$(shell $(CC) -dumpmachine)
+	-I$(INCLUDE_DIR) -Iinclude -I/usr/include/$(shell $(CC) -dumpmachine)
 USER_CFLAGS := -D__EXPORTED_HEADERS__ -O2 -g -Wall -Wextra -Werror -std=gnu11 -Iinclude \
 	$(KERNEL_UAPI_CFLAGS)
 USER_LDLIBS := -lbpf -lelf -lz
@@ -65,6 +65,7 @@ check: all check-scx-api check-sched-uapi
 	$(SLEEP_WAKE_BIN) --seconds 1 --interval-ms 100
 	sh tests/test_scx_child.sh $(CHILD_BIN) $(WORKLOAD_BIN)
 	python3 tests/test_validation.py $(CHILD_BIN) $(WORKLOAD_BIN) $(SLEEP_WAKE_BIN)
+	python3 tests/test_instrumentation.py
 
 check-scx-api:
 	@awk '$$1 == "bool" && $$2 ~ /^scx_bpf_dsq_insert\(/ { exit 1 } $$1 == "void" && $$2 ~ /^scx_bpf_dsq_insert\(/ { found = 1 } END { exit found ? 0 : 1 }' src/llama_scx_simple.bpf.c

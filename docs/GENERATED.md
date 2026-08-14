@@ -12,6 +12,8 @@ Generated files are confined to ignored `build/` and recreated by `make all`.
   own scheduling policy.
 - `build/bin/sleep_wake` — finite sleeping/waking workload that does not change
   its own scheduling policy.
+- `results/instrumentation/YYYYMMDD-HHMMSS/instrumentation.json` and `summary.txt`
+  — manual-run bounded instrumentation reports; never overwritten.
 
 `include/llama_sched_uapi.h`, `tests/test_scx_child.sh`, `scripts/`, and the files in
 `docs/` are tracked source/documentation, not generated output.

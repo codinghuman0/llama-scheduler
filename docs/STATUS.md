@@ -116,3 +116,74 @@ manual command is:
 ```sh
 ./scripts/run_validation.sh
 ```
+
+## Milestone 7: bounded sched_ext instrumentation
+
+Status: implemented, built, and non-privileged-tested; ready for manual
+instrumented verification. No scheduler was loaded, attached, stopped, or
+restarted for this milestone. Milestone 6 manually passed 7/7 scenarios; its
+recorded evidence is `results/validation/20260806-132646/` and
+`results/manual/milestone6-summary.txt`.
+
+### Files and behavior
+
+- `include/llama_instrumentation.h` defines schema version 1 and shared bounded
+  map layouts.
+- `src/llama_scx_simple.bpf.c` adds observation-only counters, live tracking,
+  completed task records, and `disable` cleanup. Its existing select-CPU, DSQ,
+  vtime, slice, and partial-switching decisions are unchanged.
+- `src/llama_scx_simple.c` adds `-o/--output-dir`, collision-safe directory
+  creation, `instrumentation.json`, `summary.txt`, and concise exit output.
+- `scripts/instrumentation_report.py` and `tests/test_instrumentation.py` add
+  non-privileged schema, aggregation, collision, summary, and source-path
+  regression coverage.
+- `docs/INSTRUMENTATION.md` contains the manual procedure and definitions.
+
+### Maps, cleanup, and metric definitions
+
+`instrumentation_cpu_stats` is a one-key `BPF_MAP_TYPE_PERCPU_ARRAY` whose
+values contain enqueue, direct-local insertion, shared-DSQ insertion, dispatch,
+running, stopping, runtime, queue-wait, migration, and failure counters.
+`live_task_stats` is a fixed `BPF_MAP_TYPE_HASH` of 1,024 PID-plus-start-time
+keys. `completed_task_stats` is a separate fixed 1,024-entry hash for bounded
+final records. `tracking_state` is a one-entry array holding current and peak
+tracked counts, updated only on enable/disable.
+
+Enqueue means `llama_simple_enqueue` invocation. Direct-local means the existing
+idle-selector local insert; shared means the existing enqueue shared-DSQ insert.
+Dispatch means the actual baseline `dispatch` callback. Runtime is `running` to
+next `stopping`, charged to the stopping CPU. Queue wait is the latest
+enqueue-callback timestamp to next running and is overwritten by a newer
+enqueue; direct local-DSQ activations from `select_cpu` may not contribute.
+Migration means a CPU change
+between successive running callbacks. Full definitions and limitations are in
+`docs/INSTRUMENTATION.md`.
+
+`disable` snapshots a live record to the completed bounded map and deletes the
+live map entry. The key's start time prevents PID-reuse merging. A missed cleanup
+can leave a bounded stale entry until unload; capacity, update, lookup, tracking-state lookup, cleanup,
+and completed-record failures are counted. Task storage was evaluated but not
+chosen because its population is not capacity-bounded. Instrumentation failures
+never gate existing scheduling calls. Expected overhead is per-CPU counter work,
+a bounded hash lookup, and a short task-local spin lock in existing callbacks.
+
+### Non-privileged result and next checkpoint
+
+Commands run without sudo:
+
+```text
+make clean
+make -j"$(nproc)"
+make check
+```
+
+The final check includes the existing baseline guards and validation tests plus
+nine instrumentation schema/source tests. The next manual instrumentation
+command, after explicit approval and the documented disabled-state check, is:
+
+```sh
+sudo ./build/bin/llama_scx_simple -v -o "results/instrumentation/$(date -u +%Y%m%d-%H%M%S)"
+```
+
+Use the exact operator procedure in `docs/INSTRUMENTATION.md`; do not use this
+command automatically or under the agent.

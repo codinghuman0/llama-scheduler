@@ -20,7 +20,9 @@ the installed 1.3.0.
 The non-privileged check is `make check`, which runs finite CPU-bound and
 sleeping/waking workloads plus dry-run validation tests without changing any
 scheduling policy. The manual `scripts/run_validation.sh` suite is blocked
-until an operator has explicitly started the partial-switching loader.
+until an operator has explicitly started the partial-switching loader. Milestone 7
+adds bounded observation-only counters and post-detach JSON/text reports; it does
+not change scheduling decisions.
 
 No scheduler load, attachment, system configuration, kernel, bootloader, or
 systemd change is part of this milestone. A future privileged checkpoint must

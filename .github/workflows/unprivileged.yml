@@ -1,0 +1,36 @@
+name: unprivileged-checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: |
+          bash -n scripts/bootstrap_ubuntu.sh
+          bash -n scripts/validate_phase.sh
+          bash -n scripts/run_validation.sh
+
+      - name: Python syntax
+        run: |
+          python3 -m py_compile scripts/*.py tests/*.py
+
+      - name: Portable unit tests
+        run: |
+          python3 tests/test_m10b.py
+          python3 tests/test_m11r.py
+
+      - name: Patch whitespace
+        run: git show --check --format=oneline HEAD
+
+      - name: Runtime scope notice
+        run: |
+          echo "CI does not load sched_ext, attach BPF, run sudo, or claim semantic runtime validation."

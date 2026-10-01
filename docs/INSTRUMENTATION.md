@@ -27,8 +27,9 @@ existing output is overwritten.
   `enqueue` callback to the next `running` callback. A re-enqueue before running
   overwrites the earlier timestamp. Activations inserted directly into a local
   DSQ from `select_cpu` may not contribute because they do not pass through that
-  enqueue timestamp. It is unavailable for capacity-untracked tasks and does
-  not include time before instrumentation began.
+  enqueue timestamp. Therefore, `queue_wait_ns` is not complete queueing-latency
+  coverage for every activation. It is unavailable for capacity-untracked tasks
+  and does not include time before instrumentation began.
 - A migration is a change in CPU ID between successive `running` callbacks for
   one tracked task. It is charged to the CPU of the later `running` callback.
 - `current_tracked_tasks` and `peak_tracked_tasks` cover successful live-map

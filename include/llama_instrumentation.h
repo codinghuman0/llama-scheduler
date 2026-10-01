@@ -2,9 +2,18 @@
 #ifndef LLAMA_INSTRUMENTATION_H
 #define LLAMA_INSTRUMENTATION_H
 
+#include "llama_phase.h"
+
 #define LLAMA_INSTRUMENTATION_SCHEMA_VERSION 1
 #define LLAMA_MAX_TRACKED_TASKS 1024
 #define LLAMA_INVALID_CPU ((__u32)-1)
+
+struct llama_phase_observation {
+	__u64 select_cpu;
+	__u64 enqueue;
+	__u64 running;
+	__u64 stopping;
+};
 
 #ifdef LLAMA_BPF
 #define LLAMA_SPIN_LOCK struct bpf_spin_lock

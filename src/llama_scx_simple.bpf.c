@@ -48,8 +48,8 @@ struct {
 /* Live tracking is bounded; completed records survive disable for final output. */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(key_size, sizeof(struct llama_task_key));
-	__uint(value_size, sizeof(struct llama_task_live));
+	__type(key, struct llama_task_key);
+	__type(value, struct llama_task_live);
 	__uint(max_entries, LLAMA_MAX_TRACKED_TASKS);
 } live_task_stats SEC(".maps");
 
@@ -63,10 +63,40 @@ struct {
 /* Low-frequency enable/disable bookkeeping only; spin lock avoids global races. */
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(struct llama_tracking_state));
+	__type(key, u32);
+	__type(value, struct llama_tracking_state);
 	__uint(max_entries, 1);
 } tracking_state SEC(".maps");
+
+/* TGID state is bounded for selected semantic targets and the legacy client. */
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);
+	__type(value, struct llama_phase_value);
+	__uint(max_entries, LLAMA_PHASE_STATE_MAX);
+} phase_state SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, u32);
+	__type(value, struct llama_uprobe_config);
+	__uint(max_entries, 1);
+} phase_uprobe_config SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, u32);
+	__type(value, struct llama_uprobe_stats);
+	__uint(max_entries, 1);
+} phase_uprobe_stats SEC(".maps");
+
+/* Observation only: no value from this map participates in scheduling. */
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, u32);
+	__type(value, struct llama_phase_observation);
+	__uint(max_entries, LLAMA_PHASE_COUNT);
+} phase_observations SEC(".maps");
 
 static u64 vtime_now;
 
@@ -114,6 +144,25 @@ static __always_inline struct llama_cpu_stats *cpu_stats(void)
 	struct llama_cpu_stats *cpu_stats__ = cpu_stats(); \
 	if (cpu_stats__) \
 		cpu_stats__->member += (value); \
+} while (0)
+
+static __always_inline struct llama_phase_observation *phase_observation(
+							struct task_struct *p)
+{
+	u32 tgid = BPF_CORE_READ(p, tgid);
+	u32 phase = LLAMA_PHASE_UNKNOWN;
+	struct llama_phase_value *value;
+
+	value = bpf_map_lookup_elem(&phase_state, &tgid);
+	if (value && value->active && value->phase < LLAMA_PHASE_COUNT)
+		phase = value->phase;
+	return bpf_map_lookup_elem(&phase_observations, &phase);
+}
+
+#define PHASE_OBSERVE(p, member) do { \
+	struct llama_phase_observation *observation__ = phase_observation(p); \
+	if (observation__) \
+		observation__->member++; \
 } while (0)
 
 static __always_inline void task_key(struct task_struct *p,
@@ -225,12 +274,124 @@ static __always_inline void track_disable(struct task_struct *p)
 	tracking_remove();
 }
 
+static __always_inline struct llama_uprobe_stats *uprobe_stats(void)
+{
+	u32 key = 0;
+
+	return bpf_map_lookup_elem(&phase_uprobe_stats, &key);
+}
+
+#define UPROBE_STAT_INC(member) do { \
+	struct llama_uprobe_stats *uprobe_stats__ = uprobe_stats(); \
+	if (uprobe_stats__) \
+		uprobe_stats__->member++; \
+} while (0)
+
+static __always_inline bool uprobe_target(u32 tgid)
+{
+	u32 key = 0;
+	struct llama_uprobe_config *config;
+
+	config = bpf_map_lookup_elem(&phase_uprobe_config, &key);
+	if (config && config->enabled && config->target_tgid == tgid)
+		return true;
+	UPROBE_STAT_INC(filtered_events);
+	return false;
+}
+
+SEC("uprobe")
+int BPF_UPROBE(llama_scx_decode_begin_v1_uprobe,
+		const struct llama_scx_event_v1 *event_pointer)
+{
+	struct llama_scx_event_v1 event;
+	struct llama_phase_value value;
+	u32 tgid = bpf_get_current_pid_tgid() >> 32;
+	int result;
+
+	UPROBE_STAT_INC(begin_events);
+	if (!uprobe_target(tgid))
+		return 0;
+	if (bpf_probe_read_user(&event, sizeof(event), event_pointer)) {
+		UPROBE_STAT_INC(user_read_failures);
+		return 0;
+	}
+	result = llama_scx_begin_value(&value, &event);
+	if (result == LLAMA_SCX_STATE_BAD_VERSION) {
+		UPROBE_STAT_INC(abi_failures);
+		return 0;
+	}
+	if (result == LLAMA_SCX_STATE_BAD_PHASE) {
+		UPROBE_STAT_INC(unsupported_phases);
+		return 0;
+	}
+	switch (value.phase) {
+	case LLAMA_PHASE_UNKNOWN:
+		UPROBE_STAT_INC(begin_unknown);
+		break;
+	case LLAMA_PHASE_PREFILL:
+		UPROBE_STAT_INC(begin_prefill);
+		break;
+	case LLAMA_PHASE_DECODE:
+		UPROBE_STAT_INC(begin_decode);
+		break;
+	case LLAMA_PHASE_MIXED:
+		UPROBE_STAT_INC(begin_mixed);
+		break;
+	}
+	if (bpf_map_update_elem(&phase_state, &tgid, &value, BPF_ANY))
+		UPROBE_STAT_INC(map_update_failures);
+	return 0;
+}
+
+SEC("uprobe")
+int BPF_UPROBE(llama_scx_decode_end_v1_uprobe,
+		const struct llama_scx_event_v1 *event_pointer)
+{
+	struct llama_scx_event_v1 event;
+	struct llama_phase_value *current;
+	struct llama_phase_value next;
+	u32 tgid = bpf_get_current_pid_tgid() >> 32;
+	int result;
+
+	UPROBE_STAT_INC(end_events);
+	if (!uprobe_target(tgid))
+		return 0;
+	if (bpf_probe_read_user(&event, sizeof(event), event_pointer)) {
+		UPROBE_STAT_INC(user_read_failures);
+		return 0;
+	}
+	if (event.version != LLAMA_SCX_EVENT_VERSION) {
+		UPROBE_STAT_INC(abi_failures);
+		return 0;
+	}
+	current = bpf_map_lookup_elem(&phase_state, &tgid);
+	if (!current) {
+		UPROBE_STAT_INC(stale_end_events);
+		return 0;
+	}
+	next = *current;
+	result = llama_scx_end_matches(&next, &event);
+	if (result == LLAMA_SCX_STATE_BAD_PHASE) {
+		UPROBE_STAT_INC(unsupported_phases);
+		return 0;
+	}
+	if (result != LLAMA_SCX_STATE_OK) {
+		UPROBE_STAT_INC(stale_end_events);
+		return 0;
+	}
+	llama_scx_end_value(&next, &event);
+	if (bpf_map_update_elem(&phase_state, &tgid, &next, BPF_EXIST))
+		UPROBE_STAT_INC(map_update_failures);
+	return 0;
+}
+
 s32 BPF_STRUCT_OPS(llama_simple_select_cpu, struct task_struct *p,
 			   s32 prev_cpu, u64 wake_flags)
 {
 	bool is_idle = false;
 	s32 cpu = scx_bpf_select_cpu_dfl(p, prev_cpu, wake_flags, &is_idle);
 
+	PHASE_OBSERVE(p, select_cpu);
 	if (is_idle) {
 		stat_inc(0);
 		CPU_STAT_INC(direct_local_insertions);
@@ -246,6 +407,7 @@ void BPF_STRUCT_OPS(llama_simple_enqueue, struct task_struct *p,
 	struct llama_task_live *live;
 	u64 now = bpf_ktime_get_ns();
 
+	PHASE_OBSERVE(p, enqueue);
 	CPU_STAT_INC(enqueue_count);
 	live = lookup_live(p, &key);
 	if (live) {
@@ -284,6 +446,7 @@ void BPF_STRUCT_OPS(llama_simple_running, struct task_struct *p)
 	bool migrated = false;
 	u32 cpu = bpf_get_smp_processor_id();
 
+	PHASE_OBSERVE(p, running);
 	CPU_STAT_INC(running_callbacks);
 	live = lookup_live(p, &key);
 	if (live) {
@@ -317,6 +480,7 @@ void BPF_STRUCT_OPS(llama_simple_stopping, struct task_struct *p, bool runnable)
 	u64 now = bpf_ktime_get_ns();
 	u64 runtime = 0;
 
+	PHASE_OBSERVE(p, stopping);
 	CPU_STAT_INC(stopping_callbacks);
 	live = lookup_live(p, &key);
 	if (live) {

@@ -1,171 +1,247 @@
 # llama-scheduler
 
-`llama-scheduler`는 Ubuntu의 `sched_ext` 환경에서 실험용 BPF 스케줄러를
-안전하게 검증하기 위한 C/libbpf 프로젝트입니다. 초기 구현은 Linux v6.17의
-`tools/sched_ext/scx_simple`을 기반으로 하며, 기록된 실행 환경인 Ubuntu
-`7.0.0-28-generic`의 BTF/UAPI와 호환되도록 조정했습니다.
+## What this is
 
-프로젝트의 목적은 **일반 데스크톱/서버 작업을 교체하지 않고**, 명시적으로
-선택한 유한 테스트 작업만 `SCHED_EXT`에서 실행해 스케줄러의 기준선과 계측을
-검증하는 것입니다. `llama.cpp` 통합은 의도적으로 포함하지 않았습니다.
+`llama-scheduler` is the reproducible M11 semantic phase-observation baseline for
+experiments with Linux `sched_ext`. It connects a pinned CPU-only semantic
+`llama-server` to PID-specific uprobes, bounded BPF phase state, and observational
+scheduler callback counters:
 
-## 왜 sched_ext인가
-
-`sched_ext`는 BPF로 스케줄링 정책을 실험하면서도 커널의 안전 장치와 표준
-스케줄러를 함께 사용할 수 있게 합니다. 이 저장소는
-`SCX_OPS_SWITCH_PARTIAL`만 사용합니다. 따라서 `SCHED_NORMAL`,
-`SCHED_BATCH`, `SCHED_IDLE`의 일반 Ubuntu 작업은 Linux fair scheduler에
-계속 남고, `SCHED_EXT`를 명시적으로 요청한 fork 자식만 `llama_simple`의
-관리 대상이 됩니다.
-
-안전 모델의 핵심은 다음과 같습니다.
-
-- 현재 셸, Codex, systemd, SSH, 데스크톱, 관련 없는 프로세스의 정책을 바꾸지
-  않습니다.
-- `build/bin/llama_scx_child`가 fork한 자식만 `sched_setattr(SCHED_EXT)`를
-  요청합니다. 부모 launcher는 원래 정책을 유지합니다.
-- 자동 빌드/테스트는 BPF를 attach하지 않으며, 실제 load/unload와 SCHED_EXT
-  선택은 승인된 운영자가 수동으로 수행합니다.
-- 모든 합성 workload는 유한하며, 검증 runner는 timeout과 자체 process-group
-  정리를 사용합니다.
-
-## 저장소 구성
-
-| 경로 | 내용 |
-| --- | --- |
-| `src/llama_scx_simple.bpf.c` | `scx_simple` 기반 partial-switching BPF 스케줄러와 bounded 계측 |
-| `src/llama_scx_simple.c` | C/libbpf foreground loader, JSON/text 계측 보고서 출력 |
-| `src/llama_scx_child.c` | 선택된 한 자식만 SCHED_EXT로 전환하는 launcher |
-| `include/` | 기록된 kernel UAPI와 BPF/userspace 공용 계측 구조체 |
-| `tests/` | 유한 CPU/sleep-wake workload 및 비권한 단위 테스트 |
-| `scripts/run_validation.sh` | 수동 load 후 실행하는 기준선 검증 suite |
-| `docs/` | 환경, 상태, 선택 자식, 검증, 계측의 상세 절차 |
-| `third_party/linux-v6.17/` | GPL-2.0 Linux v6.17 `scx_simple` provenance reference |
-| `results/` | 의도적으로 보존한 수동 검증 요약/JSON Lines 증거 |
-
-## 빌드 요구 사항
-
-기록된 대상은 Ubuntu `7.0.0-28-generic`입니다. 해당 kernel의 headers/BTF와
-다음 도구가 필요합니다.
-
-- `build-essential`, `clang`, `llvm`, `bpftool`
-- `libbpf-dev`, `libelf-dev`, `zlib1g-dev`
-- 실행 중인 kernel과 일치하는 `linux-headers-$(uname -r)`
-- `python3`, `taskset` (검증 스크립트)
-
-의존성 설치, kernel 변경, scheduler load는 이 저장소의 자동 명령에 포함되지
-않습니다.
-
-```sh
-make clean
-make -j"$(nproc)"
-make check
+```text
+semantic llama-server
+  -> llama_scx_decode_begin/end_v1
+  -> PID-specific uprobes
+  -> BPF TGID phase state
+  -> sched_ext callback observations
 ```
 
-`make check`는 비권한이며 scheduler를 load/attach하지 않습니다.
+M11R packages the already validated path; it does not add a phase-aware
+scheduling policy. The scheduler continues to use `SCX_OPS_SWITCH_PARTIAL`, and
+only the explicitly selected server process/tasks enter `SCHED_EXT`.
 
-## 수동 load / unload
+## Quick Start
 
-아래는 운영자용 절차입니다. 명시적 승인 후에만 실행하고, 이 에이전트나 CI에서
-실행하지 마십시오.
+On a supported Ubuntu host with sched_ext, matching kernel headers, BTF, and a
+CPU-runnable GGUF model:
 
-```sh
-cat /sys/kernel/sched_ext/state             # disabled 확인
-sudo ./build/bin/llama_scx_simple -v        # foreground load
-cat /sys/kernel/sched_ext/state             # enabled 확인
-cat /sys/kernel/sched_ext/root/ops          # llama_simple 확인
-# loader terminal에서 Ctrl+C
-cat /sys/kernel/sched_ext/state             # disabled 복귀 확인
+```bash
+git clone https://github.com/codinghuman0/llama-scheduler.git
+cd llama-scheduler
+
+./scripts/bootstrap_ubuntu.sh --install-deps
+
+./scripts/validate_phase.sh \
+    --model /path/to/model.gguf
 ```
 
-계측을 함께 수집하려면 정확한 출력 디렉터리를 지정합니다. 같은 경로가 이미
-있으면 loader는 덮어쓰지 않고 실패합니다.
+The bootstrap clones the semantic fork into ignored
+`.deps/llama.cpp-semantic`, checks out the exact revision in
+[config/versions.env](config/versions.env), builds both projects, and runs
+unprivileged tests. It does not download a model, install a GPU stack, change a
+kernel, or load sched_ext.
 
-```sh
-mkdir -p results/instrumentation
-run_dir="results/instrumentation/$(date -u +%Y%m%d-%H%M%S)"
-test ! -e "$run_dir"
-sudo ./build/bin/llama_scx_simple -v -o "$run_dir"
+The validator is run by the normal user. It invokes `sudo` for
+`llama_scx_simple` only; `llama_scx_child` and `llama-server` remain the normal
+user. A successful run ends with:
+
+```text
+semantic_acceptance=PASS
+result_dir=/absolute/path/to/llama-scheduler/results/m11r/...
 ```
 
-상세 절차는 [docs/INSTRUMENTATION.md](docs/INSTRUMENTATION.md)를 따르십시오.
+## Requirements
 
-## 선택 자식 실행
+The release path supports Ubuntu on x86-64 and requires:
 
-scheduler가 `enabled`인 상태에서만, 한 개의 유한 자식을 선택합니다.
+- a kernel exposing sched_ext, `/sys/kernel/sched_ext/state`, BTF at
+  `/sys/kernel/btf/vmlinux`, and the SCX kfuncs used by this repository;
+- headers matching the running kernel;
+- C/C++ build tools, Clang, CMake with Unix Makefiles, bpftool, libbpf,
+  libelf, zlib, Python 3, curl, Git, binutils, and ripgrep;
+- passwordless sudo or an interactive sudo prompt for the loader;
+- a compatible, locally supplied, CPU-runnable GGUF model.
 
-```sh
-sudo ./build/bin/llama_scx_child -- ./build/bin/cpu_burn --seconds 10
+The validated model belongs to the DeepSeek-R1-Distill-Qwen-1.5B Q4_K_M
+family. That is evidence for this model family, not a claim that every GGUF
+model behaves equivalently. Models and GGUF files are ignored and must not be
+committed.
+
+The validated host is Ubuntu 24.04, x86-64, Ryzen 5 5500U (6 cores/12 logical
+CPUs), kernel `7.0.0-29-generic`. See
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) before interpreting results from
+another machine.
+
+## Bootstrap
+
+Run without package installation when dependencies are already present:
+
+```bash
+./scripts/bootstrap_ubuntu.sh
 ```
 
-launcher는 자식 PID를 출력하고, 부모의 scheduling policy가 변하지 않았는지
-확인하며, 자식의 exit status를 그대로 반환합니다. scheduler가 비활성이면
-명확한 오류와 status `1`로 거부합니다. 더 자세한 `/proc` 확인은
-[docs/MANUAL_SELECTED_CHILD.md](docs/MANUAL_SELECTED_CHILD.md)에 있습니다.
+Use `--install-deps` only when you explicitly want the printed Ubuntu package
+command to run:
 
-## 기준선 검증
-
-loader를 운영자가 foreground로 시작한 뒤, 다음은 sudo 없이 실행합니다.
-
-```sh
-./scripts/run_validation.sh
+```bash
+./scripts/bootstrap_ubuntu.sh --install-deps
 ```
 
-결과는 `results/validation/YYYYMMDD-HHMMSS/`에 JSON Lines와 사람이 읽는
-요약으로 기록됩니다. Milestone 6의 기록된 수동 결과는 **7/7 scenarios PASS**
-입니다. 단일 CPU workload, under/over-subscription, affinity, mixed sleep/wake,
-예상 exec 실패, 예상 timeout을 포함합니다. 근거는
-`results/validation/20260806-132646/summary.txt` 및
-[docs/VALIDATION.md](docs/VALIDATION.md)입니다.
+The bootstrap:
 
-## Milestone 7 계측
+1. reports OS, architecture, kernel, CPU count, toolchain, bpftool/libbpf, and
+   sched_ext state;
+2. verifies kernel BTF and required SCX symbols;
+3. reports `VALIDATED`, `COMPATIBLE-BUT-UNVALIDATED`, or `UNSUPPORTED`;
+4. clones/fetches the semantic fork, checks out the manifest SHA detached, and
+   refuses a dirty or mismatched dependency;
+5. builds a shared, CPU-only semantic server with phase tracing;
+6. verifies both marker symbols in `libllama-server-impl.so`;
+7. builds the scheduler, BPF object, launcher, and test workloads;
+8. runs `make check`; and
+9. writes ignored build metadata to `build/reproducibility.env`.
 
-계측은 scheduling decision을 변경하지 않고 다음을 수집합니다.
+A successful build on a different kernel is not a validated runtime result.
+The final validator is the environment-specific acceptance test.
 
-- enqueue, direct-local DSQ insert, shared DSQ insert, 실제 dispatch callback,
-  running/stopping callback 횟수
-- tracked SCHED_EXT task의 runtime, CPU migration, bounded per-task record
-- stopping CPU 기준 per-CPU runtime, queue wait, current/peak tracked task 수
-- lookup/update/capacity/cleanup/completed-record/tracking-state failure 수
-- scheduler exit kind, code/reason, kernel API가 제공하는 message
+The GitHub Actions workflow runs syntax and portable Python checks only. It
+does not invoke sudo, load sched_ext, attach BPF, run inference, or certify the
+semantic runtime path.
 
-`queue_wait_ns`는 `enqueue` callback이 기록한 가장 최근 timestamp부터 다음
-`running` callback까지입니다. 재-enqueue는 이전 timestamp를 덮어쓰며,
-`select_cpu`에서 local DSQ로 직접 삽입된 activation은 enqueue callback을 거치지
-않으므로 이 수치에 포함되지 않을 수 있습니다.
+## Validation
 
-수동 계측 결과는 `results/instrumentation/YYYYMMDD-HHMMSS/` 아래의
-`instrumentation.json` (schema version 1)과 `summary.txt`에 기록됩니다.
-세부 map 용량, PID reuse, dropped statistics와 제한은
-[docs/INSTRUMENTATION.md](docs/INSTRUMENTATION.md)에 있습니다.
+Normal usage needs one terminal:
 
-## 알려진 제한
+```bash
+./scripts/validate_phase.sh --model /path/to/model.gguf
+```
 
-- 실제 scheduler load와 Milestone 7 계측 검증은 수동 checkpoint이며 아직 이
-  자동 handoff에서 실행하지 않습니다.
-- task 통계는 1,024개 bounded live map과 1,024개 completed map에 제한됩니다.
-  용량 또는 lifecycle 문제가 발생하면 failure counter가 증가하고 일부 task
-  record가 누락될 수 있습니다.
-- 결과의 runtime/queue wait/migration은 callback 기반 관측값이며 모든 kernel
-  scheduler event를 대체하지 않습니다.
-- raw workload log와 새 계측 결과는 기본적으로 Git에 추가하지 않습니다.
+Optional controls are:
 
-## 다음 단계: llama.cpp handoff
+```bash
+./scripts/validate_phase.sh \
+    --model /path/to/model.gguf \
+    --port 18080 \
+    --run-id 11 \
+    --output-dir results/m11r/my-run
+```
 
-`llama.cpp` 통합은 다음 프로젝트 단계와 담당 팀원의 범위입니다. 권장 순서는
-다음과 같습니다.
+`--output-dir` names an exact new directory and is never overwritten. With no
+port, the script selects an available localhost port. With no run ID, it uses a
+nonzero UTC-derived marker ID.
 
-1. Milestone 7 수동 계측 절차를 실행하여 기준선 결과와 7/7 validation parity를
-   기록합니다.
-2. llama.cpp workload를 **새로운 선택 자식**으로 추가하되, 먼저 유한/timeout
-   경계를 유지하고 일반 시스템 작업은 partial switching 밖에 둡니다.
-3. 기존 JSON Lines validation과 instrumentation report를 기준선과 비교한 뒤,
-   phase-aware 정책은 별도 milestone으로 검토합니다.
+The validator refuses root invocation, a missing/dirty/wrong semantic
+dependency, a busy sched_ext state, an ambiguous existing `llama-server`, an
+unavailable port, missing marker symbols, or missing build outputs. It then:
 
-## 라이선스 및 provenance
+- starts only the loader through sudo;
+- launches a normal-user one-slot, CPU-only server through
+  `llama_scx_child`;
+- verifies UID, PPID, scheduler policies, registration/target PID equality,
+  and that every observed `SCHED_EXT` task belongs to the selected server TGID;
+- sends one short completion with `n_predict=8`, `temperature=0`, and
+  `cache_prompt=false`;
+- shuts down its own server and loader by recorded PID/process group;
+- confirms sched_ext returns to `disabled`; and
+- evaluates the final instrumentation report.
 
-프로젝트 소스의 SPDX 표기는 유지됩니다. 루트 [LICENSE](LICENSE)는 GPL-2.0
-전문입니다. `third_party/linux-v6.17/`의 upstream `scx_simple` reference는
-Linux v6.17 tag/commit provenance와 GPL-2.0 상태를
-[third_party/linux-v6.17/README.md](third_party/linux-v6.17/README.md)에
-기록합니다. 이 저장소는 upstream 저자 정보를 새로 주장하지 않습니다.
+Ctrl+C, SIGTERM, normal success, and validation failures all enter the same
+targeted cleanup path. The script never uses `killall` or `pkill`.
+
+Each run keeps authoritative evidence together under `results/m11r/`:
+
+```text
+loader.log
+server.log
+validation.log
+health.json
+health.headers
+request.json
+completion.headers
+completion.json
+isolation.json
+environment.json
+instrumentation.json
+summary.txt
+loader-report/
+```
+
+The nested `loader-report/` contains the loader-owned originals; the top-level
+instrumentation files are copied into the run bundle after graceful unload.
+No shared fixed `/tmp` log is used.
+
+## Expected PASS
+
+Acceptance requires all of the following:
+
+- the invoking shell and launcher are normal-user `SCHED_NORMAL`, while only
+  the selected server TGID is `SCHED_EXT`;
+- server PID, registration PID, and uprobe target TGID are identical;
+- the completion is HTTP 200, valid JSON, and predicts at least one token;
+- semantic begin/end events are nonzero and balanced;
+- PREFILL and DECODE begin counters are nonzero;
+- ABI, user-read, unsupported-phase, stale-end, map-update, and filtered-event
+  counters are all zero;
+- final phase state is inactive/UNKNOWN;
+- both `PREFILL.running` and `DECODE.running` are nonzero; and
+- final sched_ext state is `disabled`.
+
+MIXED counters are preserved and reported. MIXED is never relabeled and is not
+an automatic failure for this baseline.
+
+## Architecture
+
+The privileged boundary is deliberately narrow:
+
+```text
+normal user: validate_phase.sh
+    |
+    +-- sudo build/bin/llama_scx_simple
+    |       loader + BPF + PID-specific uprobes
+    |
+    +-- build/bin/llama_scx_child
+            |
+            +-- build/m11r/llama-semantic/bin/llama-server (SCHED_EXT)
+```
+
+The one-shot abstract registration socket authenticates the normal-user
+launcher and exact server child. Semantic phase traffic itself travels through
+the marker uprobes, not the registration socket. Phase information remains
+observation-only in M11R: CPU selection, DSQ policy, slice, vtime, migration,
+and SMT behavior are unchanged.
+
+## Supported and validated environments
+
+Only the recorded laptop/kernel/model path is currently `VALIDATED`. A
+different Ubuntu x86-64 kernel with the required BTF/kfunc surface may be
+reported as `COMPATIBLE-BUT-UNVALIDATED` and may continue, but a passing runtime
+then constitutes a new environment result. Missing required capabilities are
+`UNSUPPORTED`; the scripts never make automatic kernel changes.
+
+The evidence table and procedure for adding a tested machine are in
+[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+
+## Experimenting from the baseline
+
+Do not implement policy experiments on the immutable baseline tag. After the
+release is reviewed and tagged `m11-semantic-phase-baseline-v1`, create a
+separate `experiment/<name>` branch, preserve the semantic revision and
+baseline validator, and change one scheduling dimension at a time.
+
+See [docs/EXPERIMENT_GUIDE.md](docs/EXPERIMENT_GUIDE.md) and the reusable
+[prompts/PHASE_POLICY_EXPERIMENT.md](prompts/PHASE_POLICY_EXPERIMENT.md).
+
+## Documentation
+
+- [docs/LLAMA_PHASE.md](docs/LLAMA_PHASE.md): semantic ABI/design and historical
+  three-terminal debug procedure
+- [docs/INSTRUMENTATION.md](docs/INSTRUMENTATION.md): bounded instrumentation
+  schema and limitations
+- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): validated environment matrix
+- [docs/EXPERIMENT_GUIDE.md](docs/EXPERIMENT_GUIDE.md): team policy experiment
+  discipline
+- [docs/STATUS.md](docs/STATUS.md): milestone history
+- [docs/VALIDATION.md](docs/VALIDATION.md): earlier synthetic baseline suite
+- [docs/M10B.md](docs/M10B.md): neutral `/proc/stat` load-signal feasibility
+
+The repository is GPL-2.0. The Linux `scx_simple` provenance reference is under
+`third_party/linux-v6.17/`.

@@ -187,3 +187,97 @@ sudo ./build/bin/llama_scx_simple -v -o "results/instrumentation/$(date -u +%Y%m
 
 Use the exact operator procedure in `docs/INSTRUMENTATION.md`; do not use this
 command automatically or under the agent.
+
+
+## Milestone 10B: neutral /proc/stat utilization validation
+
+Status: standalone tooling and brief smoke checks PASS; full manual
+10 s baseline / 20 s stress / 10 s recovery validation NOT TESTED. M0-M9
+remain accepted as per the current project state; older milestone entries above
+are historical. No scheduler, phase integration, BPF map, or llama.cpp change.
+
+Added `scripts/sample_cpu_util.py`, `scripts/run_m10b.py`,
+`tests/test_m10b.py`, and `docs/M10B.md`. The sampler uses interval deltas,
+excludes double-counted guest fields, records actual monotonic intervals, and
+emits invalid rows for counter regressions. The helper logs load transitions,
+cleans up only its own child group, and summarizes complete intervals.
+
+Non-privileged checks: Python compilation, seven focused tests, `make -j2`,
+selected-CPU CSV/error checks, actual worker affinity/SCHED_OTHER inspection,
+and Ctrl+C process-group cleanup all passed. A preserved 1/2/1 s smoke run in
+`results/m10b/20260911-smoke/` showed CPU 2: 2.81 -> 100.00 -> 0.91 percent;
+CPU 4: 0.00 -> 100.00 -> 0.00 percent. All 504 CPU rows were valid. This is
+short smoke evidence, not a full M10B reliability claim. Full commands,
+limitations, field definitions, and initial dirty status are in `docs/M10B.md`.
+
+Next manual command (unprivileged, from repository root):
+
+```sh
+m10b_run="results/m10b/$(date -u +%Y%m%d-%H%M%S)-step"
+python3 scripts/run_m10b.py run --stress-cpus 2,4 --output-dir "$m10b_run"
+cat "$m10b_run/summary.csv"
+```
+
+Next checkpoint is M10B result analysis. M11 and all scheduling policy work
+remain deferred. No commit, reset, stash, clean, or privileged runtime
+operation was performed. Pre-existing dirty files were preserved.
+
+## Milestone 11: semantic llama-server phase marker integration
+
+Status: PASS. Scheduler/semantic builds, ABI validation, unprivileged tests,
+privileged struct_ops load, PID-specific uprobe attachment, selected-child
+isolation, and end-to-end marker/callback evidence passed on the validated
+`7.0.0-29-generic` laptop. The accepted controlled request produced 8 begin and
+8 end events, 1 PREFILL and 7 DECODE begins, zero semantic failure counters,
+inactive/UNKNOWN final state, and nonzero PREFILL/DECODE running observations.
+
+The fixed clean semantic provider is
+`../llama.cpp-semantic@5219055a578fd741e029e81fefef6f3a5695086d`.
+Its server stores PREFILL or DECODE on each token when adding it to the shared
+batch, reduces each submitted/retried range to UNKNOWN=0, PREFILL=1, DECODE=2,
+or MIXED=3, and emits an 80-byte v1 C marker around synchronized decode work.
+The built marker-bearing shared objects expose default-visible decode and
+worker symbols. The fork was not modified.
+
+M11 adds scheduler-owned, pid-specific decode begin/end uprobes in the existing
+BPF object. Begin copies and validates the v1 event with
+`bpf_probe_read_user()`, explicitly translates all four phases, and publishes
+bounded TGID scalar state. End clears only a matching run/call/retry/phase.
+The selected-child launcher uses a one-shot authenticated registration
+handshake so the loader can attach to the exact exec'd SCHED_EXT child. The
+handshake carries no phase events. The old SOCK_SEQPACKET phase source remains
+available, and the loader rejects simultaneous socket and uprobe sources.
+The corrected manual checkpoint runs only the loader as root. It passes the
+invoking normal user's UID through `--phase-uid`; the launcher and semantic
+server run as that user. Runtime PASS also requires UID evidence plus
+SCHED_NORMAL shell/launcher, SCHED_EXT server, matching registration/target
+TGID, and no unrelated SCHED_EXT task.
+
+Phase remains observation only. Select-CPU, local/shared DSQ choice, dispatch,
+slice, weight, vtime, affinity, migration policy, and
+`SCX_OPS_SWITCH_PARTIAL` are unchanged. M10B and `/proc/stat` are untouched.
+Marker synchronization changes timing, so no performance-neutrality claim is
+made.
+
+The exact audit, ABI offsets, ELF symbols, counters, constraints, and
+three-terminal debug commands are in `docs/LLAMA_PHASE.md`.
+
+## Milestone 11R: reproducible semantic baseline release
+
+Status: release tooling implemented; unprivileged verification is recorded in
+the release-candidate audit. A fresh-machine privileged reproduction remains a
+manual post-push acceptance test.
+
+M11R adds a canonical external revision manifest, ignored repository-local
+semantic dependency, Ubuntu capability/bootstrap checks, deterministic
+CPU-only semantic and scheduler builds, generated reproducibility metadata, and
+a one-terminal runtime validator. Only `llama_scx_simple` is invoked through
+sudo. The launcher and semantic server remain the invoking normal user, and
+the validator proves selected-TGID isolation before sending the controlled
+request.
+
+Every M11R run uses a unique `results/m11r/` directory for loader/server/
+validation logs, request/response, environment and isolation records, and the
+final instrumentation report. Targeted cleanup runs on success, failure,
+SIGINT, and SIGTERM and verifies sched_ext returns to disabled. No scheduling
+policy dimension is changed in M11R.

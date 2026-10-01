@@ -1,247 +1,107 @@
 # llama-scheduler
 
-## What this is
+CPU-only llama.cpp semantic phase-aware `sched_ext` Base Project
 
-`llama-scheduler` is the reproducible M11 semantic phase-observation baseline for
-experiments with Linux `sched_ext`. It connects a pinned CPU-only semantic
-`llama-server` to PID-specific uprobes, bounded BPF phase state, and observational
-scheduler callback counters:
+## 1. 프로젝트 소개
+
+`llama-scheduler`는 Linux `sched_ext`를 이용해 CPU-only LLM scheduling을 연구하기 위한 공통 Base Project다. 수정된 semantic `llama-server`가 inference 중의 `PREFILL`, `DECODE`, `MIXED`, `UNKNOWN` phase를 제공하고, PID-specific `uprobe`가 이 정보를 eBPF의 TGID별 phase state로 전달한다. `sched_ext` callback에서는 선택된 `llama-server` worker가 실제로 실행될 때의 phase를 관측할 수 있다.
 
 ```text
-semantic llama-server
-  -> llama_scx_decode_begin/end_v1
-  -> PID-specific uprobes
-  -> BPF TGID phase state
-  -> sched_ext callback observations
+modified llama-server
+        |
+        | semantic phase marker
+        v
+      uprobe
+        |
+        v
+ BPF phase state
+        |
+        v
+ sched_ext callbacks
 ```
 
-M11R packages the already validated path; it does not add a phase-aware
-scheduling policy. The scheduler continues to use `SCX_OPS_SWITCH_PARTIAL`, and
-only the explicitly selected server process/tasks enter `SCHED_EXT`.
+현재 scheduler는 phase를 관측하고 계측할 뿐, CPU 선택, DSQ, queue order, vtime, slice 같은 scheduling 결정에는 phase를 사용하지 않는 neutral baseline이다. 따라서 성능을 개선하는 scheduling policy가 구현되었다거나 성능 향상이 입증되었다고 보지 않는다. 이 저장소는 팀원이 동일한 semantic phase 입력과 selected-child isolation 위에서 독립적인 policy 실험을 시작하기 위한 기반이다.
 
-## Quick Start
+## 2. 현재 상태
 
-On a supported Ubuntu host with sched_ext, matching kernel headers, BTF, and a
-CPU-runnable GGUF model:
+| 항목 | 상태 |
+|---|---|
+| Semantic PREFILL/DECODE detection | 완료 |
+| PID-specific uprobe integration | 완료 |
+| sched_ext phase observation | 완료 |
+| selected-child isolation | 완료 |
+| reproducible setup/validation | 완료 |
+| phase-aware scheduling policy | 미구현 |
+| load-aware scheduling policy | 미구현 |
+| performance improvement evaluation | 미수행 |
+
+즉, `phase-aware observability`는 구현되어 있지만 `phase-aware scheduling policy`는 아직 구현되어 있지 않다.
+
+## 3. Codex에 전달할 프로젝트 설명
+
+새 Codex 세션에는 아래 내용을 그대로 전달할 수 있다.
+
+```text
+이 저장소는 CPU-only llama.cpp inference를 위한 Linux sched_ext scheduler 연구의 Base Project다.
+
+modified llama-server가 semantic PREFILL/DECODE/MIXED/UNKNOWN phase를 제공하고,
+PID-specific uprobe를 통해 eBPF의 TGID별 phase state로 전달된다.
+
+sched_ext callback에서는 실제 selected llama-server worker의 phase를 관측할 수 있다.
+현재 scheduling policy 자체는 phase 정보를 scheduling 결정에 사용하지 않는 neutral baseline이다.
+
+이 저장소를 수정할 때:
+- semantic phase input을 유지할 것
+- selected-child isolation을 유지할 것
+- llama-server workload는 normal user로 실행할 것
+- privileged loader만 root로 실행할 것
+- 한 번에 하나의 scheduling dimension만 변경할 것
+- baseline validation을 깨뜨리지 말 것
+- 성능 향상은 반복 실험 전에는 주장하지 말 것
+- 실험 변경은 가급적 experiment/<name> 브랜치에서 진행할 것
+```
+
+## 4. 빠른 설치
+
+지원 경로는 `sched_ext`, kernel BTF, 실행 중인 kernel과 일치하는 headers를 갖춘 Ubuntu x86-64 환경이다.
 
 ```bash
 git clone https://github.com/codinghuman0/llama-scheduler.git
 cd llama-scheduler
 
 ./scripts/bootstrap_ubuntu.sh --install-deps
+```
 
+bootstrap은 환경과 kernel capability를 검사하고, [config/versions.env](config/versions.env)에 고정된 semantic llama.cpp fork를 `.deps/llama.cpp-semantic`에 받아 CPU-only semantic server를 빌드한다. 이어서 scheduler와 BPF 구성 요소를 빌드하고 unprivileged tests를 실행한다.
+
+현재 고정된 semantic revision은 `5219055a578fd741e029e81fefef6f3a5695086d`다. bootstrap은 kernel을 변경하거나 scheduler를 load하지 않으며 GPU dependency와 model도 설치하지 않는다. 시스템 dependency가 이미 준비되어 있다면 `--install-deps` 없이 실행할 수 있다.
+
+## 5. Phase 연결 검증
+
+호환되는 CPU-runnable GGUF model을 준비한 뒤 normal user shell에서 실행한다.
+
+```bash
 ./scripts/validate_phase.sh \
     --model /path/to/model.gguf
 ```
 
-The bootstrap clones the semantic fork into ignored
-`.deps/llama.cpp-semantic`, checks out the exact revision in
-[config/versions.env](config/versions.env), builds both projects, and runs
-unprivileged tests. It does not download a model, install a GPU stack, change a
-kernel, or load sched_ext.
+이 검증은 semantic `llama-server -> uprobe -> BPF phase state -> sched_ext callback` 경로와 selected-child isolation을 한 번의 controlled inference로 확인한다. 내부적으로 `llama_scx_simple` loader만 `sudo`를 사용하며, `llama_scx_child`와 `llama-server`는 계속 normal-user process로 실행된다.
 
-The validator is run by the normal user. It invokes `sudo` for
-`llama_scx_simple` only; `llama_scx_child` and `llama-server` remain the normal
-user. A successful run ends with:
+성공한 실행의 마지막에는 다음 결과와 run별 evidence directory가 출력된다.
 
 ```text
 semantic_acceptance=PASS
-result_dir=/absolute/path/to/llama-scheduler/results/m11r/...
+result_dir=/absolute/path/to/result
 ```
 
-## Requirements
+GGUF model은 이 저장소에 포함되지 않으며 validation script가 자동으로 다운로드하지도 않는다.
 
-The release path supports Ubuntu on x86-64 and requires:
+## 6. 실험 시작
 
-- a kernel exposing sched_ext, `/sys/kernel/sched_ext/state`, BTF at
-  `/sys/kernel/btf/vmlinux`, and the SCX kfuncs used by this repository;
-- headers matching the running kernel;
-- C/C++ build tools, Clang, CMake with Unix Makefiles, bpftool, libbpf,
-  libelf, zlib, Python 3, curl, Git, binutils, and ripgrep;
-- passwordless sudo or an interactive sudo prompt for the loader;
-- a compatible, locally supplied, CPU-runnable GGUF model.
-
-The validated model belongs to the DeepSeek-R1-Distill-Qwen-1.5B Q4_K_M
-family. That is evidence for this model family, not a claim that every GGUF
-model behaves equivalently. Models and GGUF files are ignored and must not be
-committed.
-
-The validated host is Ubuntu 24.04, x86-64, Ryzen 5 5500U (6 cores/12 logical
-CPUs), kernel `7.0.0-29-generic`. See
-[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) before interpreting results from
-another machine.
-
-## Bootstrap
-
-Run without package installation when dependencies are already present:
+먼저 위 validation이 통과하는지 확인한 뒤 별도 브랜치를 만든다.
 
 ```bash
-./scripts/bootstrap_ubuntu.sh
+git checkout -b experiment/<name>
 ```
 
-Use `--install-deps` only when you explicitly want the printed Ubuntu package
-command to run:
-
-```bash
-./scripts/bootstrap_ubuntu.sh --install-deps
-```
-
-The bootstrap:
-
-1. reports OS, architecture, kernel, CPU count, toolchain, bpftool/libbpf, and
-   sched_ext state;
-2. verifies kernel BTF and required SCX symbols;
-3. reports `VALIDATED`, `COMPATIBLE-BUT-UNVALIDATED`, or `UNSUPPORTED`;
-4. clones/fetches the semantic fork, checks out the manifest SHA detached, and
-   refuses a dirty or mismatched dependency;
-5. builds a shared, CPU-only semantic server with phase tracing;
-6. verifies both marker symbols in `libllama-server-impl.so`;
-7. builds the scheduler, BPF object, launcher, and test workloads;
-8. runs `make check`; and
-9. writes ignored build metadata to `build/reproducibility.env`.
-
-A successful build on a different kernel is not a validated runtime result.
-The final validator is the environment-specific acceptance test.
-
-The GitHub Actions workflow runs syntax and portable Python checks only. It
-does not invoke sudo, load sched_ext, attach BPF, run inference, or certify the
-semantic runtime path.
-
-## Validation
-
-Normal usage needs one terminal:
-
-```bash
-./scripts/validate_phase.sh --model /path/to/model.gguf
-```
-
-Optional controls are:
-
-```bash
-./scripts/validate_phase.sh \
-    --model /path/to/model.gguf \
-    --port 18080 \
-    --run-id 11 \
-    --output-dir results/m11r/my-run
-```
-
-`--output-dir` names an exact new directory and is never overwritten. With no
-port, the script selects an available localhost port. With no run ID, it uses a
-nonzero UTC-derived marker ID.
-
-The validator refuses root invocation, a missing/dirty/wrong semantic
-dependency, a busy sched_ext state, an ambiguous existing `llama-server`, an
-unavailable port, missing marker symbols, or missing build outputs. It then:
-
-- starts only the loader through sudo;
-- launches a normal-user one-slot, CPU-only server through
-  `llama_scx_child`;
-- verifies UID, PPID, scheduler policies, registration/target PID equality,
-  and that every observed `SCHED_EXT` task belongs to the selected server TGID;
-- sends one short completion with `n_predict=8`, `temperature=0`, and
-  `cache_prompt=false`;
-- shuts down its own server and loader by recorded PID/process group;
-- confirms sched_ext returns to `disabled`; and
-- evaluates the final instrumentation report.
-
-Ctrl+C, SIGTERM, normal success, and validation failures all enter the same
-targeted cleanup path. The script never uses `killall` or `pkill`.
-
-Each run keeps authoritative evidence together under `results/m11r/`:
-
-```text
-loader.log
-server.log
-validation.log
-health.json
-health.headers
-request.json
-completion.headers
-completion.json
-isolation.json
-environment.json
-instrumentation.json
-summary.txt
-loader-report/
-```
-
-The nested `loader-report/` contains the loader-owned originals; the top-level
-instrumentation files are copied into the run bundle after graceful unload.
-No shared fixed `/tmp` log is used.
-
-## Expected PASS
-
-Acceptance requires all of the following:
-
-- the invoking shell and launcher are normal-user `SCHED_NORMAL`, while only
-  the selected server TGID is `SCHED_EXT`;
-- server PID, registration PID, and uprobe target TGID are identical;
-- the completion is HTTP 200, valid JSON, and predicts at least one token;
-- semantic begin/end events are nonzero and balanced;
-- PREFILL and DECODE begin counters are nonzero;
-- ABI, user-read, unsupported-phase, stale-end, map-update, and filtered-event
-  counters are all zero;
-- final phase state is inactive/UNKNOWN;
-- both `PREFILL.running` and `DECODE.running` are nonzero; and
-- final sched_ext state is `disabled`.
-
-MIXED counters are preserved and reported. MIXED is never relabeled and is not
-an automatic failure for this baseline.
-
-## Architecture
-
-The privileged boundary is deliberately narrow:
-
-```text
-normal user: validate_phase.sh
-    |
-    +-- sudo build/bin/llama_scx_simple
-    |       loader + BPF + PID-specific uprobes
-    |
-    +-- build/bin/llama_scx_child
-            |
-            +-- build/m11r/llama-semantic/bin/llama-server (SCHED_EXT)
-```
-
-The one-shot abstract registration socket authenticates the normal-user
-launcher and exact server child. Semantic phase traffic itself travels through
-the marker uprobes, not the registration socket. Phase information remains
-observation-only in M11R: CPU selection, DSQ policy, slice, vtime, migration,
-and SMT behavior are unchanged.
-
-## Supported and validated environments
-
-Only the recorded laptop/kernel/model path is currently `VALIDATED`. A
-different Ubuntu x86-64 kernel with the required BTF/kfunc surface may be
-reported as `COMPATIBLE-BUT-UNVALIDATED` and may continue, but a passing runtime
-then constitutes a new environment result. Missing required capabilities are
-`UNSUPPORTED`; the scripts never make automatic kernel changes.
-
-The evidence table and procedure for adding a tested machine are in
-[docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
-
-## Experimenting from the baseline
-
-Do not implement policy experiments on the immutable baseline tag. After the
-release is reviewed and tagged `m11-semantic-phase-baseline-v1`, create a
-separate `experiment/<name>` branch, preserve the semantic revision and
-baseline validator, and change one scheduling dimension at a time.
-
-See [docs/EXPERIMENT_GUIDE.md](docs/EXPERIMENT_GUIDE.md) and the reusable
-[prompts/PHASE_POLICY_EXPERIMENT.md](prompts/PHASE_POLICY_EXPERIMENT.md).
-
-## Documentation
-
-- [docs/LLAMA_PHASE.md](docs/LLAMA_PHASE.md): semantic ABI/design and historical
-  three-terminal debug procedure
-- [docs/INSTRUMENTATION.md](docs/INSTRUMENTATION.md): bounded instrumentation
-  schema and limitations
-- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md): validated environment matrix
-- [docs/EXPERIMENT_GUIDE.md](docs/EXPERIMENT_GUIDE.md): team policy experiment
-  discipline
-- [docs/STATUS.md](docs/STATUS.md): milestone history
-- [docs/VALIDATION.md](docs/VALIDATION.md): earlier synthetic baseline suite
-- [docs/M10B.md](docs/M10B.md): neutral `/proc/stat` load-signal feasibility
-
-The repository is GPL-2.0. The Linux `scx_simple` provenance reference is under
-`third_party/linux-v6.17/`.
+초기에는 `CPU selection`, `SMT avoidance`, `migration policy`, `DSQ policy`, `phase-dependent slice`, `load-aware scheduling` 중 하나처럼 한 번에 하나의 scheduling dimension만 변경한다. baseline validation과 semantic phase 입력을 유지하고, 반복 실험 전에는 성능 향상을 주장하지 않는다. 실험 원칙과 기록 항목은 [docs/EXPERIMENT_GUIDE.md](docs/EXPERIMENT_GUIDE.md)를 참고한다.

@@ -11,6 +11,38 @@ M11R makes this path reproducible through `scripts/bootstrap_ubuntu.sh` and
 historical/debug path, not the normal release workflow. Its shared `/tmp` files
 must not be treated as authoritative M11R evidence.
 
+## Current fork cleanup and run configurations
+
+The current sibling `llama.cpp-fork` removes the unused
+`ggml_scx_worker_begin_v1` and `ggml_scx_worker_end_v1` hooks. Decode markers,
+the 80-byte v1 event, decode synchronization, and the final CPU graph barrier
+are unchanged. `phase_uprobe_attach()` attaches only
+`llama_scx_decode_begin_v1` and `llama_scx_decode_end_v1`, so worker removal
+does not reduce this loader's uprobe hits or establish a performance gain.
+
+Use the matched CPU-only ON/OFF build commands in the sibling
+`docs/development/compute-profile.md`. Diagnostic acceptance and experiments
+that depend on phase require `LLAMA_SCX_PHASE_TRACE=ON`, a server
+`--scx-phase-run-id`, loader `--phase-uprobe`, `--phase-register-socket`, and
+`--phase-uid`, plus launcher `--phase-register-socket`. Keep phase input and
+logging settings matched between baseline and treatment.
+
+A CPU performance baseline without phase observation uses
+`LLAMA_SCX_PHASE_TRACE=OFF`, omits those server/loader/launcher options, and
+omits `--server-compute-profile-trace` and verbose logging. Leave the legacy
+`--phase-socket` source disabled too. The scheduler still performs per-task
+and per-CPU instrumentation and `PHASE_OBSERVE` lookups; without an active
+phase source, observations use UNKNOWN. `scripts/validate_phase.py` is a
+diagnostic acceptance runner, not a performance benchmark.
+
+`config/versions.env` still pins provider
+`5219055a578fd741e029e81fefef6f3a5695086d`. Bootstrap and release validation
+therefore still use the original provider with worker symbols. Adoption of
+the cleanup requires a separate integration milestone: after a human commit,
+explicitly update the provider pin, rebuild, and repeat semantic acceptance.
+Preserve the old baseline and its evidence. The audit, source line references,
+and ELF evidence below describe the historical pinned provider.
+
 ## Fixed revisions and environment
 
 - Scheduler worktree: intentionally dirty before M11; it was not reset, cleaned,
@@ -126,7 +158,7 @@ with result -1 if normal finish was skipped. This is a source-level ordering
 guarantee, not a performance guarantee. The synchronization changes timing;
 M11 makes no zero-overhead, performance-neutral, or production-readiness claim.
 
-Worker markers are C functions because they are defined in a C translation
+In the historical pinned provider, worker markers are C functions because they are defined in a C translation
 unit. Their signatures are `void ggml_scx_worker_begin_v1(void)` and
 `void ggml_scx_worker_end_v1(void)`; both are noinline, used, and
 default-visible at `ggml/src/ggml-cpu/ggml-cpu.c:3060-3072`. Begin occurs at
@@ -134,12 +166,12 @@ worker compute-thread entry at lines 3075-3078. End occurs at lines 3144-3148,
 before the final graph barrier. They carry no event pointer, version, phase, or
 identity fields.
 
-Worker markers are audited but not attached in M11. Decode begin/end publish a
+Worker markers were audited but not attached in M11. Decode begin/end publish a
 TGID state, all CPU worker threads share that TGID, and synchronized decode end
 keeps the state active through graph completion. Worker attachment would add
 complexity without improving the controlled one-process validation.
 
-## Built ELF evidence
+## Historical pinned ELF evidence
 
 - Launcher:
   `build/llama-semantic/bin/llama-server`; ELF64 x86-64 PIE

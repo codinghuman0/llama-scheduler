@@ -281,3 +281,66 @@ validation logs, request/response, environment and isolation records, and the
 final instrumentation report. Targeted cleanup runs on success, failure,
 SIGINT, and SIGTERM and verifies sched_ext returns to disabled. No scheduling
 policy dimension is changed in M11R.
+
+## SCX observation cleanup in the sibling fork
+
+Status: source and documentation cleanup implemented in the local sibling
+`llama.cpp-fork`; focused local build and non-privileged verification passed.
+The unused CPU worker begin/end hooks were removed. The final graph barrier,
+decode observation structure, 80-byte v1 ABI, synchronization, and this
+scheduler's decode-only attachment path are unchanged.
+
+`docs/LLAMA_PHASE.md` and `docs/EXPERIMENT_GUIDE.md` now distinguish diagnostic
+acceptance, phase-dependent policy experiments, and a CPU performance baseline
+without phase observation. Scheduler per-task/per-CPU and `PHASE_OBSERVE`
+instrumentation remains active when phase input is disabled. No performance
+gain has been measured.
+
+Local validation used GCC 16.2.1, CMake 4.3.0, Release shared libraries, and `GGML_NATIVE=OFF`. The full server build used `LLAMA_BUILD_UI=OFF` and `LLAMA_USE_PREBUILT_UI=OFF`.
+
+- `cmake --build ../llama.cpp-fork/build-scx-trace --parallel 1 --target llama-server test-compute-profile test-backend-ops` passed with `LLAMA_SCX_PHASE_TRACE=ON` and `GGML_OPENMP=ON`.
+- The `ggml` target built in `build-scx-native` with trace ON/OpenMP OFF and in `build-scx-off` with trace OFF/OpenMP ON.
+- `nm -D --defined-only` found no worker marker symbols in all three CPU libraries and found both decode marker symbols in the trace server library. `llama-server --help` passed and retained `--scx-phase-run-id`.
+- `ctest --test-dir ../llama.cpp-fork/build-scx-trace --output-on-failure -R '^test-compute-profile$'` passed 1/1.
+- `test-backend-ops test -b CPU -o MUL_MAT,RMS_NORM -p 'm=16,n=(1|4),k=256|ne=\[64,5,4,3\]'` passed 253/253 cases in each of the three CPU variants against the CPU reference implementation. The native and trace-OFF runs used the same test executable with `LD_LIBRARY_PATH` selecting the corresponding GGML libraries; `ldd` confirmed resolution. Logs showed actual team sizes of 1, 4, and 16. This does not validate another hardware backend.
+- `make build/bin/llama_scx_child` passed. The existing M11 and M11R unittest suites passed 20/20 after the edits, with `test_m11.SEMANTIC` set to `/home/hs/llama.cpp-fork` in the test runner so the ABI check used the edited checkout.
+- `bash -n` accepted the new provider build block and the eight existing phase runbook shell blocks. Both repositories passed `git diff --check`.
+
+No BPF scheduler build/load, live uprobe attachment, model inference, or performance measurement was performed. The local host lacks clang, bpftool, and libbpf development headers; scheduler source was not changed.
+
+The provider pin in `config/versions.env` remains
+`5219055a578fd741e029e81fefef6f3a5695086d`; bootstrap still builds that
+historical provider. The next integration checkpoint requires an explicit
+revised pin and rebuild after a human commit, followed by semantic acceptance
+with the old baseline preserved. No scheduler loading or model workload was
+performed for this cleanup.
+
+## SCX v2 reception
+
+The loader accepts `--phase-uprobe-mode trace|state`. The default `trace` uses the original v1 begin/end ABI. The M11R validation path uses its original provider pin. State mode attaches to `llama_scx_phase_set_v2` and validates the 32-byte event before updating TGID state. Invalid events clear the active phase and retain the accepted run ID and sequence. A pidfd tracks target exit. BPF checks the process start time before attributing active state to a worker.
+
+The state report records applied transitions, diagnostic failures, and the phase at target exit. The state acceptance runner uses matching loader and provider modes and waits for registration before sending requests.
+
+Local validation on Fedora kernel `7.3.4-200.fc44.x86_64` used Clang 22.1.8 and GCC 16.2.1.
+
+- `make -j2 all check-scx-api check-sched-uapi` built the loader, BPF object, launcher, and workloads from the local kernel BTF and UAPI. The BPF ELF contains both v1 handlers and the v2 handler.
+- `PYTHONDONTWRITEBYTECODE=1 make -j2 check-unprivileged` passed 57 tests and skipped two external provider checks. The missing legacy socket producer caused the legacy skip. The v1 ABI check also passed separately against both the pinned M11R source and the current sibling provider.
+- `python3 tests/test_m10b.py` passed seven tests. The current sibling provider passed its SCX state fixture with trace ON and OFF and the synchronization fixture with trace ON.
+
+Native sched_ext loading, live uprobe delivery, model-backed lifecycle checks, and performance trials remain pending.
+
+### Manual state acceptance checkpoint
+
+Use a current trace-enabled, shared-library provider build and a local CPU-runnable GGUF. From the scheduler repository root, set `SCX_PROVIDER_BUILD` to that build directory and `SCX_GGUF_MODEL` to the model file. Run the existing trace acceptance and the two state cases separately under the scheduler approval rules.
+
+```sh
+python3 scripts/validate_phase.py --phase-uprobe-mode state \
+    --semantic-dir ../llama.cpp-fork --semantic-build "$SCX_PROVIDER_BUILD" \
+    --model "$SCX_GGUF_MODEL"
+
+python3 scripts/validate_phase.py --phase-uprobe-mode state --state-abort \
+    --semantic-dir ../llama.cpp-fork --semantic-build "$SCX_PROVIDER_BUILD" \
+    --model "$SCX_GGUF_MODEL"
+```
+
+The controlled normal case requires three applied transitions and final sequence 3. The second case requires five applied transitions and sequence 5, with an active DECODE phase retired on target exit.

@@ -56,14 +56,17 @@ $(SLEEP_WAKE_BIN): tests/sleep_wake.c | $(BUILD_DIR)/bin
 $(CHILD_BIN): src/llama_scx_child.c include/llama_sched_uapi.h | validate-kernel-sched-uapi $(BUILD_DIR)/bin
 	$(CC) $(USER_CFLAGS) $< -o $@
 
-check: all check-scx-api check-sched-uapi
+check: check-unprivileged
+	sh tests/test_scx_child.sh $(CHILD_BIN) $(WORKLOAD_BIN)
+
+check-unprivileged: all check-scx-api check-sched-uapi
 	$(WORKLOAD_BIN) --seconds 1
 	$(SLEEP_WAKE_BIN) --seconds 1 --interval-ms 100
-	sh tests/test_scx_child.sh $(CHILD_BIN) $(WORKLOAD_BIN)
 	python3 tests/test_validation.py $(CHILD_BIN) $(WORKLOAD_BIN) $(SLEEP_WAKE_BIN)
 	python3 tests/test_instrumentation.py
 	python3 tests/test_m11.py
 	python3 tests/test_m11r.py
+	python3 tests/test_phase_state.py
 
 check-scx-api:
 	@awk '$$1 == "bool" && $$2 ~ /^scx_bpf_dsq_insert\(/ { exit 1 } $$1 == "void" && $$2 ~ /^scx_bpf_dsq_insert\(/ { found = 1 } END { exit found ? 0 : 1 }' src/llama_scx_simple.bpf.c
@@ -84,4 +87,4 @@ check-sched-uapi: validate-kernel-sched-uapi
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all check check-scx-api check-sched-uapi validate-kernel-sched-uapi clean
+.PHONY: all check check-unprivileged check-scx-api check-sched-uapi validate-kernel-sched-uapi clean

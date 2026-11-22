@@ -517,6 +517,8 @@ int main(int argc, char **argv) {
         if not producer.exists():
             self.skipTest("sibling llama.cpp checkout is required for the producer integration test")
         source = producer.read_text()
+        if "llama_scx_phase_notify(" not in source:
+            self.skipTest("sibling llama.cpp checkout does not contain the legacy socket producer")
         notifier = source[source.index("#include <cerrno>"):source.index("//\n// llama_context")]
         self.assertNotRegex(notifier, r"libbpf|bpf\(|bpf/|SYS_bpf|/sys/fs/bpf")
         ubatch = source[source.index("llm_graph_result * llama_context::process_ubatch"):

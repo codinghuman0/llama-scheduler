@@ -154,7 +154,9 @@ static __always_inline struct llama_phase_observation *phase_observation(
 	struct llama_phase_value *value;
 
 	value = bpf_map_lookup_elem(&phase_state, &tgid);
-	if (value && value->active && value->phase < LLAMA_PHASE_COUNT)
+	if (value && value->active && value->phase < LLAMA_PHASE_COUNT &&
+	    (value->source != LLAMA_PHASE_SOURCE_UPROBE_STATE ||
+	     value->process_start_time == BPF_CORE_READ(p, group_leader, start_time)))
 		phase = value->phase;
 	return bpf_map_lookup_elem(&phase_observations, &phase);
 }
@@ -382,6 +384,76 @@ int BPF_UPROBE(llama_scx_decode_end_v1_uprobe,
 	llama_scx_end_value(&next, &event);
 	if (bpf_map_update_elem(&phase_state, &tgid, &next, BPF_EXIST))
 		UPROBE_STAT_INC(map_update_failures);
+	return 0;
+}
+
+SEC("uprobe")
+int BPF_UPROBE(llama_scx_phase_set_v2_uprobe,
+		const struct llama_scx_state_v2 *event_pointer)
+{
+	struct llama_scx_state_v2 event;
+	struct llama_phase_value *previous;
+	struct llama_phase_value next;
+	struct llama_uprobe_stats *stats;
+	struct task_struct *task;
+	u32 tgid = bpf_get_current_pid_tgid() >> 32;
+	int result;
+
+	UPROBE_STAT_INC(state_events);
+	if (!uprobe_target(tgid))
+		return 0;
+	previous = bpf_map_lookup_elem(&phase_state, &tgid);
+	if (!previous) {
+		UPROBE_STAT_INC(map_update_failures);
+		return 0;
+	}
+	if (previous->source != LLAMA_PHASE_SOURCE_UPROBE_STATE) {
+		UPROBE_STAT_INC(map_update_failures);
+		goto invalidate;
+	}
+	if (bpf_probe_read_user(&event, sizeof(event), event_pointer)) {
+		UPROBE_STAT_INC(user_read_failures);
+		goto invalidate;
+	}
+	task = (struct task_struct *)bpf_get_current_task_btf();
+	result = llama_scx_state_value(&next, previous, &event,
+				       BPF_CORE_READ(task, group_leader, start_time));
+	switch (result) {
+	case LLAMA_SCX_STATE_OK:
+		break;
+	case LLAMA_SCX_STATE_BAD_VERSION:
+		UPROBE_STAT_INC(abi_failures);
+		goto invalidate;
+	case LLAMA_SCX_STATE_BAD_PHASE:
+		UPROBE_STAT_INC(unsupported_phases);
+		goto invalidate;
+	case LLAMA_SCX_STATE_WRONG_RUN:
+		UPROBE_STAT_INC(run_id_mismatches);
+		goto invalidate;
+	case LLAMA_SCX_STATE_STALE_SEQUENCE:
+		UPROBE_STAT_INC(stale_sequences);
+		goto invalidate;
+	default:
+		UPROBE_STAT_INC(invalid_state_events);
+		goto invalidate;
+	}
+	/* An in-flight notification cannot recreate a retired entry. */
+	if (bpf_map_update_elem(&phase_state, &tgid, &next, BPF_EXIST)) {
+		UPROBE_STAT_INC(map_update_failures);
+		goto invalidate;
+	}
+	stats = uprobe_stats();
+	if (stats) {
+		stats->state_applied++;
+		if (!next.active)
+			stats->state_idle++;
+		else if (next.phase < LLAMA_PHASE_COUNT)
+			stats->state_active[next.phase]++;
+	}
+	return 0;
+
+invalidate:
+	llama_scx_invalidate_state(previous);
 	return 0;
 }
 

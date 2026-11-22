@@ -18,6 +18,7 @@
 #include <stddef.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/un.h>
 #include <sys/utsname.h>
@@ -69,15 +70,28 @@ struct phase_control {
 	__u64 latest_sequence;
 };
 
+enum phase_uprobe_mode {
+	PHASE_UPROBE_TRACE,
+	PHASE_UPROBE_STATE,
+};
+
 struct phase_uprobe_control {
 	bool enabled;
+	enum phase_uprobe_mode mode;
 	int listener_fd;
+	int target_pidfd;
 	uid_t allowed_uid;
 	const char *binary_path;
 	__u32 target_tgid;
 	__u32 last_target_tgid;
 	struct bpf_link *begin_link;
 	struct bpf_link *end_link;
+	struct bpf_link *state_link;
+	struct llama_phase_value last_state;
+	bool target_exited;
+	bool active_at_exit;
+	__u32 phase_at_exit;
+	unsigned int cleanup_failures;
 };
 
 static bool verbose;
@@ -107,7 +121,8 @@ static void usage(const char *program)
 		"  --phase-socket NAME --phase-uid UID\n"
 		"      use the legacy abstract SOCK_SEQPACKET phase source\n"
 		"  --phase-uprobe ELF --phase-register-socket NAME --phase-uid UID\n"
-		"      attach semantic decode markers to one registered selected child\n"
+			"      attach semantic phase markers to one registered selected child\n"
+			"  --phase-uprobe-mode trace|state  select v1 trace or v2 state (default: trace)\n"
 		"  -h  show this help\n",
 		program);
 }
@@ -344,6 +359,7 @@ static void phase_uprobe_init(struct phase_uprobe_control *control)
 {
 	memset(control, 0, sizeof(*control));
 	control->listener_fd = -1;
+	control->target_pidfd = -1;
 }
 
 static int phase_uprobe_open(struct phase_uprobe_control *control, const char *name,
@@ -484,7 +500,132 @@ fail:
 	return error;
 }
 
-static void phase_uprobe_send_ack(int fd, __u32 tgid, int status)
+static int phase_uprobe_select_programs(struct bpf_object *object, enum phase_uprobe_mode mode)
+{
+	const struct {
+		const char *name;
+		enum phase_uprobe_mode mode;
+	} programs[] = {
+		{ "llama_scx_decode_begin_v1_uprobe", PHASE_UPROBE_TRACE },
+		{ "llama_scx_decode_end_v1_uprobe", PHASE_UPROBE_TRACE },
+		{ "llama_scx_phase_set_v2_uprobe", PHASE_UPROBE_STATE },
+	};
+
+	for (size_t index = 0; index < sizeof(programs) / sizeof(programs[0]); index++) {
+		struct bpf_program *program = bpf_object__find_program_by_name(object, programs[index].name);
+		int error;
+
+		if (!program)
+			return -ENOENT;
+		error = bpf_program__set_autoload(program, programs[index].mode == mode);
+		if (error)
+			return error;
+	}
+	return 0;
+}
+
+static int phase_pidfd_exited(int pidfd)
+{
+	struct pollfd process = { .fd = pidfd, .events = POLLIN };
+	int status;
+
+	do {
+		status = poll(&process, 1, 0);
+	} while (status < 0 && errno == EINTR);
+	if (status <= 0)
+		return status < 0 ? -errno : 0;
+	return process.revents & (POLLIN | POLLHUP) ? 1 : -EIO;
+}
+
+static int phase_uprobe_attach_state(struct phase_uprobe_control *control,
+				      struct bpf_object *object, int config_map_fd,
+				      int phase_map_fd, __u32 tgid, int pidfd)
+{
+	LIBBPF_OPTS(bpf_uprobe_opts, options, .func_name = "llama_scx_phase_set_v2");
+	struct llama_uprobe_config config = { .enabled = 1, .target_tgid = tgid };
+	struct llama_phase_value initial = { .source = LLAMA_PHASE_SOURCE_UPROBE_STATE };
+	struct bpf_program *program;
+	struct bpf_link *link;
+	__u32 key = 0;
+	int error;
+
+	program = bpf_object__find_program_by_name(object, "llama_scx_phase_set_v2_uprobe");
+	if (!program)
+		return -ENOENT;
+	if (bpf_map_update_elem(phase_map_fd, &tgid, &initial, BPF_NOEXIST))
+		return -errno;
+	link = bpf_program__attach_uprobe_opts(program, (pid_t)tgid, control->binary_path, 0, &options);
+	if (!link) {
+		error = -(errno ?: EIO);
+		goto fail;
+	}
+	error = phase_pidfd_exited(pidfd);
+	if (error) {
+		error = error > 0 ? -ESRCH : error;
+		goto fail;
+	}
+	if (bpf_map_update_elem(config_map_fd, &key, &config, BPF_ANY)) {
+		error = -errno;
+		goto fail;
+	}
+	control->state_link = link;
+	control->target_pidfd = pidfd;
+	control->target_tgid = tgid;
+	control->last_target_tgid = tgid;
+	control->last_state = initial;
+	control->target_exited = false;
+	control->active_at_exit = false;
+	control->phase_at_exit = LLAMA_PHASE_UNKNOWN;
+	return 0;
+
+fail:
+	if (bpf_link__destroy(link))
+		control->cleanup_failures++;
+	if (bpf_map_delete_elem(phase_map_fd, &tgid) && errno != ENOENT)
+		control->cleanup_failures++;
+	return error;
+}
+
+static int phase_uprobe_retire_state(struct phase_uprobe_control *control,
+				     int config_map_fd, int phase_map_fd, bool exited)
+{
+	struct llama_uprobe_config disabled = {};
+	struct llama_phase_value last = {};
+	__u32 tgid = control->target_tgid;
+	__u32 key = 0;
+	int error = 0;
+
+	if (!tgid)
+		return 0;
+	if (bpf_map_update_elem(config_map_fd, &key, &disabled, BPF_ANY))
+		error = -errno;
+	if (bpf_link__destroy(control->state_link) && !error)
+		error = -EIO;
+	control->state_link = NULL;
+	if (bpf_map_lookup_elem(phase_map_fd, &tgid, &last) && !error)
+		error = -errno;
+	control->target_exited = exited;
+	control->active_at_exit = exited && last.active;
+	control->phase_at_exit = control->active_at_exit ? last.phase : LLAMA_PHASE_UNKNOWN;
+	llama_scx_invalidate_state(&last);
+	control->last_state = last;
+	if (bpf_map_delete_elem(phase_map_fd, &tgid) && errno != ENOENT) {
+		if (!error)
+			error = -errno;
+		bpf_map_update_elem(phase_map_fd, &tgid, &last, BPF_EXIST);
+	}
+	close(control->target_pidfd);
+	control->target_pidfd = -1;
+	control->target_tgid = 0;
+	if (error) {
+		control->cleanup_failures++;
+		fprintf(stderr, "phase uprobe: state cleanup for tgid=%u failed: %s\n",
+			tgid, strerror(-error));
+	}
+	return error;
+}
+
+static int phase_uprobe_send_ack(int fd, __u32 tgid, int status)
 {
 	char response[PHASE_REGISTER_MAX];
 	int length;
@@ -492,12 +633,15 @@ static void phase_uprobe_send_ack(int fd, __u32 tgid, int status)
 	length = snprintf(response, sizeof(response), "ACK %u %u %d",
 		PHASE_REGISTER_VERSION, tgid, status);
 	if (length < 0 || length >= (int)sizeof(response) ||
-	    send(fd, response, (size_t)length, MSG_NOSIGNAL) != length)
+	    send(fd, response, (size_t)length, MSG_NOSIGNAL) != length) {
 		fprintf(stderr, "phase uprobe: cannot send registration ACK\n");
+		return -EIO;
+	}
+	return 0;
 }
 
 static void phase_uprobe_accept(struct phase_uprobe_control *control,
-				struct bpf_object *object, int config_map_fd)
+						struct bpf_object *object, int config_map_fd, int phase_map_fd)
 {
 	struct timeval timeout = { .tv_sec = 1 };
 	struct ucred credentials;
@@ -509,6 +653,8 @@ static void phase_uprobe_accept(struct phase_uprobe_control *control,
 	ssize_t length;
 	int client_fd;
 	int status = 0;
+	int pidfd = -1;
+	int ack_error;
 	int policy;
 
 	client_fd = accept4(control->listener_fd, NULL, NULL, SOCK_CLOEXEC);
@@ -540,6 +686,13 @@ static void phase_uprobe_accept(struct phase_uprobe_control *control,
 		status = -EBUSY;
 		goto reply;
 	}
+	if (control->mode == PHASE_UPROBE_STATE) {
+		pidfd = (int)syscall(SYS_pidfd_open, (pid_t)target_tgid, 0);
+		if (pidfd < 0) {
+			status = -errno;
+			goto reply;
+		}
+	}
 	status = read_process_identity(target_tgid, &parent_tgid, &target_uid);
 	if (status)
 		goto reply;
@@ -552,32 +705,58 @@ static void phase_uprobe_accept(struct phase_uprobe_control *control,
 		status = policy < 0 ? -errno : -EPERM;
 		goto reply;
 	}
-	status = phase_uprobe_attach(control, object, config_map_fd, target_tgid);
+	if (control->mode == PHASE_UPROBE_STATE) {
+		status = phase_uprobe_attach_state(control, object, config_map_fd, phase_map_fd,
+						 target_tgid, pidfd);
+		if (!status)
+			pidfd = -1;
+	} else {
+		status = phase_uprobe_attach(control, object, config_map_fd, target_tgid);
+	}
 reply:
-	phase_uprobe_send_ack(client_fd, target_tgid, status);
-	if (!status)
+	ack_error = phase_uprobe_send_ack(client_fd, target_tgid, status);
+	if (pidfd >= 0)
+		close(pidfd);
+	if (!status && control->mode == PHASE_UPROBE_STATE) {
+		if (ack_error)
+			phase_uprobe_retire_state(control, config_map_fd, phase_map_fd, false);
+		else
+			fprintf(stderr, "phase uprobe: attached pid-specific state marker to tgid=%u\n",
+				target_tgid);
+	} else if (!status) {
 		fprintf(stderr, "phase uprobe: attached pid-specific decode markers to tgid=%u\n",
 			target_tgid);
-	else
+	} else {
 		fprintf(stderr, "phase uprobe: rejected registration tgid=%u status=%d (%s)\n",
 			target_tgid, status, strerror(-status));
+	}
 	close(client_fd);
 }
 
-static void phase_uprobe_close(struct phase_uprobe_control *control, int config_map_fd)
+static int phase_uprobe_close(struct phase_uprobe_control *control, int config_map_fd, int phase_map_fd)
 {
 	struct llama_uprobe_config disabled = {};
 	__u32 key = 0;
+	int error = 0;
 
-	if (config_map_fd >= 0)
-		bpf_map_update_elem(config_map_fd, &key, &disabled, BPF_ANY);
-	bpf_link__destroy(control->end_link);
-	bpf_link__destroy(control->begin_link);
-	control->end_link = NULL;
-	control->begin_link = NULL;
+	if (control->mode == PHASE_UPROBE_STATE) {
+		int exited = control->target_tgid ? phase_pidfd_exited(control->target_pidfd) : 0;
+
+		error = phase_uprobe_retire_state(control, config_map_fd, phase_map_fd, exited > 0);
+		if (!error && exited < 0)
+			error = exited;
+	} else {
+		if (config_map_fd >= 0)
+			bpf_map_update_elem(config_map_fd, &key, &disabled, BPF_ANY);
+		bpf_link__destroy(control->end_link);
+		bpf_link__destroy(control->begin_link);
+		control->end_link = NULL;
+		control->begin_link = NULL;
+	}
 	if (control->listener_fd >= 0)
 		close(control->listener_fd);
 	control->listener_fd = -1;
+	return error;
 }
 
 static void iso_timestamp(char output[32])
@@ -747,8 +926,8 @@ static int collect_uprobe_stats(struct bpf_map *map,
 		return error;
 	}
 	for (int cpu = 0; cpu < cpus; cpu++) {
-		const uint64_t *source = (const uint64_t *)&per_cpu[cpu];
-		uint64_t *destination = (uint64_t *)total;
+		const __u64 *source = (const __u64 *)&per_cpu[cpu];
+		__u64 *destination = (__u64 *)total;
 
 		for (size_t index = 0; index < sizeof(*total) / sizeof(*source); index++)
 			destination[index] += source[index];
@@ -838,6 +1017,46 @@ static int write_task_json(FILE *output, struct bpf_map *map,
 	return error == -ENOENT ? 0 : error;
 }
 
+static void write_uprobe_state_json(FILE *json, const struct phase_uprobe_control *control,
+				     const struct llama_uprobe_stats *stats)
+{
+	const struct llama_phase_value *state = &control->last_state;
+
+	fprintf(json, ",\"mode\":\"state\",\"event_semantics\":\"phase_transitions\","
+		"\"target_exited\":%s,\"active_at_exit\":%s,\"phase_at_exit\":\"%s\","
+		"\"state\":{\"active\":%u,\"phase\":%u,\"phase_name\":\"%s\","
+		"\"source\":%u,\"run_id\":%llu,\"sequence\":%llu},"
+		"\"counters\":{\"state_events\":%llu,\"state_applied\":%llu,\"state_idle\":%llu,"
+		"\"state_unknown\":%llu,\"state_prefill\":%llu,\"state_decode\":%llu,\"state_mixed\":%llu,"
+		"\"abi_failures\":%llu,\"user_read_failures\":%llu,\"unsupported_phases\":%llu,"
+		"\"invalid_state_events\":%llu,\"run_id_mismatches\":%llu,\"stale_sequences\":%llu,"
+		"\"map_update_failures\":%llu,\"filtered_events\":%llu,\"cleanup_failures\":%u}}",
+		control->target_exited ? "true" : "false", control->active_at_exit ? "true" : "false",
+		phase_name(control->phase_at_exit), state->active, state->phase, phase_name(state->phase),
+		state->source, (unsigned long long)state->run_id, (unsigned long long)state->sequence,
+		(unsigned long long)stats->state_events, (unsigned long long)stats->state_applied,
+		(unsigned long long)stats->state_idle,
+		(unsigned long long)stats->state_active[LLAMA_PHASE_UNKNOWN],
+		(unsigned long long)stats->state_active[LLAMA_PHASE_PREFILL],
+		(unsigned long long)stats->state_active[LLAMA_PHASE_DECODE],
+		(unsigned long long)stats->state_active[LLAMA_PHASE_MIXED],
+		(unsigned long long)stats->abi_failures, (unsigned long long)stats->user_read_failures,
+		(unsigned long long)stats->unsupported_phases,
+		(unsigned long long)stats->invalid_state_events, (unsigned long long)stats->run_id_mismatches,
+		(unsigned long long)stats->stale_sequences, (unsigned long long)stats->map_update_failures,
+		(unsigned long long)stats->filtered_events, control->cleanup_failures);
+}
+
+static void print_uprobe_state_counters(FILE *output, const struct phase_uprobe_control *control,
+					 const struct llama_uprobe_stats *stats)
+{
+	fprintf(output, "phase_state_tgid=%u applied=%llu prefill=%llu decode=%llu idle=%llu\n",
+		control->last_target_tgid, (unsigned long long)stats->state_applied,
+		(unsigned long long)stats->state_active[LLAMA_PHASE_PREFILL],
+		(unsigned long long)stats->state_active[LLAMA_PHASE_DECODE],
+		(unsigned long long)stats->state_idle);
+}
+
 static int write_report(const char *directory, const char *start_timestamp,
 			const char *end_timestamp, struct bpf_map *cpu_map,
 			struct bpf_map *task_map, struct bpf_map *tracking_map,
@@ -856,7 +1075,7 @@ static int write_report(const char *directory, const char *start_timestamp,
 	struct llama_tracking_state tracking;
 	struct llama_phase_observation phase_observations[LLAMA_PHASE_COUNT];
 	struct llama_uprobe_stats uprobe_stats;
-	struct llama_phase_value uprobe_state;
+	struct llama_phase_value uprobe_state = {};
 	struct task_totals tasks;
 	FILE *json = NULL;
 	FILE *text = NULL;
@@ -880,7 +1099,8 @@ static int write_report(const char *directory, const char *start_timestamp,
 		memset(phase_observations, 0, sizeof(phase_observations));
 	if (collect_uprobe_stats(phase_uprobe_stats_map, &uprobe_stats))
 		memset(&uprobe_stats, 0, sizeof(uprobe_stats));
-	if (collect_phase_state(phase_state_map, phase_uprobe->last_target_tgid,
+	if (phase_uprobe->mode == PHASE_UPROBE_TRACE &&
+	    collect_phase_state(phase_state_map, phase_uprobe->last_target_tgid,
 				&uprobe_state))
 		memset(&uprobe_state, 0, sizeof(uprobe_state));
 	json = fopen(json_path, "wx");
@@ -916,15 +1136,18 @@ static int write_report(const char *directory, const char *start_timestamp,
 		phase_uprobe->enabled ? "true" : "false", phase_uprobe->target_tgid,
 		phase_uprobe->last_target_tgid);
 	json_string(json, phase_uprobe->binary_path ?: "");
-	fprintf(json, ",\"state\":{\"active\":%u,\"phase\":%u,\"phase_name\":\"%s\","
+	if (phase_uprobe->mode == PHASE_UPROBE_STATE) {
+		write_uprobe_state_json(json, phase_uprobe, &uprobe_stats);
+	} else {
+		fprintf(json, ",\"mode\":\"trace\",\"event_semantics\":\"decode_attempts\","
+			"\"state\":{\"active\":%u,\"phase\":%u,\"phase_name\":\"%s\","
 		"\"run_id\":%llu,\"call_id\":%llu,\"retry\":%llu,"
 		"\"n_prefill\":%llu,\"n_decode\":%llu,\"n_unknown\":%llu,\"result\":%lld},"
 		"\"counters\":{\"begin_events\":%llu,\"end_events\":%llu,"
 		"\"begin_unknown\":%llu,\"begin_prefill\":%llu,\"begin_decode\":%llu,"
 		"\"begin_mixed\":%llu,\"abi_failures\":%llu,\"user_read_failures\":%llu,"
 		"\"unsupported_phases\":%llu,\"stale_end_events\":%llu,"
-		"\"map_update_failures\":%llu,\"filtered_events\":%llu}},\n"
-		"  \"phase_observations\": [",
+			"\"map_update_failures\":%llu,\"filtered_events\":%llu}}",
 		uprobe_state.active, uprobe_state.phase, phase_name(uprobe_state.phase),
 		(unsigned long long)uprobe_state.run_id,
 		(unsigned long long)uprobe_state.call_id,
@@ -945,6 +1168,8 @@ static int write_report(const char *directory, const char *start_timestamp,
 		(unsigned long long)uprobe_stats.stale_end_events,
 		(unsigned long long)uprobe_stats.map_update_failures,
 		(unsigned long long)uprobe_stats.filtered_events);
+	}
+	fputs(",\n  \"phase_observations\": [", json);
 	for (__u32 phase = 0; phase < LLAMA_PHASE_COUNT; phase++) {
 		const struct llama_phase_observation *observation = &phase_observations[phase];
 
@@ -1061,14 +1286,27 @@ static int write_report(const char *directory, const char *start_timestamp,
 		phase_control->enabled ? "true" : "false", phase_control->client_tgid,
 		phase_control->last_client_tgid, phase_name(phase_control->latest_phase),
 		(uint64_t)phase_control->latest_sequence);
-	fprintf(text, "phase_uprobe enabled=%s target_tgid=%u marker_elf=%s "
+	if (phase_uprobe->mode == PHASE_UPROBE_STATE) {
+		const struct llama_phase_value *state = &phase_uprobe->last_state;
+
+		fprintf(text, "phase_uprobe mode=state target_tgid=%u marker_elf=%s "
+			"active=%u phase=%s run_id=%llu sequence=%llu target_exited=%s "
+			"active_at_exit=%s phase_at_exit=%s cleanup_failures=%u\n",
+			phase_uprobe->last_target_tgid, phase_uprobe->binary_path ?: "",
+			state->active, phase_name(state->phase), (unsigned long long)state->run_id,
+			(unsigned long long)state->sequence, phase_uprobe->target_exited ? "yes" : "no",
+			phase_uprobe->active_at_exit ? "yes" : "no", phase_name(phase_uprobe->phase_at_exit),
+			phase_uprobe->cleanup_failures);
+		print_uprobe_state_counters(text, phase_uprobe, &uprobe_stats);
+	} else {
+		fprintf(text, "phase_uprobe enabled=%s target_tgid=%u marker_elf=%s "
 		"active=%u phase=%s run_id=%llu call_id=%llu retry=%llu result=%lld\n",
 		phase_uprobe->enabled ? "true" : "false", phase_uprobe->last_target_tgid,
 		phase_uprobe->binary_path ?: "", uprobe_state.active,
 		phase_name(uprobe_state.phase), (unsigned long long)uprobe_state.run_id,
 		(unsigned long long)uprobe_state.call_id,
 		(unsigned long long)uprobe_state.retry, (long long)uprobe_state.result);
-	fprintf(text, "uprobe begin=%llu end=%llu unknown=%llu prefill=%llu decode=%llu mixed=%llu "
+		fprintf(text, "uprobe begin=%llu end=%llu unknown=%llu prefill=%llu decode=%llu mixed=%llu "
 		"abi_fail=%llu read_fail=%llu unsupported=%llu stale_end=%llu update_fail=%llu filtered=%llu\n",
 		(unsigned long long)uprobe_stats.begin_events,
 		(unsigned long long)uprobe_stats.end_events,
@@ -1082,6 +1320,7 @@ static int write_report(const char *directory, const char *start_timestamp,
 		(unsigned long long)uprobe_stats.stale_end_events,
 		(unsigned long long)uprobe_stats.map_update_failures,
 		(unsigned long long)uprobe_stats.filtered_events);
+	}
 	for (__u32 phase = 0; phase < LLAMA_PHASE_COUNT; phase++) {
 		const struct llama_phase_observation *observation = &phase_observations[phase];
 
@@ -1151,6 +1390,11 @@ static void print_status(struct bpf_map *stats_map,
 	       (unsigned long long)observations[LLAMA_PHASE_MIXED].enqueue,
 	       (unsigned long long)observations[LLAMA_PHASE_MIXED].running,
 	       (unsigned long long)observations[LLAMA_PHASE_MIXED].stopping);
+	if (phase_uprobe->mode == PHASE_UPROBE_STATE) {
+		print_uprobe_state_counters(stdout, phase_uprobe, &uprobe_stats);
+		fflush(stdout);
+		return;
+	}
 	printf("phase_uprobe_tgid=%u begin=%llu end=%llu prefill=%llu decode=%llu mixed=%llu "
 	       "abi_fail=%llu read_fail=%llu unsupported=%llu stale_end=%llu update_fail=%llu filtered=%llu\n",
 	       phase_uprobe->target_tgid,
@@ -1175,6 +1419,7 @@ int main(int argc, char **argv)
 		OPTION_PHASE_UID,
 		OPTION_PHASE_UPROBE,
 		OPTION_PHASE_REGISTER_SOCKET,
+		OPTION_PHASE_UPROBE_MODE,
 	};
 	struct bpf_object *object = NULL;
 	struct bpf_map *ops_map = NULL;
@@ -1200,6 +1445,7 @@ int main(int argc, char **argv)
 	const char *phase_register_socket = NULL;
 	uid_t phase_uid = 0;
 	bool phase_uid_set = false;
+	bool phase_uprobe_mode_set = false;
 	bool fifo = false;
 	int option;
 	int err = 0;
@@ -1210,6 +1456,7 @@ int main(int argc, char **argv)
 		{ "phase-uid", required_argument, NULL, OPTION_PHASE_UID },
 		{ "phase-uprobe", required_argument, NULL, OPTION_PHASE_UPROBE },
 		{ "phase-register-socket", required_argument, NULL, OPTION_PHASE_REGISTER_SOCKET },
+		{ "phase-uprobe-mode", required_argument, NULL, OPTION_PHASE_UPROBE_MODE },
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 },
 	};
@@ -1237,6 +1484,17 @@ int main(int argc, char **argv)
 		case OPTION_PHASE_REGISTER_SOCKET:
 			phase_register_socket = optarg;
 			break;
+		case OPTION_PHASE_UPROBE_MODE:
+			if (!strcmp(optarg, "trace"))
+				phase_uprobe.mode = PHASE_UPROBE_TRACE;
+			else if (!strcmp(optarg, "state"))
+				phase_uprobe.mode = PHASE_UPROBE_STATE;
+			else {
+				fprintf(stderr, "--phase-uprobe-mode must be trace or state\n");
+				return EXIT_FAILURE;
+			}
+			phase_uprobe_mode_set = true;
+			break;
 		case OPTION_PHASE_UID:
 			if (parse_uid(optarg, &phase_uid)) {
 				fprintf(stderr, "invalid --phase-uid value: %s\n", optarg);
@@ -1249,7 +1507,7 @@ int main(int argc, char **argv)
 			return option != 'h';
 		}
 	}
-	if (phase_socket && (phase_uprobe_path || phase_register_socket)) {
+	if (phase_socket && (phase_uprobe_path || phase_register_socket || phase_uprobe_mode_set)) {
 		fprintf(stderr, "legacy socket and semantic uprobe phase sources are mutually exclusive\n");
 		return EXIT_FAILURE;
 	}
@@ -1257,7 +1515,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "--phase-socket and --phase-uid must be specified together\n");
 		return EXIT_FAILURE;
 	}
-	if (phase_uprobe_path || phase_register_socket) {
+	if (phase_uprobe_path || phase_register_socket || phase_uprobe_mode_set) {
 		if (!phase_uprobe_path || !phase_register_socket || !phase_uid_set) {
 			fprintf(stderr, "--phase-uprobe, --phase-register-socket, and --phase-uid must be specified together\n");
 			return EXIT_FAILURE;
@@ -1275,6 +1533,11 @@ int main(int argc, char **argv)
 	if (!object) {
 		fprintf(stderr, "failed to open %s\n", BPF_OBJECT_PATH);
 		err = -ENOENT;
+		goto out;
+	}
+	err = phase_uprobe_select_programs(object, phase_uprobe.mode);
+	if (err) {
+		fprintf(stderr, "failed to select phase uprobe mode: %s\n", strerror(-err));
 		goto out;
 	}
 	{
@@ -1328,9 +1591,10 @@ int main(int argc, char **argv)
 		int64_t next_status = monotonic_ms();
 
 		while (!exit_requested) {
-			struct pollfd poll_fds[3];
+			struct pollfd poll_fds[4];
 			int socket_listener_index = -1;
 			int uprobe_listener_index = -1;
+			int target_index = -1;
 			int client_index = -1;
 			int poll_count = 0;
 			int64_t now = monotonic_ms();
@@ -1363,6 +1627,13 @@ int main(int argc, char **argv)
 				poll_fds[poll_count].revents = 0;
 				poll_count++;
 			}
+			if (phase_uprobe.target_pidfd >= 0) {
+				target_index = poll_count;
+				poll_fds[poll_count++] = (struct pollfd){
+					.fd = phase_uprobe.target_pidfd,
+					.events = POLLIN,
+				};
+			}
 			now = monotonic_ms();
 			timeout = next_status > now ? (int)(next_status - now) : 0;
 			poll_result = poll(poll_fds, (nfds_t)poll_count, timeout);
@@ -1376,10 +1647,24 @@ int main(int argc, char **argv)
 			if (socket_listener_index >= 0 &&
 			    (poll_fds[socket_listener_index].revents & POLLIN))
 				phase_control_accept(&phase_control);
+			if (target_index >= 0 && poll_fds[target_index].revents) {
+				bool exited = poll_fds[target_index].revents & (POLLIN | POLLHUP);
+
+				err = phase_uprobe_retire_state(&phase_uprobe, bpf_map__fd(phase_uprobe_config_map),
+							       bpf_map__fd(phase_state_map), exited);
+				if (!exited && !err)
+					err = -EIO;
+				if (err)
+					break;
+			}
 			if (uprobe_listener_index >= 0 &&
 			    (poll_fds[uprobe_listener_index].revents & POLLIN))
 				phase_uprobe_accept(&phase_uprobe, object,
-					bpf_map__fd(phase_uprobe_config_map));
+						bpf_map__fd(phase_uprobe_config_map), bpf_map__fd(phase_state_map));
+			if (phase_uprobe.cleanup_failures) {
+				err = -EIO;
+				break;
+			}
 			if (client_index >= 0) {
 				short events = poll_fds[client_index].revents;
 
@@ -1396,8 +1681,14 @@ int main(int argc, char **argv)
 out:
 	phase_control_close(&phase_control,
 		phase_state_map ? bpf_map__fd(phase_state_map) : -1);
-	phase_uprobe_close(&phase_uprobe,
-		phase_uprobe_config_map ? bpf_map__fd(phase_uprobe_config_map) : -1);
+	{
+		int cleanup_error = phase_uprobe_close(&phase_uprobe,
+			phase_uprobe_config_map ? bpf_map__fd(phase_uprobe_config_map) : -1,
+			phase_state_map ? bpf_map__fd(phase_state_map) : -1);
+
+		if (cleanup_error && !err)
+			err = cleanup_error;
+	}
 	bpf_link__destroy(link);
 	if (data_map && bpf_map_lookup_elem(bpf_map__fd(data_map), &key, &exit_data))
 		memset(&exit_data, 0, sizeof(exit_data));

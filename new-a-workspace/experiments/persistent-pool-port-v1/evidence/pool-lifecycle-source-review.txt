@@ -1,0 +1,401 @@
+ggml/src/ggml-cpu/ggml-cpu.c sha256=cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e
+2830: void ggml_threadpool_pause(struct ggml_threadpool * threadpool) {
+2831: #ifndef GGML_USE_OPENMP
+2832:     ggml_mutex_lock(&threadpool->mutex);
+2833:     if (!threadpool->pause) {
+2834:        ggml_threadpool_pause_locked(threadpool);
+2835:     }
+2836:     ggml_mutex_unlock(&threadpool->mutex);
+2837: #else
+2838:     UNUSED(threadpool);
+2839: #endif
+2840: }
+2841: 
+2842: void ggml_threadpool_resume(struct ggml_threadpool * threadpool) {
+2843: #ifndef GGML_USE_OPENMP
+2844:     ggml_mutex_lock(&threadpool->mutex);
+2845:     if (threadpool->pause) {
+2846:        ggml_threadpool_resume_locked(threadpool);
+2847:     }
+2848:     ggml_mutex_unlock(&threadpool->mutex);
+2849: #else
+2850:     UNUSED(threadpool);
+2851: #endif
+2852: }
+2853: 
+2854: struct ggml_cplan ggml_graph_plan(
+2855:           const struct ggml_cgraph * cgraph,
+2856:                                int   n_threads,
+2857:             struct ggml_threadpool * threadpool) {
+2858: 
+2859:     if (threadpool == NULL) {
+2860:         //GGML_PRINT_DEBUG("Threadpool is not specified. Will create a disposable threadpool : n_threads %d\n", n_threads);
+3386: static struct ggml_threadpool * ggml_threadpool_new_impl(
+3387:     struct ggml_threadpool_params * tpp,
+3388:                struct ggml_cgraph * cgraph,
+3389:                 struct ggml_cplan * cplan) {
+3390: 
+3391:     struct ggml_threadpool * threadpool =
+3392:         ggml_aligned_malloc(sizeof(struct ggml_threadpool));
+3393:     {
+3394:         threadpool->cgraph           = cgraph;
+3395:         threadpool->cplan            = cplan;
+3396:         threadpool->n_graph          = 0;
+3397:         threadpool->n_barrier        = 0;
+3398:         threadpool->n_barrier_passed = 0;
+3399:         threadpool->current_chunk    = 0;
+3400:         threadpool->stop             = false;
+3401:         threadpool->pause            = tpp->paused;
+3402:         threadpool->abort            = -1;
+3403:         threadpool->workers          = NULL;
+3404:         threadpool->newa_q6_phase = 0;
+3405:         threadpool->n_threads        = tpp->n_threads;
+3406:         threadpool->poll             = tpp->poll;
+3407:         threadpool->prio             = tpp->prio;
+3408:         threadpool->ec               = GGML_STATUS_SUCCESS;
+3409:     }
+3410: 
+3411: #if !defined(GGML_USE_OPENMP) && defined(__gnu_linux__)
+3412:     const char * barrier_mode = getenv("GGML_NEWA_BARRIER");
+3413:     enum newa_barrier_mode selected_mode = NEWA_BARRIER_SPIN;
+3414:     if (barrier_mode && strcmp(barrier_mode, "spin") != 0) {
+3415:         if (strcmp(barrier_mode, "park") == 0) selected_mode = NEWA_BARRIER_PARK;
+3416:         else if (strcmp(barrier_mode, "hint") == 0) selected_mode = NEWA_BARRIER_HINT;
+3417:         else GGML_ABORT("invalid GGML_NEWA_BARRIER");
+3418:     }
+3419:     newa_barrier_init(&threadpool->newa_barrier, selected_mode, tpp->n_threads);
+3420:     const char * phase_policy = getenv("GGML_NEWA_PHASE_BARRIER");
+3421:     if (phase_policy && strcmp(phase_policy, "all") != 0) {
+3422:         if (strcmp(phase_policy, "prefill") == 0) threadpool->newa_barrier.phase_policy = NEWA_PHASE_PREFILL;
+3423:         else if (strcmp(phase_policy, "budget") == 0) threadpool->newa_barrier.phase_policy = NEWA_PHASE_BUDGET;
+3424:         else GGML_ABORT("invalid GGML_NEWA_PHASE_BARRIER");
+3425:     }
+3426:     fprintf(stderr, "NEWA_BARRIER init mode=%d threads=%d spins=%d\n", (int) selected_mode, tpp->n_threads, NEWA_BARRIER_SPINS);
+3427: #endif
+3428: 
+3429:     // Allocate and init workers state
+3430:     const size_t workers_size = sizeof(struct ggml_compute_state) * tpp->n_threads;
+3431:     struct ggml_compute_state * workers = ggml_aligned_malloc(workers_size);
+3432: 
+3433:     memset(workers, 0, workers_size);
+3434:     for (int j = 0; j < tpp->n_threads; j++) {
+3435:         workers[j].threadpool = threadpool;
+3436:         workers[j].ith        = j;
+3437:     }
+3438: 
+3439:     threadpool->workers = workers;
+3440: 
+3441: #ifdef GGML_USE_OPENMP
+3442:     int32_t cpumask_iter = 0;
+3443: 
+3444:     // Compute CPU masks for each thread
+3445:     for (int j = 0; j < tpp->n_threads; j++) {
+3446:         ggml_thread_cpumask_next(tpp->cpumask, workers[j].cpumask, tpp->strict_cpu, &cpumask_iter);
+3447:     }
+3448: #else // GGML_USE_OPENMP
+3449:     ggml_mutex_init(&threadpool->mutex);
+3450:     ggml_cond_init(&threadpool->cond);
+3451: 
+3452:     // Spin the threads for all workers, and update CPU placements.
+3453:     // Place the main thread last (towards the higher numbered CPU cores).
+3454: 
+3455:     int32_t cpumask_iter = 0;
+3456: 
+3457:     for (int j = 1; j < tpp->n_threads; j++) {
+3458:         ggml_thread_cpumask_next(tpp->cpumask, workers[j].cpumask, tpp->strict_cpu, &cpumask_iter);
+3459: 
+3460:         int32_t rc = ggml_thread_create(&workers[j].thrd, NULL, ggml_graph_compute_secondary_thread, &workers[j]);
+3461:         GGML_ASSERT(rc == 0);
+3462:     }
+3463: 
+3464:     ggml_thread_cpumask_next(tpp->cpumask, workers[0].cpumask, tpp->strict_cpu, &cpumask_iter);
+3465: 
+3466:     if (!threadpool->pause) {
+3467:         // Update main thread prio and affinity at the start, otherwise we'll do it in resume
+3468:         ggml_thread_apply_priority(threadpool->prio);
+3469:         if (ggml_thread_cpumask_is_valid(threadpool->workers[0].cpumask)) {
+3470:             ggml_thread_apply_affinity(threadpool->workers[0].cpumask);
+3471:         }
+3472:     }
+3473: #endif // GGML_USE_OPENMP
+3474: 
+3475:     return threadpool;
+3476: }
+3477: 
+3478: struct ggml_threadpool * ggml_threadpool_new(struct ggml_threadpool_params * tpp) {
+3479:     return ggml_threadpool_new_impl(tpp, NULL, NULL);
+3480: }
+3481: 
+3482: enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {
+3483:     ggml_cpu_init();
+3484:     newa_q6_configure();
+3485: 
+3486:     GGML_ASSERT(cplan);
+3487:     GGML_ASSERT(cplan->n_threads > 0);
+3488:     GGML_ASSERT(cplan->work_size == 0 || cplan->work_data != NULL);
+3489: 
+3490:     int n_threads                               = cplan->n_threads;
+3491:     struct ggml_threadpool * threadpool = cplan->threadpool;
+3492: 
+3493:     bool disposable_threadpool = false;
+3494: 
+3495:     if (threadpool == NULL) {
+3496:         //GGML_PRINT_DEBUG("Threadpool is not specified. Will create a disposable threadpool : n_threads %d\n", n_threads);
+3497:         disposable_threadpool = true;
+3498: 
+3499:         struct ggml_threadpool_params ttp = ggml_threadpool_params_default(n_threads);
+3500:         threadpool = ggml_threadpool_new_impl(&ttp, cgraph, cplan);
+3501:     } else {
+3502:         // Reset some of the parameters that need resetting
+3503:         // No worker threads should be accessing the parameters below at this stage
+3504:         threadpool->cgraph           = cgraph;
+3505:         threadpool->cplan            = cplan;
+3506:         threadpool->current_chunk    = 0;
+3507:         threadpool->abort            = -1;
+3508:         threadpool->ec               = GGML_STATUS_SUCCESS;
+3509:     }
+3510: 
+3511:     threadpool->newa_q6_phase = atomic_load_explicit(&newa_current_phase, memory_order_acquire);
+3512: #ifdef GGML_USE_OPENMP
+3513:     if (n_threads > 1) {
+3514:         #pragma omp parallel num_threads(n_threads)
+3515:         {
+3516:             #pragma omp single
+3517:             {
+3518:                 // update the number of threads from the actual number of threads that we got from OpenMP
+3519:                 n_threads = omp_get_num_threads();
+3520:                 atomic_store_explicit(&threadpool->n_graph, n_threads, memory_order_relaxed);
+3521:             }
+3522: 
+3523:             // Apply thread CPU mask and priority
+3524:             int ith = omp_get_thread_num();
+3525: 
+3526:             ggml_thread_apply_priority(threadpool->prio);
+3527:             if (ggml_thread_cpumask_is_valid(threadpool->workers[ith].cpumask)) {
+3528:                 ggml_thread_apply_affinity(threadpool->workers[ith].cpumask);
+3529:             }
+3530:             ggml_graph_compute_thread(&threadpool->workers[ith]);
+3531:         }
+3532:     } else {
+3533:         atomic_store_explicit(&threadpool->n_graph, 1, memory_order_relaxed);
+3534:         ggml_graph_compute_thread(&threadpool->workers[0]);
+3535:     }
+3536: #else
+3537:     if (n_threads > threadpool->n_threads) {
+3538:         GGML_LOG_WARN("cplan requested more threads (%d) than available (%d)\n", n_threads, threadpool->n_threads);
+3539:         n_threads = threadpool->n_threads;
+3540:     }
+3541: 
+3542:     // Kick all threads to start the new graph
+3543:     ggml_graph_compute_kickoff(threadpool, n_threads);
+3544: 
+3545:     // This is a work thread too
+3546:     ggml_graph_compute_thread(&threadpool->workers[0]);
+3547: #endif
+3548: 
+3549:     // don't leave affinity set on the main thread
+3550:     clear_numa_thread_affinity();
+3551: 
+3552:     enum ggml_status ret = threadpool->ec;
+3553: 
+3554:     if (disposable_threadpool) {
+3555:         ggml_threadpool_free(threadpool);
+3556:     }
+3557: 
+3558:     return ret;
+ggml/src/ggml-cpu/ggml-cpu.cpp sha256=8ab6ed68e2c0eea05090368d7788636500d146851298685276d7a9302c03c5c1
+96:     }
+97:     return false;
+98: }
+99: 
+100: // CPU backend - backend (stream)
+101: 
+102: struct ggml_backend_cpu_context {
+103:     int                 n_threads;
+104:     ggml_threadpool_t   threadpool;
+105: 
+106:     uint8_t *           work_data;
+107:     size_t              work_size;
+108: 
+109:     ggml_abort_callback abort_callback;
+110:     void *              abort_callback_data;
+111: 
+112:     bool                use_ref;  // use reference implementation
+113: };
+114: 
+115: static const char * ggml_backend_cpu_get_name(ggml_backend_t backend) {
+116:     return "CPU";
+117: 
+118:     GGML_UNUSED(backend);
+119: }
+120: 
+121: static void ggml_backend_cpu_free(ggml_backend_t backend) {
+122:     struct ggml_backend_cpu_context * cpu_ctx = (struct ggml_backend_cpu_context *)backend->context;
+123:     delete[] cpu_ctx->work_data;
+124:     delete cpu_ctx;
+125:     delete backend;
+126: }
+127: 
+128: struct ggml_backend_plan_cpu {
+129:     struct ggml_cplan cplan;
+130:     struct ggml_cgraph cgraph;
+131: };
+132: 
+133: static ggml_backend_graph_plan_t ggml_backend_cpu_graph_plan_create(ggml_backend_t backend, const struct ggml_cgraph * cgraph) {
+134:     struct ggml_backend_cpu_context * cpu_ctx = (struct ggml_backend_cpu_context *)backend->context;
+135: 
+136:     struct ggml_backend_plan_cpu * cpu_plan = new ggml_backend_plan_cpu;
+137: 
+138:     cpu_plan->cplan = ggml_graph_plan(cgraph, cpu_ctx->n_threads, cpu_ctx->threadpool);
+139:     cpu_plan->cgraph = *cgraph; // FIXME: deep copy
+140: 
+263: void ggml_backend_cpu_set_threadpool(ggml_backend_t backend_cpu, ggml_threadpool_t threadpool) {
+264:     GGML_ASSERT(ggml_backend_is_cpu(backend_cpu));
+265: 
+266:     struct ggml_backend_cpu_context * ctx = (struct ggml_backend_cpu_context *)backend_cpu->context;
+267: 
+268:     if (ctx->threadpool && ctx->threadpool != threadpool) {
+269:         // already had a different threadpool, pause/suspend it before switching
+270:         ggml_threadpool_pause(ctx->threadpool);
+271:     }
+272:     ctx->threadpool = threadpool;
+273: }
+274: 
+275: void ggml_backend_cpu_set_abort_callback(ggml_backend_t backend_cpu, ggml_abort_callback abort_callback, void * abort_callback_data) {
+276:     GGML_ASSERT(ggml_backend_is_cpu(backend_cpu));
+tools/server/server-context.cpp sha256=85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685
+958:     server_state_callback_t callback_state = [](server_state, json) -> void {};
+959: 
+960:     server_context_impl() {
+961:         mtmd_helper_log_set(common_log_default_callback, nullptr);
+962:     }
+963: 
+964:     ~server_context_impl() {
+965:         if (!sleeping) {
+966:             // destroy() is already called when entering sleeping state
+967:             // we don't call it again here to avoid double free
+968:             destroy();
+969:         }
+970:     }
+971: 
+972: private:
+973:     // note: accessing these fields outside of this class is not thread-safe
+974:     // use server_context methods instead
+975: 
+976:     common_params params_base;
+977: 
+978:     // note: keep these alive - they determine the lifetime of the model, context, etc.
+979:     common_init_result_ptr llama_init;
+980: 
+981:     llama_context * ctx_tgt = nullptr;
+982:     ggml_threadpool_t newa_pool = nullptr;
+983:     void (*newa_pool_free)(ggml_threadpool_t) = nullptr;
+984: 
+985:     server_batch batch;
+986: 
+987:     llama_model   * model_dft = nullptr;
+988:     llama_context * ctx_dft   = nullptr;
+1033:     int64_t t_last_load_progress_ms = 0;
+1034: 
+1035:     void destroy() {
+1036:         if (newa_pool) {
+1037:             llama_synchronize(ctx_tgt);
+1038:             llama_detach_threadpool(ctx_tgt);
+1039:             newa_pool_free(newa_pool);
+1040:             newa_pool = nullptr;
+1041:         }
+1042:         spec.reset();
+1043:         spec_init.reset();
+1044: 
+1045:         ctx_dft   = nullptr;
+1046:         model_dft = nullptr;
+1047: 
+1048:         llama_init.reset();
+1049: 
+1050:         ctx_tgt = nullptr;
+1051:         model_tgt = nullptr;
+1052: 
+1053:         mtmd_free(mctx);
+1054:         mctx = nullptr;
+1055:     }
+1056: 
+1057:     void handle_sleeping_state(bool new_state) {
+1058:         GGML_ASSERT(sleeping != new_state);
+1059:         if (new_state) {
+1060:             SRV_INF("%s", "server is entering sleeping state\n");
+1061:             destroy();
+1062:         } else {
+1063:             SRV_INF("%s", "server is exiting sleeping state\n");
+1064:             if (!load_model(params_base)) {
+1065:                 GGML_ABORT("failed to reload model after sleeping");
+1260:         ctx_tgt   = llama_init->context();
+1261: 
+1262:         if (model_tgt == nullptr) {
+1263:             SRV_ERR("failed to load model, '%s'\n", params_base.model.path.c_str());
+1264:             return false;
+1265:         }
+1266: 
+1267:         if (ctx_tgt == nullptr) {
+1268:             SRV_ERR("failed to create_context with model '%s'\n", params_base.model.path.c_str());
+1269:             return false;
+1270:         }
+1271: 
+1272:         const char * pool_mode = std::getenv("GGML_NEWA_POOL");
+1273:         if (pool_mode && std::strcmp(pool_mode, "off") != 0) {
+1274:             if (std::strcmp(pool_mode, "on") != 0) GGML_ABORT("invalid GGML_NEWA_POOL");
+1275:             auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+1276:             if (!dev) return false;
+1277:             auto * reg = ggml_backend_dev_backend_reg(dev);
+1278:             using create_fn = ggml_threadpool_t (*)(ggml_threadpool_params *);
+1279:             auto create = (create_fn) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_new");
+1280:             newa_pool_free = (void (*)(ggml_threadpool_t)) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_free");
+1281:             if (!create || !newa_pool_free) return false;
+1282:             const int threads = std::max(params_base.cpuparams.n_threads, params_base.cpuparams_batch.n_threads);
+1283:             auto pool_params = ggml_threadpool_params_default(threads);
+1284:             pool_params.poll = 0;
+1285:             pool_params.paused = true;
+1286:             newa_pool = create(&pool_params);
+1287:             if (!newa_pool) return false;
+1288:             llama_attach_threadpool(ctx_tgt, newa_pool, newa_pool);
+1289:             std::fprintf(stderr, "NEWA_POOL attached=1 threads=%d poll=0\n", threads);
+1290:         } else {
+1291:             std::fprintf(stderr, "NEWA_POOL attached=0\n");
+1292:         }
+1293: 
+1294:         if (params.scx_phase_run_id && (llama_model_has_encoder(model_tgt) || !llama_model_has_decoder(model_tgt))) {
+1295:             SRV_ERR("%s", "SCX phase tracing requires a decoder-only model\n");
+1296:             return false;
+1297:         }
+1298: 
+1299:         vocab = llama_model_get_vocab(model_tgt);
+1300: 
+1301:         n_ctx = llama_n_ctx(ctx_tgt);
+1302: 
+1303:         add_bos_token = llama_vocab_get_add_bos(vocab);
+1304: 
+1305:         if (has_spec) {
+1306:             // spec_mtp doesn't use load a model internally, so we report 0.0 and 1.0 manually
+1307:             load_progress_callback(0.0f, &load_progress_spec);
+1308:             load_progress_spec.t_last_load_progress_ms = 0;  // reset so internal cbs aren't delayed
+1309: 
+1310:             {
+1311:                 common_params params_dft = common_base_params_to_speculative(params_base);
+1312: 
+1313:                 // progress callback
+1314:                 params_dft.load_progress_callback           = load_progress_callback;
+1315:                 params_dft.load_progress_callback_user_data = &load_progress_spec;
+1316: 
+1317:                 spec_init = common_speculative_init_from_params(params_dft, model_tgt, ctx_tgt);
+1318:                 model_dft = spec_init->model();
+1319:                 ctx_dft   = spec_init->context();
+1320: 
+1321:                 if (has_draft && model_dft == nullptr) {
+1322:                     SRV_ERR("failed to load draft model, '%s'\n", params_dft.model.path.c_str());
+1323:                     return false;
+1324:                 }
+1325: 
+1326:                 if (ctx_dft == nullptr) {
+1327:                     SRV_ERR("%s", "failed to create MTP context\n");
+1328:                     return false;
+1329:                 }
+1330: 

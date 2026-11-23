@@ -1,5 +1,46 @@
 # Status
 
+## 2026-11-23: preserved NEW_A workspace and Intel handoff
+
+Added `new-a-workspace/` alongside the existing base project, preserving its
+history and code. Models, frozen runtime binaries, caches, and duplicate archives
+are excluded. The portable script builds historical B0 and the retained A/R source
+recipe with identical AVX2/OpenMP options and compares B0_L, F6_L, and A_L under
+the default Linux scheduler. It never loads BPF or changes system configuration.
+
+Validation completed on AMD Ryzen 5 5500U, targeting Intel i5-1240P / Ubuntu:
+
+- Both fresh server builds passed; source/overlay/compiler and loaded DSO identities recorded.
+- 15 smoke visits completed (156 requests including warmup, 16 output tokens/request).
+  A/F6 and A/B0 token equality passed for both concurrent cohorts, two singleton
+  cases, and a concurrent cpu25 case. Cache reuse, affinity, actual CPU load,
+  policy decisions and OpenMP team sizes were checked.
+- Under cpu25, A selected five workers in all 15 measured eligible Decode calls;
+  F6 selected six. All owned processes exited normally; sched_ext stayed disabled.
+- `python3 -B new-a-workspace/tools/test_intel_experiment.py`: 9 tests passed.
+- `make -j2 check`: passed; 51 Python tests with one expected skip because the
+  separate `.deps` semantic fork is absent, plus shell checks. No kernel load.
+- Packaged historical performance recalculation: 20 contrasts and two pool
+  conditions passed; no new inference was used for that recalculation.
+
+Exact local smoke command, from `new-a-workspace/`:
+
+```bash
+bash scripts/intel_experiment.sh smoke --allow-non-intel \
+  --baseline-repo /home/codinghuman/projects/llama.cpp \
+  --model /home/codinghuman/projects/new-a-workspace/models/model.gguf
+```
+
+Known limits: Intel hardware, Intel performance and Intel sched_ext loading are
+NOT_RUN. Full pilot/confirmation is NOT_RUN. This short smoke makes no gain claim.
+The first UI alias-header build failure is retained with its recipe-2 fix.
+Original model, source and best A frozen runtimes passed preservation hashes.
+
+Next milestone: teammate runs the [Intel guide](../new-a-workspace/docs/INTEL_EXPERIMENT.ko.md).
+See [compatibility results](../new-a-workspace/docs/INTEL_COMPATIBILITY_CHECK.ko.md)
+and [Codex handoff](../new-a-workspace/docs/INTEL_CODEX_HANDOFF.ko.md).
+Raw local check artifacts are in `new-a-workspace/experiments/intel-portability-check-v1/`.
+
 ## Milestone 6: baseline sched_ext validation suite
 
 Status: implemented, built, and non-privileged-tested; ready for the next

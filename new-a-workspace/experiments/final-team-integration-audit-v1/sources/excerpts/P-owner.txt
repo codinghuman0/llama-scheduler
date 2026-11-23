@@ -1,0 +1,29 @@
+SOURCE: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-threadpool.h
+SHA256: 61a61c12907cf122ed5de90ef1fb9acb80531e39a86b56b9ccd314d0736fde58
+Original line numbers follow; omitted regions are explicit.
+
+... 3-26 ...
+3: #include "common.h"
+4: #include "ggml-backend.h"
+5: #include "ggml-cpu.h"
+6: #include "log.h"
+7: 
+8: struct server_threadpools {
+9:     ggml_threadpool_t normal = nullptr;
+10:     ggml_threadpool_t batch  = nullptr;
+11: 
+12:     server_threadpools() = default;
+13:     server_threadpools(const server_threadpools &) = delete;
+14:     server_threadpools & operator=(const server_threadpools &) = delete;
+15: 
+16:     ~server_threadpools() {
+17:         reset();
+18:     }
+19: 
+20:     // Destroy all contexts and backends that use these pools before reset().
+21:     void reset() {
+22:         if (normal) {
+23:             free_fn(normal);
+24:         }
+25:         if (batch) {
+26:             free_fn(batch);

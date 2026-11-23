@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "created_utc": "2026-11-22T11:21:32.212593+00:00",
+  "contrast": "A/B0",
+  "scheduler": "default Linux; no sudo/BPF",
+  "runtime_changes": "NONE: all B0/R/A binaries and source are immutable; only new harness/documents",
+  "fixtures": [
+    "heldout-1",
+    "heldout-2"
+  ],
+  "fixture_meaning": "Historical labels, not unseen heldout data",
+  "primary": "actual generated tokens / full cohort HTTP wall seconds",
+  "clock": "time.monotonic_ns around unchanged HTTPConnection request/read/JSON decode",
+  "tokens_per_request": 128,
+  "requests_per_cohort": 8,
+  "tokens_per_cohort": 1024,
+  "arrival": "single atomic prompt-array /completion",
+  "warmup": "one identical excluded cohort on each fresh server",
+  "include": [
+    "queueing",
+    "prefill",
+    "decode",
+    "policy cost",
+    "response complete"
+  ],
+  "exclude": [
+    "model loading",
+    "one warmup",
+    "identity/proc/environment inspections outside HTTP clock"
+  ],
+  "campaigns": 2,
+  "conditions": [
+    "ambient",
+    "cpu25"
+  ],
+  "pairs_per_condition": 8,
+  "planned_visits": 64,
+  "order": "order.json",
+  "bootstrap": {
+    "unit": "paired block",
+    "stratified_by": "cohort",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "samples_per_stratum": 4,
+    "replicates": 10000,
+    "seed": 20261122,
+    "quantile": "linear interpolation at (n-1)*p, p=.025/.975; random.Random choices within each of h1,h2, reset seed for each campaign-condition"
+  },
+  "success": {
+    "mean_paired_gain_min_pct": 5,
+    "ci_lower_strictly_gt": 0,
+    "faster_pairs_min": 6,
+    "strong_evidence": "CI lower>=5",
+    "all_four_cells_required": true
+  },
+  "other_verdicts": {
+    "POSITIVE_BELOW_TARGET": "all four lower>0 but at least one target gate fails",
+    "REGRESSION": "all four means negative and all four upper<0",
+    "SCOPED_OR_MIXED_RESULT": "at least one target pass or positive/negative confirmed cell, not all-four categories above",
+    "NO_CONFIRMED_GAIN": "otherwise",
+    "INCOMPLETE_INVALID": "any planned visit missing or invalid"
+  },
+  "cpu_envelope": [
+    0,
+    2,
+    4,
+    6,
+    8,
+    10
+  ],
+  "controller_cpu": 11,
+  "cpu25": {
+    "cpu": 10,
+    "period_s": 0.05,
+    "cpu_budget_s": 0.0125,
+    "measured_core_range": [
+      0.22,
+      0.28
+    ],
+    "normal_priority": true,
+    "lifecycle": "same start before fresh server, READY then explicit 0.5s stabilization; same warmup; stop after server cleanup; <=180s generator"
+  },
+  "bounds": {
+    "ready_timeout_s": 90,
+    "http_timeout_s": 180,
+    "server_lifetime_s": 480,
+    "min_disk_bytes": 1073741824,
+    "min_mem_available_kib": 3000000,
+    "max_cpu_temperature_c": 85,
+    "thermal_checks": "pre/post request, outside primary clock"
+  },
+  "diagnostics": {
+    "perf": "on both",
+    "log_verbosity": 4,
+    "OMP_DISPLAY_AFFINITY": "TRUE both, bounded team changes",
+    "LD_PRELOAD": "absent",
+    "TRACE": "off",
+    "A_pressure": "required bounded shutdown evidence, real cost included",
+    "no_separate_overhead_correction": true
+  },
+  "model_sha256": "f3bdf9cf31dee4b57ae4e455a1cb0d01b5c2c1b50d72d3112141c195506c2840",
+  "environment_allowlist": "cases.json server_env replaces parent environment; no parent LLAMA_ARG/LD_PRELOAD/OMP/GOMP/KMP inheritance",
+  "invalid_rules": [
+    "timeout",
+    "output mismatch against frozen same-fixture B0 oracle",
+    "wrong loaded DSO/model/affinity/policy",
+    "cleanup failure",
+    "sensor read failure",
+    "measured cpu25 outside .22..28",
+    "stable environment change",
+    "pre/post thermal or resource gate failure"
+  ],
+  "failure_policy": "Stop on any invalid visit; preserve incomplete/invalid campaign/condition and all planned NOT_RUN visits; no replacement pairs or runner edits during timing. A normal pressure fallback is valid if raw audit passes.",
+  "smoke": "four fresh servers: each arm x each cohort; one warmup and one check, all excluded from timing",
+  "auxiliary": [
+    "process CPU seconds and seconds/token (not energy)",
+    "raw E pressure/actual team choices",
+    "background CPU",
+    "temperature/frequency/environment brackets",
+    "response-defined per-request prompt_n/prompt_ms/predicted_n/predicted_ms; never summed as aggregate throughput"
+  ],
+  "TTFT": "NOT_MEASURED (nonstream)",
+  "limitations": [
+    "same AMD host and two previously observed cohorts",
+    "no A-fixed6 ablation or isolated E/kernel scheduler attribution",
+    "no Intel or other model/ISA/chat/quality/energy claim"
+  ]
+}

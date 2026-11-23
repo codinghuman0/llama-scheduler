@@ -1,0 +1,120 @@
+/goal 기존 동결 A(E-R, persistent pool off)와 기존 observe 스케줄러를 변경하지 않고, a-component-scheduler-attribution-v1의 네 비교군을 새 독립 실행 캠페인 정확히 1회로 재현하라. E의 fixed6 대비 선택 효과, observe 추가 효과, 최종 조합의 B0 대비 전체 효과를 분리해 검증하고, 기존 캠페인과 새 캠페인을 각각 보존한 제출용 최종 근거표·재현 패키지를 완성하라. 계획 작성이나 기존 결과 재계산에서 멈추지 말고, 허용된 실제 모델 실행·kernel admission·64 measured visits·분석·패키징까지 수행하라. 새 최적화나 승자를 만들기 위한 반복은 하지 마라.
+
+[0. 목표와 명칭]
+NEW_A는 현재 검증된 개선 runtime 계열이다. 런타임 E는 Prefill-pressure worker 선택 정책이며, kernel scheduler의 이름과 혼동하지 않는다.
+기존 A/B0 직접 확인 두 캠페인과 이번 기여 분석 원본 한 캠페인은 서로 다른 증거다.
+이 goal에서 추가할 것은 동일 네 arm의 새로운 실행 캠페인 한 개뿐이다. 기존 기여 분석 한 개와 합쳐 비교 가능한 기여 분석 실행 두 개를 확보하되, 네 번 재현했다고 부풀리지 마라.
+동일 장비의 시간적으로 분리된 새 실행이다. 다른 장비·다른 팀의 외부 독립 재현이나 workload 일반화를 뜻하지 않는다.
+
+[1. 정확한 출발점과 보호]
+현재 workspace를 조사해 실제 경로를 확인하라. 예상 기준:
+/home/codinghuman/projects/new-a-workspace
+원본 기여 분석:
+experiments/a-component-scheduler-attribution-v1
+이전 runtime 직접 확인:
+experiments/a-b0-direct-confirmation-v1
+수치 호환 기반:
+experiments/r-pool-validation-v1
+
+원본 component-summary.md/json, cases.json, protocol.json, order.json, identity.json, scheduler-identity.json, seal.json, README.md, code/, ledger, raw, admission 기록과 이전 실패를 읽어라.
+원본 검토 archive의 기록된 SHA256은 38e174805e0d59abb24b30d31e5c93bdbac09a099798a2b20feb587cf7c2af4f이다. 이것은 모델이나 runtime의 SHA가 아니다.
+과거 파일·source·B0/R/A/P·모델·runtime DSO·kernel object·보고서·manifest를 읽기 전용 기준으로 보호하고 시작/종료 시 내용과 mode를 확인한다.
+원본 결과의 성공/실패 판정을 새 결과로 덮어쓰지 마라. 기존 보호 목록을 임의 축소하지 마라.
+
+새 sibling 디렉터리 예:
+experiments/a-component-scheduler-replication-v1
+존재하면 덮어쓰지 말고 새 이름을 사용한다. 모델·runtime·전체 build tree를 복제하지 말고 검증된 원본을 참조한다. 작은 harness/protocol/fixture만 필요한 만큼 복사한다.
+특히 원본 run.py/analyze.py/finalize.py는 results의 --name만 바꿔도 원본 GOAL_STATE.md, ledger.jsonl, evidence의 admission pointer, component-summary.json 등을 갱신한다. 따라서 원본 디렉터리에서 단순히 full/analyze를 실행하는 방식으로 재현하지 마라.
+새 실행용 복사본에서 출력 목적지를 격리하고 원본이 수정되지 않는지 먼저 검사하라. 변경 가능한 harness 파일을 원본과 hardlink로 공유하지 않는다.
+기존 finalizer의 scheduler-admission-v1/linux-smoke-v1 등 하드코딩된 경로도 새 실행을 가리키는지 확인하라. 옛 smoke를 새 admission으로 인정하지 마라.
+실행 경로·보고 대상·현재 실행 ID 연결에 필요한 도구 변경은 허용하지만 patch와 이유를 기록한다. runtime, 모델, 산술, E 정책, scheduler 정책은 변경 금지다.
+추가로 원본 code/recalculate.py는 result.json 누락 및 불완전 block을 continue한 뒤 최종 PASS를 반환할 수 있다. 원본은 수정하지 말고 새 도구에서 planned64 visits/128 raw cohorts/10 contrasts의 완결성을 요구하여 누락 시 nonzero/INCOMPLETE로 실패하게 하라. 임시 복사본에서 방문 하나를 제외하는 negative test로 이를 검증한다. 기존 완결된 데이터의 수치·통계식을 바꾸지 않으며, 이 강화 전후 정상 자료 결과가 정확히 같아야 한다.
+
+[2. 고정할 네 비교군]
+B0_L = 보존된 역사적 원본 재빌드 + Linux.
+F6_L = 동일한 A binary/DSO + NEWA_DECODE_RESOURCE=fixed6 + Linux.
+A_L = 동일한 A binary/DSO + NEWA_DECODE_RESOURCE=pressure + Linux.
+A_S = A_L + 보존된 observe/FULL/partial/fixed-affinity scheduler.
+
+F6_L과 A_L은 NEWA_DECODE_RESOURCE 값 외에 다른 실행 차이가 없어야 한다.
+fixed6은 센서·원시 관측·유효성/연속성 검사·phase 전달을 유지한다. 적격 multi-token Decode 선택만 여섯으로 고정한다. mode=off로 대체하지 않는다.
+A_S/A_L은 동일 userspace argv/env/ELF/DSO를 사용하며 scheduler 경로만 달라야 한다.
+모든 arm에서 기존 pool off를 유지한다. generation5/batch6, 같은 OpenMP 환경, HTTP threads, batch/ubatch/context, FA, per-slot KV, speculation/cache 금지 설정과 계측 설정을 원본 cases.json에서 정확하게 승계한다.
+B0는 source revision 7a2db1a0cf38e5f4eb278a58c3903d295258d0ea의 보존 재빌드다. 새 upstream이나 새 컴파일 결과로 바꾸지 마라.
+새 R/SIMD/Q4/Q6 변경, pool ON, v2 통합, Runtime Lite, dynamic affinity, governor/boost 변경, E threshold/.02 margin/worker 후보 변경, Git merge/push를 하지 마라.
+
+[3. 시작 전 재승인과 실험 안전]
+일반 계정으로 검사·추론·분석을 수행한다. 권한은 기존 승인된 selected-child loader, read-only kernel/BPF 진단, 자신이 시작한 loader cleanup에 한정한다. 저장된 비밀번호·sudoers 수정·무인 권한 우회를 사용하지 않는다.
+현재 kernel/BTF/topology/CPU mask/model/source/actual ELF hashes와 기록된 값의 일치 여부를 확인한다. boot가 달라졌다면 새 admission을 수행하며 과거 pidfd·PID·kernel object ID를 재사용하지 않는다. kernel/BTF 등 실행 계약이 달라졌다면 이전 object의 guard를 우회하거나 새 정책을 만드는 대신 BLOCKED로 기록한다.
+CPU envelope [0,2,4,6,8,10], controller/loader/launcher CPU11, load CPU10, 선택 server/worker만 SCHED_EXT, unrelated tasks와 load generator는 기본 Linux를 유지한다.
+기존 measurement lock, disk/memory/temperature guard, timeout, FULL diagnostics, watchdog, cleanup을 유지한다. timing과 빌드/무거운 관측을 겹치지 않는다.
+권한이 없으면 실행 가능한 verify/오프라인 비교는 완료하되 스케줄러 실행은 BLOCKED다. 사용자가 승인을 제공하지 않은 권한을 새로 획득하려 하지 않는다.
+이번 goal의 목표는 네 arm 재현이다. S admission이 막히면 3-arm 캠페인으로 임의 변경해 같은 목표를 달성했다고 하지 마라. blocker와 재개 명령을 남긴다.
+
+[4. 프로토콜과 횟수 고정]
+측정 전에 새 protocol·identity·seal·order와 원본과의 차이를 확정한다. runtime/metric/workload/반복수/판정식은 원본 네 arm 프로토콜을 유지한다.
+원본 order.json의 균형 순서를 그대로 사용하라. 실행 namespace만 새로 분리하고 original order SHA와 새 실행 계획의 대응을 기록한다. 결과를 본 뒤 순서를 바꾸지 마라.
+ambient와 cpu25 각각 정확히 8 complete four-arm paired blocks: 총 64 fresh-server measured visits.
+각 조건에서 두 historical cohort가 각각 4 blocks, 각 cohort에서 각 arm이 위치1/2/3/4에 한 번씩 오도록 검증한다.
+각 visit은 같은 한 번의 제외 warmup cohort + 한 번의 measured cohort다. 입력은 하나의 atomic prompt-array /completion, 서로 다른 요청8개, 요청당128 generated tokens이다. 독립 HTTP client8개 도착이라고 바꿔 설명하지 마라.
+두 cohort는 이미 관측된 historical fixture이며 새로운 heldout 일반화 표본이 아니다.
+primary = 실제 완료 generated tokens / cohort 전체 HTTP wall seconds. loading/warmup 제외 규칙, JSON read/parse 포함 범위, clock 위치를 유지한다. 실패·부분 완료 throughput을 성공 표본으로 사용하지 않는다.
+CPU25 = CPU10의 일반계정 generator, .0125 process CPU seconds / .05 seconds period. 기존 READY·stabilization·시작/종료 수명과 measured .22~.28 core gate를 유지한다.
+부하 수요만 같다고 보고하지 말고 실제 average core, affinity, policy와 유효 기간을 확인한다. CPU25는 총 CPU25% 또는 CPU quota25%가 아니라 이 고정된0.25-core 간섭 조건이다.
+원본과 같은 제외 기능검사: 두 cohort의 S admission, 세 Linux arm의 smoke. 새 모델 호출 수와 warmup/diagnostic/measured를 별도로 합산한다.
+본측정 실패 시 원래 실패와 미실행 계획을 보존하고 중단한다. 불리한 block 제거·대체·성공할 때까지 추가 pair·중간 E tuning·순서 변경을 하지 않는다. 느려도 사전 invalid rule에 해당하지 않으면 유효 표본으로 유지한다.
+
+[5. 정확성과 실제 작동 증거]
+모든 유효 warmup/measurement를 동일 fixture의 frozen B0 token oracle과 직접 비교한다. 실제128 tokens/request, cache_n=0, prompt/token count를 확인한다. teacher forcing으로 출력을 맞추지 않는다.
+새로운 전체 logits 검증을 수행했다고 표현하지 말고 기존 R checkpoint와 이번 token 검증의 범위를 구분한다.
+선언된 경로뿐 아니라 실제 loaded DSO/model을 검사한다. 기존 통합 workspace의 합법적인 hardlink alias는 device/inode/hash로 검증하되 다른 내용을 허용하지 마라.
+A/F6의 원시 pressure, threshold/margin, epoch/task 연속성, shadow choice, 실제 선택 count와 OpenMP team 증거를 재계산한다. 보이는 team 크기 집합을 모든 graph의 연속 관측으로 과장하지 않는다.
+A_S는 실제 observe object/ops/BPF tags, matching marker ELF/PID, phase bits, selected server/worker SCHED_EXT, loader/launcher/load Linux, FULL mask/tracking/drop/error=0, handoff moved=0, no bypass/fallback, detach/final disabled를 확인한다.
+현재 observe는 phase를 관측하지만 phase-dependent placement는 하지 않는다. performance 성공을 만들기 위해 NEW_A_IDLE_HANDOFF 등을 켜지 않는다. 고정 mask의 scoped PASS로 역사적 dynamic-affinity 실패를 해소했다고 하지 않는다.
+
+[6. 비교와 해석]
+매 complete block에서 다음 다섯 비율을 직접 계산한다:
+A_L/B0_L, F6_L/B0_L, A_L/F6_L, A_S/A_L, A_S/B0_L.
+개선율 = 100*(candidate metric/baseline metric-1). 평균값의 비율과 paired ratio 평균을 구분한다.
+cohort별4 blocks를 50:50 가중한 paired stratified bootstrap10,000회, seed20261122, 기존 quantile 식을 유지한다. 모든 arm을 같은 resampled block에 유지한다. 8개 요청/1024 tokens를 독립 표본으로 부풀리지 않는다.
+각 캠페인을 따로 분석한다. 원본 기여 분석1회와 새 재현1회를 합친 단일 좋은 CI로 실패를 감추지 마라. 이전 A/B0 두 캠페인에는 F6/S가 없으므로 E 또는 S의 재현 횟수에 포함하지 않는다.
+
+전체 조합 성공 gate는 원래대로 각 조건 A_S/B0_L mean>=5%, CI lower>0, faster>=6/8이다. CI lower>=5이면 더 강한 결과로 구분한다.
+E 효과는 CPU25 A_L/F6_L에서 원본과 새 캠페인 각각 CI lower>0이며 실제 선택 차이가 확인되는지를 별도로 판정한다. E에 별도5% 목표를 새로 강제하지 않는다. ambient에서 실제 선택이 같으면 작은 시간 차이를 adaptive selection 이득으로 부르지 않는다.
+S 추가 효과는 조건별 A_S/A_L의 sign/CI로 판단한다. CI가0을 포함하면 inconclusive이며, 효과0·동등성·무오버헤드가 입증된 것이 아니다. A_S/A_L이 음수여도 숨기지 말고 전체 A_S/B0_L과 구분한다.
+A_S와 A_L의 실제 worker 선택이 다르면 S+E 상호작용이 포함된 효과다. 현재 네 arm만으로 fixed6_S interaction이나 모든 static 정책 대비 adaptive 우월성을 주장하지 않는다.
+E에는 semantic phase가 실제 쓰이지만, A/F6만으로 semantic label의 다른 controller 대비 고유 가치를 증명한 것은 아니다. 고정5/센서제거/다른 load/Intel 등의 새로운 비교는 이 goal에 추가하지 않는다.
+
+[7. 이번에는 캠페인 간 절대 성능도 반드시 검토]
+기존 A/B0 CPU25는 B0 약41.08/40.99 tokens/s, A 약51.75/51.71로 상대개선 약26%였다.
+기여 분석 원본 CPU25는 B0 약38.68, A 약51.03으로 상대개선32.39%였다. 새 코드가 빨라졌다는 증거가 아니라 상대 기준의 변동이 포함된 결과다.
+새 보고서에 각 캠페인의 모든 arm 절대tokens/s, wall/CPU seconds, paired gain/CI, cohort별/순서별 결과와 환경 brackets를 나란히 제시하라.
+특히 E/fixed6 원본의 전체8 pair는 모두 양수였지만(+6.705~+16.083%), 순서·배경 간섭 등의 변동은 별도 재현으로 확인한다. 이 범위를 새 합격 임계값으로 사용하지 않는다.
+환경 snapshot으로 온도/주파수/전원/부하 차이를 관측할 수 있어도 원인 분리 실험이 없으면 CAUSE_UNDETERMINED라고 남긴다. 느린 B0 block을 사후 outlier로 제거하지 않는다. 결과를32%에 맞추기 위해 power/affinity/load를 조정하지 않는다.
+
+[8. 종료와 최종 제출 기준점]
+정확히 새1캠페인의 고정 실행·기능검사·재계산·패키징이 끝나면 이 goal을 종료한다. 첫 긍정 결과에서 조기 성공 선언하지도, 유의성 확보를 위해 세 번째 기여분석 캠페인을 자동 시작하지도 마라.
+원본과 새 캠페인 각각에 대해 overall system, E_cpu25, E_ambient, S_cpu25, S_ambient를 별도 판정한다.
+권장 상태:
+- REPLICATED_SCOPED_SYSTEM_GAIN: 두 기여 분석 캠페인에서 전체 조합 조건 gate 유지.
+- E_SELECTION_REPLICATED_CPU25: 두 캠페인에서 실제 선택 차이와 positive CI 유지.
+- MIXED_OR_INCONCLUSIVE_REPLICATION: 완결됐지만 핵심 기여가 일치하지 않음.
+- INCOMPLETE_INVALID / BLOCKED: 실패 또는 실행 계약/권한 부족.
+여러 상태를 독립 필드로 기록하고, S가 inconclusive라는 이유만으로 runtime 성과를 실패로 바꾸지 마라. 반대로 system success만으로 S가 유효하다고 하지 마라.
+성능 기본 실행은 기존 A_L을 유지하고, A_S는 scoped integration/evaluation 구성으로 보존한다. 새 자료로 역할이 달라질 때는 사전 기준과 근거를 쓰되 원래 후보를 덮어쓰지 않는다.
+결과가 유지되면 추가 기능 연구를 자동 시작하지 않고 현재 지원 범위의 제출용 연구 기준점으로 동결한다. “production-ready” 또는 일반 제품 품질 검증이라고 하지 않는다.
+
+[9. 산출물]
+새 디렉터리에 다음을 남겨라:
+- 실행 전 replication-protocol.json/identity/seal/order, 원본과의 차이 및 SHA 연결.
+- fresh admission/smoke/64 measured visit 원시 결과와 실패/미실행 기록.
+- replication-summary.md/json: 새 캠페인의 모든 비교·CI·출력/실제선택·scheduler evidence.
+- campaign-comparison.md/json: 기존 원본과 새 캠페인 별도 결과, 이전 A/B0 참고, baseline 변동과 해석 범위.
+- claim-evidence-matrix.md: 주장마다 증거/범위/미검증 항목. E 선택 효과와 커널 스케줄러 효과를 구분.
+- frozen-release-map.json: 현재 A_L 및 연구용 A_S의 source overlays/바이너리/실제DSO/모델 hashes, 정확한 argv/env, 재현 경로. 자동 Git push나 기존 tag 변경은 하지 않는다.
+- 원본 보호파일 before/after, 소유 process cleanup/final sched_ext disabled, package manifest/zip hash.
+- README/reproduce.sh: 새 이름·현재 경로에서 원본 보고서를 덮어쓰지 않는 명령. 모델 없는 재계산과 실제 재실행을 구분.
+- review ZIP: 작은 코드/프로토콜/필수 원시 자료/결과만 포함. 모델·전체runtime·build tree 복제 금지. ZIP의 모델 없는 별도 재계산과 모든 member hash 검증까지 수행.
+
+최종 답변은 한국어로 캠페인별 표와 상태, 원본 보존 여부, 실제 모델 호출 수, 각 구성의 역할, 주장 가능한 범위와 한계를 보고한다.
+지금부터 새 출력 root를 준비하고 동결 입력/원본보호 확인, fresh admission, 고정 재현과 제출 기준점 정리를 진행하라.

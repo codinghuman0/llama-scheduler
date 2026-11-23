@@ -1,0 +1,55 @@
+SOURCE: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.cpp
+SHA256: 8ab6ed68e2c0eea05090368d7788636500d146851298685276d7a9302c03c5c1
+Original line numbers follow; omitted regions are explicit.
+
+... 251-274 ...
+251: 
+252: bool ggml_backend_is_cpu(ggml_backend_t backend) {
+253:     return backend != NULL && ggml_guid_matches(backend->guid, ggml_backend_cpu_guid());
+254: }
+255: 
+256: void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {
+257:     GGML_ASSERT(ggml_backend_is_cpu(backend_cpu));
+258: 
+259:     struct ggml_backend_cpu_context * ctx = (struct ggml_backend_cpu_context *)backend_cpu->context;
+260:     ctx->n_threads = n_threads;
+261: }
+262: 
+263: void ggml_backend_cpu_set_threadpool(ggml_backend_t backend_cpu, ggml_threadpool_t threadpool) {
+264:     GGML_ASSERT(ggml_backend_is_cpu(backend_cpu));
+265: 
+266:     struct ggml_backend_cpu_context * ctx = (struct ggml_backend_cpu_context *)backend_cpu->context;
+267: 
+268:     if (ctx->threadpool && ctx->threadpool != threadpool) {
+269:         // already had a different threadpool, pause/suspend it before switching
+270:         ggml_threadpool_pause(ctx->threadpool);
+271:     }
+272:     ctx->threadpool = threadpool;
+273: }
+274: 
+
+... 648-671 ...
+648:     GGML_UNUSED(reg);
+649: }
+650: 
+651: static void * ggml_backend_cpu_get_proc_address(ggml_backend_reg_t reg, const char * name) {
+652: #if defined(__gnu_linux__)
+653:     if (strcmp(name, "ggml_backend_cpu_newa_phase") == 0) return (void *) ggml_backend_cpu_newa_phase;
+654: #endif
+655:     if (strcmp(name, "ggml_backend_set_n_threads") == 0) {
+656:         ggml_backend_set_n_threads_t fct = ggml_backend_cpu_set_n_threads;
+657:         return (void *)fct;
+658:     }
+659:     if (strcmp(name, "ggml_backend_dev_get_extra_bufts") == 0) {
+660:         ggml_backend_dev_get_extra_bufts_t fct = ggml_backend_cpu_device_get_extra_buffers_type;
+661:         return (void *)fct;
+662:     }
+663:     if (strcmp(name, "ggml_backend_get_features") == 0) {
+664:         return (void *)ggml_backend_cpu_get_features;
+665:     }
+666:     if (strcmp(name, "ggml_backend_set_abort_callback") == 0) {
+667:         return (void *)ggml_backend_cpu_set_abort_callback;
+668:     }
+669:     if (strcmp(name, "ggml_backend_cpu_numa_init") == 0) {
+670:         return (void *)ggml_numa_init;
+671:     }

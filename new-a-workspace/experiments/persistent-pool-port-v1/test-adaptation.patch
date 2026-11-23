@@ -1,0 +1,36 @@
+--- donor/test-server-threadpool.cpp
++++ local/test-server-threadpool.cpp
+@@ -1,5 +1,5 @@
+-#include "../tools/server/server-threadpool.h"
+-#include "../ggml/src/ggml-backend-impl.h"
++#include "server-threadpool.h"
++#include "ggml-backend-impl.h"
+ #include "ggml-alloc.h"
+ 
+ #include <cstring>
+@@ -129,10 +129,10 @@
+     GGML_ASSERT(set_pool && set_threads && set_abort);
+ 
+     common_cpu_params cpu;
+-    cpu.n_threads = 2;
+-    cpu.poll = 0;
++    cpu.n_threads = 5;
++    cpu.poll = 50;
+     auto batch = cpu;
+-    batch.n_threads = separate ? 3 : 2;
++    batch.n_threads = separate ? 6 : 5;
+ 
+     // Repeat the ownership cycle used when the server unloads and reloads a model.
+     for (int cycle = 0; cycle < 4; ++cycle) {
+@@ -177,9 +177,11 @@
+ 
+ int main() {
+     test_parameters_and_failures();
++    std::puts("PASS parameters, paused creation, capability failures, allocation failures, retry/reset");
+     ggml_backend_load_all();
+     auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+     GGML_ASSERT(dev);
+     test_graph_reuse(dev, false);
+     test_graph_reuse(dev, true);
++    std::puts("PASS shared/separate graphs, abort recovery, ownership cycles (OpenMP5/6, poll50)");
+ }

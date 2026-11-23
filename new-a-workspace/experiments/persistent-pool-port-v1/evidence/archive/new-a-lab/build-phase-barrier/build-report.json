@@ -1,0 +1,133 @@
+{
+  "status": "BUILT_NOT_INFERENCE_VALIDATED",
+  "source": "/home/codinghuman/projects/new-a-lab/llama-phase-barrier",
+  "sources": {
+    "ggml/src/ggml-cpu/ggml-cpu.c": "de41d6d44070f2e7cef3b21e1690fc2bd6a6265e4659e09ff9ba13531c690494",
+    "ggml/src/ggml-cpu/ggml-cpu.cpp": "8ab6ed68e2c0eea05090368d7788636500d146851298685276d7a9302c03c5c1",
+    "ggml/src/ggml-cpu/newa-barrier.h": "f0d208c6530034b639b9de219a5bef3c70e790b8b856738a51d6f2371537239b",
+    "ggml/src/ggml-cpu/newa-phase-policy.h": "a9412ee4942ee4b98fa7002b7e6e1f60fc3757b1aa8187388cb5631994b04b87",
+    "tools/server/server-context.cpp": "37446911eb50346a4762e300ba7fc1a28e6d2c8f32d5972a95bb02de19dcb502",
+    "tools/server/server-scx.h": "655e62843596e98e66920b6b8d12e868ea0a01df96a5020c0ee6cc86d26f303f"
+  },
+  "commands": [
+    [
+      "git",
+      "-C",
+      "/home/codinghuman/projects/llama.cpp-lightweight",
+      "worktree",
+      "add",
+      "--detach",
+      "/home/codinghuman/projects/new-a-lab/llama-phase-barrier",
+      "59abec45fe0919de20550ce7cdcf363d9f7bbe5a"
+    ],
+    [
+      "git",
+      "-C",
+      "/home/codinghuman/projects/new-a-lab/llama-phase-barrier",
+      "apply",
+      "/home/codinghuman/projects/new-a-llm-scheduler/experiments/persistent_pool/llama-pool.patch"
+    ],
+    [
+      "/usr/bin/python3",
+      "-B",
+      "/home/codinghuman/projects/new-a-llm-scheduler/experiments/phase_barrier/check.py",
+      "--output",
+      "/home/codinghuman/projects/new-a-lab/build-phase-barrier/stress"
+    ],
+    [
+      "cmake",
+      "-S",
+      "/home/codinghuman/projects/new-a-lab/llama-phase-barrier",
+      "-B",
+      "/home/codinghuman/projects/new-a-lab/build-phase-barrier/native",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DGGML_NATIVE=ON",
+      "-DGGML_BLAS=OFF",
+      "-DGGML_CUDA=OFF",
+      "-DGGML_VULKAN=OFF",
+      "-DLLAMA_SCX_PHASE_HINT=ON",
+      "-DLLAMA_SCX_PHASE_TRACE=OFF",
+      "-DLLAMA_BUILD_UI=OFF",
+      "-DGGML_OPENMP=OFF"
+    ],
+    [
+      "cmake",
+      "--build",
+      "/home/codinghuman/projects/new-a-lab/build-phase-barrier/native",
+      "--target",
+      "llama-server",
+      "-j",
+      "4"
+    ],
+    [
+      "cmake",
+      "-S",
+      "/home/codinghuman/projects/new-a-lab/llama-phase-barrier",
+      "-B",
+      "/home/codinghuman/projects/new-a-lab/build-phase-barrier/openmp",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DGGML_NATIVE=ON",
+      "-DGGML_BLAS=OFF",
+      "-DGGML_CUDA=OFF",
+      "-DGGML_VULKAN=OFF",
+      "-DLLAMA_SCX_PHASE_HINT=ON",
+      "-DLLAMA_SCX_PHASE_TRACE=OFF",
+      "-DLLAMA_BUILD_UI=OFF",
+      "-DGGML_OPENMP=ON"
+    ],
+    [
+      "cmake",
+      "--build",
+      "/home/codinghuman/projects/new-a-lab/build-phase-barrier/openmp",
+      "--target",
+      "llama-server",
+      "-j",
+      "4"
+    ]
+  ],
+  "openmp": "/home/codinghuman/projects/new-a-lab/build-phase-barrier/openmp/bin/llama-server",
+  "native": "/home/codinghuman/projects/new-a-lab/build-phase-barrier/native/bin/llama-server",
+  "stress": {
+    "status": "PASS",
+    "original": {
+      "status": "PASS",
+      "cases": 20,
+      "barrier_generations": 37200,
+      "sources": {
+        "newa-barrier.h": "f0d208c6530034b639b9de219a5bef3c70e790b8b856738a51d6f2371537239b",
+        "test_barrier.c": "b030731f1b407dd443b89b924c2b8a4974fc5853666824a7f4b0a98fb9a7aa6e"
+      },
+      "binary_sha256": "71e439dacb104dfb3695c80f18dc36576e1f5276838e073fea0daa1f2fa38aaf",
+      "covers": [
+        "shared-memory visibility",
+        "repeated generations",
+        "signed-generation wrap",
+        "signal interruption",
+        "deliberate late worker",
+        "single-CPU oversubscription",
+        "hint TID list",
+        "stale-hint generation rejection"
+      ],
+      "limitation": "Host stress tests do not prove all interleavings or kernel hint consumption"
+    },
+    "phase_cases": 14,
+    "phase_generations": 13200,
+    "total_generations": 50400,
+    "inputs": {
+      "test_barrier.c": "b030731f1b407dd443b89b924c2b8a4974fc5853666824a7f4b0a98fb9a7aa6e",
+      "newa-phase-policy.h": "a9412ee4942ee4b98fa7002b7e6e1f60fc3757b1aa8187388cb5631994b04b87",
+      "test_phase.c": "2a06d4ee09ce464c90dfa9adb4a034079d580a8680b6ba9ad476c12997315a2a",
+      "newa-barrier.h": "f0d208c6530034b639b9de219a5bef3c70e790b8b856738a51d6f2371537239b"
+    },
+    "covers": [
+      "generation wrap",
+      "signals",
+      "late worker",
+      "visibility",
+      "phase switches",
+      "prefill-only futex exclusion",
+      "long Decode spin budget",
+      "single-CPU oversubscription"
+    ]
+  }
+}

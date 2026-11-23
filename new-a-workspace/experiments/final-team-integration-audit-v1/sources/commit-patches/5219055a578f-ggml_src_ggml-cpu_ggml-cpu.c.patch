@@ -1,0 +1,57 @@
+--- 4c1742f34be270f95ff24a1fdaf47773b5e8661a/ggml/src/ggml-cpu/ggml-cpu.c
++++ 5219055a578fd741e029e81fefef6f3a5695086d/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -3057,7 +3057,25 @@
+     return 0;
+ }
+ 
++#ifdef LLAMA_SCX_PHASE_TRACE
++void ggml_scx_worker_begin_v1(void);
++void ggml_scx_worker_end_v1(void);
++
++__attribute__((noinline, used, visibility("default")))
++void ggml_scx_worker_begin_v1(void) {
++    __asm__ __volatile__("nop" : : : "memory");
++}
++
++__attribute__((noinline, used, visibility("default")))
++void ggml_scx_worker_end_v1(void) {
++    __asm__ __volatile__("nop; nop" : : : "memory");
++}
++#endif
++
+ static thread_ret_t ggml_graph_compute_thread(void * data) {
++#ifdef LLAMA_SCX_PHASE_TRACE
++    ggml_scx_worker_begin_v1();
++#endif
+     struct ggml_compute_state * state = (struct ggml_compute_state *) data;
+     struct ggml_threadpool    * tp    = state->threadpool;
+ 
+@@ -3123,6 +3141,10 @@
+     GGML_PRINT_DEBUG("thread #%d compute-done cplan %p last-graph %d\n", state->ith, (const void *)cplan, state->last_graph);
+ #endif
+ 
++#ifdef LLAMA_SCX_PHASE_TRACE
++    // Clear worker state before the final barrier releases the caller.
++    ggml_scx_worker_end_v1();
++#endif
+     ggml_barrier(state->threadpool);
+ 
+ #ifdef GGML_USE_CPU_RISCV64_SPACEMIT
+@@ -3355,6 +3377,7 @@
+     GGML_ASSERT(cplan->work_size == 0 || cplan->work_data != NULL);
+ 
+     int n_threads                               = cplan->n_threads;
++    const int n_threads_planned                 = n_threads;
+     struct ggml_threadpool * threadpool = cplan->threadpool;
+ 
+     bool disposable_threadpool = false;
+@@ -3411,6 +3434,9 @@
+     // This is a work thread too
+     ggml_graph_compute_thread(&threadpool->workers[0]);
+ #endif
++
++    GGML_LOG_DEBUG("%s: planned_threads=%d, actual_team_size=%d, pool_threads=%d, disposable_threadpool=%s\n",
++            __func__, n_threads_planned, n_threads, threadpool->n_threads, disposable_threadpool ? "yes" : "no");
+ 
+     // don't leave affinity set on the main thread
+     clear_numa_thread_affinity();

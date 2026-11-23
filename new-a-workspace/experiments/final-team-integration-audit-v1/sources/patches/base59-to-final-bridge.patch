@@ -1,0 +1,24 @@
+--- /home/codinghuman/projects/new-a-workspace/experiments/final-team-integration-audit-v1/sources/base-59abec4/tools/server/server-scx.h
++++ /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-scx.h
+@@ -2,12 +2,21 @@
+ 
+ #ifdef LLAMA_SCX_PHASE_HINT
+ #include "server-phase.h"
++#include "ggml-backend.h"
+ 
+ extern "C" {
+ void llama_scx_phase_v1(uint32_t phase);
+ 
+ __attribute__((noinline, used, visibility("default")))
+ void llama_scx_phase_v1(uint32_t phase) {
++    using phase_fn = void (*)(uint32_t);
++    static phase_fn update = [] {
++        auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
++        if (!dev) return phase_fn(nullptr);
++        auto * reg = ggml_backend_dev_backend_reg(dev);
++        return (phase_fn) ggml_backend_reg_get_proc_address(reg, "ggml_backend_cpu_newa_phase");
++    }();
++    if (update) update(phase);
+     __asm__ __volatile__("nop" : : "r"(phase) : "memory");
+ }
+ }

@@ -1,0 +1,30 @@
+--- 542850645a54fc2e35a9a8189ff8dfcf35b9c51d/tools/server/server-scx.h
++++ c2c398510f69180cfc29026cb1e0ca133b01d548/tools/server/server-scx.h
+@@ -2,6 +2,7 @@
+ 
+ #ifdef LLAMA_SCX_PHASE_TRACE
+ #include "llama.h"
++#include "server-phase.h"
+ #include <cstdint>
+ 
+ // Keep the v1 layout in sync with llama-scheduler/include/llama_phase.h.
+@@ -22,6 +23,7 @@
+ extern "C" {
+ void llama_scx_decode_begin_v1(const server_scx_event * event);
+ void llama_scx_decode_end_v1(const server_scx_event * event);
++void llama_scx_phase_v1(uint32_t phase);
+ 
+ __attribute__((noinline, used, visibility("default")))
+ void llama_scx_decode_begin_v1(const server_scx_event * event) {
+@@ -31,6 +33,11 @@
+ __attribute__((noinline, used, visibility("default")))
+ void llama_scx_decode_end_v1(const server_scx_event * event) {
+     __asm__ __volatile__("nop; nop" : : "r"(event) : "memory");
++}
++
++__attribute__((noinline, used, visibility("default")))
++void llama_scx_phase_v1(uint32_t phase) {
++    __asm__ __volatile__("nop" : : "r"(phase) : "memory");
+ }
+ }
+ 

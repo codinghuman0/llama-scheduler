@@ -1,0 +1,29 @@
+SOURCE: /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.h
+SHA256: af5f558d5e4e1ce38c0e541f60181053291ac8e9355f4e63eeb59a9f8caef9e5
+Original line numbers follow; omitted regions are explicit.
+
+... 33-56 ...
+33:     }
+34: 
+35:     return false;
+36: }
+37: 
+38: inline llama_compute_profile llama_compute_profile_resolve(llama_compute_profile compute_profile, uint32_t n_tokens) {
+39:     GGML_ASSERT(llama_compute_profile_is_valid(compute_profile));
+40: 
+41:     if (compute_profile == LLAMA_COMPUTE_PROFILE_AUTO) {
+42:         return n_tokens > 1 ? LLAMA_COMPUTE_PROFILE_BATCH : LLAMA_COMPUTE_PROFILE_GENERATION;
+43:     }
+44: 
+45:     return compute_profile;
+46: }
+47: 
+48: // stores copy of the memory in device buffer. used for fast state save/load
+49: struct llama_memory_buffer {
+50:     int n_tensors = 0;
+51:     size_t total_size = 0;
+52: 
+53:     ggml_backend_buffer_ptr buf;
+54: 
+55:     ggml_context_ptr ctx;
+56: 

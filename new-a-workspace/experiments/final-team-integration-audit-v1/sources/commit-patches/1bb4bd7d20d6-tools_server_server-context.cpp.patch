@@ -1,0 +1,83 @@
+--- 2ec5829580fa3d9e16e3a315eb789982f7169882/tools/server/server-context.cpp
++++ 1bb4bd7d20d6e8fe8dcbd3f529bab7cf9f257927/tools/server/server-context.cpp
+@@ -954,7 +954,6 @@
+ 
+     server_context_impl() {
+         mtmd_helper_log_set(common_log_default_callback, nullptr);
+-        compute_profile_run_id = ggml_time_us();
+     }
+ 
+     ~server_context_impl() {
+@@ -3714,15 +3713,9 @@
+         int32_t n_prefill = 0;
+         int32_t n_decode  = 0;
+         int32_t n_unknown = classify_phase ? 0 : batch_view.n_tokens;
+-        std::set<int> slot_ids;
+-        std::set<int> task_ids;
+         if (classify_phase) {
+             for (int32_t i = off; i < off + batch_view.n_tokens; ++i) {
+                 const auto & token = batch.tokens[i];
+-                if (trace_profile) {
+-                    slot_ids.insert(token.id_slot);
+-                    task_ids.insert(token.id_task);
+-                }
+                 switch (token.phase) {
+                     case SERVER_BATCH_PHASE_PREFILL: n_prefill++; break;
+                     case SERVER_BATCH_PHASE_DECODE:  n_decode++;  break;
+@@ -3744,20 +3737,35 @@
+             }
+         }
+ 
+-        const uint64_t call_id = ++compute_profile_call_id;
+-        const int64_t t_start_us = ggml_time_us();
+-
+-        auto format_ids = [](const std::set<int> & ids) {
+-            std::ostringstream ss;
+-            const char * separator = "";
+-            for (int id : ids) {
+-                ss << separator << id;
+-                separator = ",";
+-            }
+-            return ss.str();
+-        };
++#ifdef LLAMA_SCX_PHASE_TRACE
++        const uint64_t call_id = trace_profile || params_base.scx_phase_run_id ? ++compute_profile_call_id : 0;
++#else
++        const uint64_t call_id = trace_profile ? ++compute_profile_call_id : 0;
++#endif
++        int64_t t_start_us = 0;
+ 
+         if (trace_profile) {
++            if (compute_profile_run_id == 0) {
++                compute_profile_run_id = ggml_time_us();
++            }
++            std::set<int> slot_ids;
++            std::set<int> task_ids;
++            for (int32_t i = off; i < off + batch_view.n_tokens; ++i) {
++                const auto & token = batch.tokens[i];
++                slot_ids.insert(token.id_slot);
++                task_ids.insert(token.id_task);
++            }
++
++            t_start_us = ggml_time_us();
++            auto format_ids = [](const std::set<int> & ids) {
++                std::ostringstream ss;
++                const char * separator = "";
++                for (int id : ids) {
++                    ss << separator << id;
++                    separator = ",";
++                }
++                return ss.str();
++            };
+             const std::string slots_text = format_ids(slot_ids);
+             const std::string tasks_text = format_ids(task_ids);
+             SRV_INF("compute_profile_trace start: run=%" PRId64 " call=%" PRIu64 " retry=%d off=%d n_tokens=%d n_prefill=%d n_decode=%d n_unknown=%d phase=%s mode=%s requested_profile=%s slots=%s tasks=%s t_start_us=%" PRId64 "\n",
+@@ -3782,7 +3790,7 @@
+             ret = llama_decode(ctx_tgt, batch_view);
+         }
+ 
+-        const int64_t t_return_us = ggml_time_us();
++        const int64_t t_return_us = trace_profile ? ggml_time_us() : 0;
+ #ifdef LLAMA_SCX_PHASE_TRACE
+         scx_scope.finish(ret);
+ #endif

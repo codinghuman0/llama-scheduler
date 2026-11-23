@@ -1,0 +1,738 @@
+[
+  {
+    "id": "semantic-origin",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp",
+    "sha256": "85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685",
+    "lines": 5608,
+    "anchors": [
+      {
+        "name": "decode-origin",
+        "line": 541,
+        "match": "                add_ok &= batch.add(id, task->id, inp_embd, prompt.tokens.pos_next(), true, SERVER_BATCH_PHASE_DECODE);",
+        "all_match_lines": [
+          541,
+          543,
+          561,
+          563
+        ]
+      },
+      {
+        "name": "prompt-origin",
+        "line": 3615,
+        "match": "                            SERVER_BATCH_PHASE_PREFILL);",
+        "all_match_lines": [
+          3615
+        ]
+      },
+      {
+        "name": "retry-view",
+        "line": 2957,
+        "match": "                batch_view = batch.get_view(off, n_tokens);",
+        "all_match_lines": [
+          2957
+        ]
+      },
+      {
+        "name": "classification",
+        "line": 3754,
+        "match": "            for (int32_t i = off; i < off + batch_view.n_tokens; ++i) {",
+        "all_match_lines": [
+          3754,
+          3796
+        ]
+      },
+      {
+        "name": "profile-selection",
+        "line": 3780,
+        "match": "            requested_profile = newa_resource.select(phase, batch_view, batch.tokens, off, ctx_tgt, requested_profile);",
+        "all_match_lines": [
+          3780
+        ]
+      },
+      {
+        "name": "transition",
+        "line": 3825,
+        "match": "        scx_phase_state.transition(static_cast<server_scx_phase>(phase), llama_scx_phase_v1);",
+        "all_match_lines": [
+          3825
+        ]
+      },
+      {
+        "name": "decode-api",
+        "line": 3833,
+        "match": "                ret = llama_decode_with_options(ctx_tgt, batch_view, options);",
+        "all_match_lines": [
+          3833
+        ]
+      },
+      {
+        "name": "split",
+        "line": 3902,
+        "match": "                n_batch /= 2;",
+        "all_match_lines": [
+          3902
+        ]
+      },
+      {
+        "name": "old-pool",
+        "line": 1272,
+        "match": "        const char * pool_mode = std::getenv(\"GGML_NEWA_POOL\");",
+        "all_match_lines": [
+          1272,
+          1274
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/semantic-origin.txt"
+  },
+  {
+    "id": "phase-classifier",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-phase.h",
+    "sha256": "9b6165627fbb8f775a50fbc574a08d30914aae9ee3ca6679b3450ec3f79f459b",
+    "lines": 64,
+    "anchors": [
+      {
+        "name": "classifier",
+        "line": 24,
+        "match": "constexpr server_batch_phase server_batch_phase_classify(int32_t n_prefill, int32_t n_decode, int32_t n_unknown) {",
+        "all_match_lines": [
+          24
+        ]
+      },
+      {
+        "name": "transition-state",
+        "line": 47,
+        "match": "class server_scx_phase_state {",
+        "all_match_lines": [
+          47
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/phase-classifier.txt"
+  },
+  {
+    "id": "profile-header",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/include/llama.h",
+    "sha256": "9d5a18d731237f25111e1772eb0546690497b8a25ec2ad299910f6f7234f172b",
+    "lines": 1641,
+    "anchors": [
+      {
+        "name": "enum",
+        "line": 221,
+        "match": "    enum llama_compute_profile {",
+        "all_match_lines": [
+          221,
+          242
+        ]
+      },
+      {
+        "name": "options",
+        "line": 241,
+        "match": "    struct llama_decode_options {",
+        "all_match_lines": [
+          241,
+          486,
+          1010
+        ]
+      },
+      {
+        "name": "api",
+        "line": 1007,
+        "match": "    LLAMA_API int32_t llama_decode_with_options(",
+        "all_match_lines": [
+          1007
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/profile-header.txt"
+  },
+  {
+    "id": "profile-resolve",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.h",
+    "sha256": "af5f558d5e4e1ce38c0e541f60181053291ac8e9355f4e63eeb59a9f8caef9e5",
+    "lines": 419,
+    "anchors": [
+      {
+        "name": "resolve",
+        "line": 38,
+        "match": "inline llama_compute_profile llama_compute_profile_resolve(llama_compute_profile compute_profile, uint32_t n_tokens) {",
+        "all_match_lines": [
+          38
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/profile-resolve.txt"
+  },
+  {
+    "id": "profile-engine",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp",
+    "sha256": "5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a",
+    "lines": 4214,
+    "anchors": [
+      {
+        "name": "graph",
+        "line": 2457,
+        "match": "ggml_status llama_context::graph_compute(",
+        "all_match_lines": [
+          2457
+        ]
+      },
+      {
+        "name": "pool-setter",
+        "line": 2471,
+        "match": "            set_threadpool_fn(backend_cpu, tp);",
+        "all_match_lines": [
+          2471
+        ]
+      },
+      {
+        "name": "threads-setter",
+        "line": 2477,
+        "match": "        set_n_threads_fn.second(set_n_threads_fn.first, n_threads);",
+        "all_match_lines": [
+          2477
+        ]
+      },
+      {
+        "name": "default",
+        "line": 3531,
+        "match": "llama_decode_options llama_decode_default_options() {",
+        "all_match_lines": [
+          3531
+        ]
+      },
+      {
+        "name": "api",
+        "line": 4122,
+        "match": "int32_t llama_decode_with_options(",
+        "all_match_lines": [
+          4122
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/profile-engine.txt"
+  },
+  {
+    "id": "phase-bridge",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-scx.h",
+    "sha256": "655e62843596e98e66920b6b8d12e868ea0a01df96a5020c0ee6cc86d26f303f",
+    "lines": 83,
+    "anchors": [
+      {
+        "name": "marker",
+        "line": 11,
+        "match": "void llama_scx_phase_v1(uint32_t phase) {",
+        "all_match_lines": [
+          11
+        ]
+      },
+      {
+        "name": "setter-lookup",
+        "line": 17,
+        "match": "        return (phase_fn) ggml_backend_reg_get_proc_address(reg, \"ggml_backend_cpu_newa_phase\");",
+        "all_match_lines": [
+          17
+        ]
+      },
+      {
+        "name": "trace",
+        "line": 25,
+        "match": "#ifdef LLAMA_SCX_PHASE_TRACE",
+        "all_match_lines": [
+          25
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/phase-bridge.txt"
+  },
+  {
+    "id": "E",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h",
+    "sha256": "944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d",
+    "lines": 332,
+    "anchors": [
+      {
+        "name": "limits",
+        "line": 22,
+        "match": "    static constexpr long long min_call_ns = 1000000000LL;",
+        "all_match_lines": [
+          22,
+          130
+        ]
+      },
+      {
+        "name": "sensor",
+        "line": 75,
+        "match": "        FILE * file = std::fopen(\"/proc/stat\", \"r\");",
+        "all_match_lines": [
+          75
+        ]
+      },
+      {
+        "name": "score",
+        "line": 129,
+        "match": "        value.score = (value.task_cpu_s - value.own_cpu_upper_s - value.rounding_cpu_s) / value.wall_s - accounting_margin;",
+        "all_match_lines": [
+          129
+        ]
+      },
+      {
+        "name": "reset",
+        "line": 175,
+        "match": "    void reset() {",
+        "all_match_lines": [
+          175
+        ]
+      },
+      {
+        "name": "select",
+        "line": 186,
+        "match": "    llama_compute_profile select(server_batch_phase phase, const llama_batch & view,",
+        "all_match_lines": [
+          186
+        ]
+      },
+      {
+        "name": "capture",
+        "line": 268,
+        "match": "    void begin() {",
+        "all_match_lines": [
+          268
+        ]
+      },
+      {
+        "name": "commit",
+        "line": 277,
+        "match": "    void finish(int result) {",
+        "all_match_lines": [
+          277
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/E.txt"
+  },
+  {
+    "id": "CPU-graph",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c",
+    "sha256": "cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e",
+    "lines": 4029,
+    "anchors": [
+      {
+        "name": "phase-setter",
+        "line": 481,
+        "match": "void ggml_backend_cpu_newa_phase(uint32_t phase) {",
+        "all_match_lines": [
+          481
+        ]
+      },
+      {
+        "name": "barrier",
+        "line": 604,
+        "match": "void ggml_barrier(struct ggml_threadpool * tp) {",
+        "all_match_lines": [
+          604
+        ]
+      },
+      {
+        "name": "q6",
+        "line": 1249,
+        "match": "    const bool newa_q6_eligible = newa_q6_phase_allowed(params->threadpool->newa_q6_phase) && !params->use_ref &&",
+        "all_match_lines": [
+          1249
+        ]
+      },
+      {
+        "name": "pool-new",
+        "line": 3386,
+        "match": "static struct ggml_threadpool * ggml_threadpool_new_impl(",
+        "all_match_lines": [
+          3386,
+          3479,
+          3500
+        ]
+      },
+      {
+        "name": "graph",
+        "line": 3482,
+        "match": "enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cplan * cplan) {",
+        "all_match_lines": [
+          3482,
+          3566
+        ]
+      },
+      {
+        "name": "phase-load",
+        "line": 3511,
+        "match": "    threadpool->newa_q6_phase = atomic_load_explicit(&newa_current_phase, memory_order_acquire);",
+        "all_match_lines": [
+          3511
+        ]
+      },
+      {
+        "name": "team",
+        "line": 3514,
+        "match": "        #pragma omp parallel num_threads(n_threads)",
+        "all_match_lines": [
+          3514
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/CPU-graph.txt"
+  },
+  {
+    "id": "CPU-registry",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.cpp",
+    "sha256": "8ab6ed68e2c0eea05090368d7788636500d146851298685276d7a9302c03c5c1",
+    "lines": 715,
+    "anchors": [
+      {
+        "name": "setter",
+        "line": 256,
+        "match": "void ggml_backend_cpu_set_n_threads(ggml_backend_t backend_cpu, int n_threads) {",
+        "all_match_lines": [
+          256
+        ]
+      },
+      {
+        "name": "registry",
+        "line": 653,
+        "match": "    if (strcmp(name, \"ggml_backend_cpu_newa_phase\") == 0) return (void *) ggml_backend_cpu_newa_phase;",
+        "all_match_lines": [
+          653
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/CPU-registry.txt"
+  },
+  {
+    "id": "Q4-R",
+    "path": "/home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h",
+    "sha256": "014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029",
+    "lines": 50,
+    "anchors": [
+      {
+        "name": "eligibility",
+        "line": 38,
+        "match": "static bool newa_q4_try(int n,float * s,size_t bs,const void * vx,const void * vy,int nr,int nc) {",
+        "all_match_lines": [
+          38
+        ]
+      },
+      {
+        "name": "reference",
+        "line": 42,
+        "match": "        return false; // Keep semantic Prefill on the reference body.",
+        "all_match_lines": [
+          42
+        ]
+      },
+      {
+        "name": "exact",
+        "line": 47,
+        "match": "    else newa_q4_decode_exact(n,s,bs,vx,vy,nr,nc);",
+        "all_match_lines": [
+          47
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/Q4-R.txt"
+  },
+  {
+    "id": "Q4-exact",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q4-decode-exact.h",
+    "sha256": "20d7bdc052650a53b6b5b7fabf81ec23d96aff4283c393ca3b9a23dcc98be62b",
+    "lines": 719,
+    "anchors": [
+      {
+        "name": "tile",
+        "line": 3,
+        "match": "static __attribute__((noinline)) void newa_q4_decode_exact(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, const void * GGML_RESTRICT vy, int nr, int nc) {",
+        "all_match_lines": [
+          3
+        ]
+      },
+      {
+        "name": "two-activation-groups",
+        "line": 43,
+        "match": "        const block_q8_Kx4 * a_ptrs[2];",
+        "all_match_lines": [
+          43
+        ]
+      },
+      {
+        "name": "shared-weights",
+        "line": 79,
+        "match": "                    const __m256i rhs_raw_mat_0123_0 = _mm256_loadu_si256((const __m256i * )(b_ptr[b].qs + sb * 256));",
+        "all_match_lines": [
+          79,
+          89,
+          90,
+          413,
+          423,
+          424
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/Q4-exact.txt"
+  },
+  {
+    "id": "Q6-policy",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q6-policy.h",
+    "sha256": "605cf933b96dc6ee4af7c635bdddb4dcdb04429d215b538bf0e59849f30b6d42",
+    "lines": 47,
+    "anchors": [
+      {
+        "name": "phase",
+        "line": 39,
+        "match": "static inline bool newa_q6_phase_allowed(unsigned phase) {",
+        "all_match_lines": [
+          39,
+          44
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/Q6-policy.txt"
+  },
+  {
+    "id": "repack-pages",
+    "path": "/home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-repack-pages.h",
+    "sha256": "69da9db393e937a15535b86255570e30290a116fb294a4c5d62f8ab9007a95c8",
+    "lines": 39,
+    "anchors": [
+      {
+        "name": "advice",
+        "line": 30,
+        "match": "        rc = madvise((void *) first, last - first, MADV_HUGEPAGE);",
+        "all_match_lines": [
+          30
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/repack-pages.txt"
+  },
+  {
+    "id": "scheduler",
+    "path": "/home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c",
+    "sha256": "c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736",
+    "lines": 434,
+    "anchors": [
+      {
+        "name": "tier",
+        "line": 249,
+        "match": "static __always_inline s32 pick_idle_from_list(struct task_struct *p, const u32 *cpus, u32 count,",
+        "all_match_lines": [
+          249
+        ]
+      },
+      {
+        "name": "select",
+        "line": 278,
+        "match": "s32 BPF_STRUCT_OPS(llama_select_cpu, struct task_struct *p, s32 prev_cpu, u64 wake_flags)",
+        "all_match_lines": [
+          278
+        ]
+      },
+      {
+        "name": "handoff",
+        "line": 335,
+        "match": "    if (phase != LLAMA_SCX_PHASE_DECODE ||",
+        "all_match_lines": [
+          335
+        ]
+      },
+      {
+        "name": "handoff-guard",
+        "line": 326,
+        "match": "#ifdef NEW_A_IDLE_HANDOFF",
+        "all_match_lines": [
+          326,
+          342
+        ]
+      },
+      {
+        "name": "enqueue",
+        "line": 362,
+        "match": "void BPF_STRUCT_OPS(llama_enqueue, struct task_struct *p, u64 enq_flags)",
+        "all_match_lines": [
+          362
+        ]
+      },
+      {
+        "name": "dispatch",
+        "line": 374,
+        "match": "void BPF_STRUCT_OPS(llama_dispatch, s32 cpu, struct task_struct *prev)",
+        "all_match_lines": [
+          374
+        ]
+      },
+      {
+        "name": "weight",
+        "line": 389,
+        "match": "\tp->scx.dsq_vtime += (SCX_SLICE_DFL - p->scx.slice) * 100 / p->scx.weight;",
+        "all_match_lines": [
+          389
+        ]
+      },
+      {
+        "name": "uprobe",
+        "line": 408,
+        "match": "int BPF_UPROBE(llama_phase, __u32 phase)",
+        "all_match_lines": [
+          408
+        ]
+      },
+      {
+        "name": "partial",
+        "line": 432,
+        "match": "\t.flags = SCX_OPS_SWITCH_PARTIAL,",
+        "all_match_lines": [
+          432
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/scheduler.txt"
+  },
+  {
+    "id": "scheduler-loader",
+    "path": "/home/codinghuman/projects/new-a-workspace/scheduler/loader.c",
+    "sha256": "005f9f2a5b6d740c300bc60668af4cb1af6eb051d40dca8d6466bca33dbbc6c1",
+    "lines": 231,
+    "anchors": [
+      {
+        "name": "topology",
+        "line": 48,
+        "match": "\tif (fread(&topology, 1, sizeof(topology), input) != sizeof(topology) || fgetc(input) != EOF || ferror(input)) {",
+        "all_match_lines": [
+          48
+        ]
+      },
+      {
+        "name": "live-monitor",
+        "line": 177,
+        "match": "\tif (diagnostics_fd >= 0 && analysis_monitor()) result = EXIT_FAILURE;",
+        "all_match_lines": [
+          177
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/scheduler-loader.txt"
+  },
+  {
+    "id": "scheduler-lifecycle",
+    "path": "/home/codinghuman/projects/new-a-workspace/scheduler/neutral_lifecycle.c",
+    "sha256": "65ab6db95be1c94faa6bcd38de9d3d9c4c2b95408ee14221b6b3ccb51f2709b5",
+    "lines": 600,
+    "anchors": [
+      {
+        "name": "uprobe",
+        "line": 344,
+        "match": "\tlink = bpf_program__attach_uprobe_opts(phase_program, tgid, marker_path, 0, &options);",
+        "all_match_lines": [
+          344
+        ]
+      },
+      {
+        "name": "structops",
+        "line": 504,
+        "match": "\tscheduler_link = bpf_map__attach_struct_ops(ops_map);",
+        "all_match_lines": [
+          504
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/scheduler-lifecycle.txt"
+  },
+  {
+    "id": "selected-child",
+    "path": "/home/codinghuman/projects/new-a-workspace/scheduler/llama_scx_child.c",
+    "sha256": "93638218e23ccacd061b35594e69c4900fef382918ec715fda55278cb263ba11",
+    "lines": 299,
+    "anchors": [
+      {
+        "name": "policy",
+        "line": 168,
+        "match": "\t\t\t.sched_policy = SCHED_EXT,",
+        "all_match_lines": [
+          168
+        ]
+      },
+      {
+        "name": "exec",
+        "line": 177,
+        "match": "\texecvp(command[0], command);",
+        "all_match_lines": [
+          177,
+          178
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/selected-child.txt"
+  },
+  {
+    "id": "monitor",
+    "path": "/home/codinghuman/projects/new-a-workspace/scheduler/monitor.h",
+    "sha256": "0a0f0c0257c3e551cb741214d26ed71d19431a931a0057681dd476eeebe1832d",
+    "lines": 109,
+    "anchors": [
+      {
+        "name": "monitor",
+        "line": 71,
+        "match": "static int analysis_monitor(void)",
+        "all_match_lines": [
+          71
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/monitor.txt"
+  },
+  {
+    "id": "P-owner",
+    "path": "/home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-threadpool.h",
+    "sha256": "61a61c12907cf122ed5de90ef1fb9acb80531e39a86b56b9ccd314d0736fde58",
+    "lines": 74,
+    "anchors": [
+      {
+        "name": "owner",
+        "line": 8,
+        "match": "struct server_threadpools {",
+        "all_match_lines": [
+          8
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/P-owner.txt"
+  },
+  {
+    "id": "P-context",
+    "path": "/home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-context.cpp",
+    "sha256": "378d0f745e44b4da887820fc85bef3c143170bb5a949c3c5633ac198809a7410",
+    "lines": 5635,
+    "anchors": [
+      {
+        "name": "donor",
+        "line": 1280,
+        "match": "        if (pool_mode && std::strcmp(pool_mode, \"donor\") == 0) {",
+        "all_match_lines": [
+          1280
+        ]
+      },
+      {
+        "name": "owner",
+        "line": 980,
+        "match": "    server_threadpools newa_donor_pools;",
+        "all_match_lines": [
+          980
+        ]
+      },
+      {
+        "name": "reset",
+        "line": 1055,
+        "match": "        newa_donor_pools.reset();",
+        "all_match_lines": [
+          1055
+        ]
+      }
+    ],
+    "excerpt": "sources/excerpts/P-context.txt"
+  }
+]

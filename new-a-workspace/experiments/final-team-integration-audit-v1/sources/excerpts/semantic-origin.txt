@@ -1,0 +1,219 @@
+SOURCE: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp
+SHA256: 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685
+Original line numbers follow; omitted regions are explicit.
+
+... 536-559 ...
+536:         if (spec_draft.empty()) {
+537:             // no speculative decoding
+538:             i_batch = batch.size();
+539: 
+540:             if (!inp_embd.empty()) {
+541:                 add_ok &= batch.add(id, task->id, inp_embd, prompt.tokens.pos_next(), true, SERVER_BATCH_PHASE_DECODE);
+542:             } else {
+543:                 add_ok &= batch.add(id, task->id, sampled, prompt.tokens.pos_next(), true, SERVER_BATCH_PHASE_DECODE);
+544:             }
+545: 
+546:             SLT_DBG(*this, "slot decode token, id=%d, n_ctx = %d, n_tokens = %d, truncated = %d\n",
+547:                     sampled, n_ctx, prompt.n_tokens(), truncated);
+548:         } else {
+549:             SLT_DBG(*this, "generate_draft: id=%d, #tokens=%zu, #draft=%zu, pos_next=%d\n",
+550:                     sampled, prompt.tokens.size(), spec_draft.size(), prompt.tokens.pos_next());
+551: 
+552:             GGML_ASSERT(spec_i_batch.empty());
+553: 
+554:             spec_i_batch.push_back(batch.size());
+555:             for (size_t i = 0; i < spec_draft.size(); i++) {
+556:                 spec_i_batch.push_back(batch.size() + i + 1);
+557:             }
+558: 
+559:             auto pos0 = prompt.tokens.pos_next();
+
+... 1267-1290 ...
+1267:         if (ctx_tgt == nullptr) {
+1268:             SRV_ERR("failed to create_context with model '%s'\n", params_base.model.path.c_str());
+1269:             return false;
+1270:         }
+1271: 
+1272:         const char * pool_mode = std::getenv("GGML_NEWA_POOL");
+1273:         if (pool_mode && std::strcmp(pool_mode, "off") != 0) {
+1274:             if (std::strcmp(pool_mode, "on") != 0) GGML_ABORT("invalid GGML_NEWA_POOL");
+1275:             auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+1276:             if (!dev) return false;
+1277:             auto * reg = ggml_backend_dev_backend_reg(dev);
+1278:             using create_fn = ggml_threadpool_t (*)(ggml_threadpool_params *);
+1279:             auto create = (create_fn) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_new");
+1280:             newa_pool_free = (void (*)(ggml_threadpool_t)) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_free");
+1281:             if (!create || !newa_pool_free) return false;
+1282:             const int threads = std::max(params_base.cpuparams.n_threads, params_base.cpuparams_batch.n_threads);
+1283:             auto pool_params = ggml_threadpool_params_default(threads);
+1284:             pool_params.poll = 0;
+1285:             pool_params.paused = true;
+1286:             newa_pool = create(&pool_params);
+1287:             if (!newa_pool) return false;
+1288:             llama_attach_threadpool(ctx_tgt, newa_pool, newa_pool);
+1289:             std::fprintf(stderr, "NEWA_POOL attached=1 threads=%d poll=0\n", threads);
+1290:         } else {
+
+... 2952-2975 ...
+2952:             const int32_t n_tokens = std::min(n_batch, batch.size() - off);
+2953:             try {
+2954:                 scoped_timer t(t_decode, n_decode);
+2955:                 // TODO @ngxson : maybe handle n_batch == 1 here instead of inside decode()
+2956: 
+2957:                 batch_view = batch.get_view(off, n_tokens);
+2958:                 bool ok = decode(n_batch, off, retry, batch_view);
+2959: #ifdef DEBUG_TIMINGS
+2960:                 llama_synchronize(ctx_tgt);
+2961: #endif
+2962: 
+2963:                 if (ok) {
+2964:                     // move the head of the batch forward with the number of tokens we just processed
+2965:                     off_next = off + n_tokens;
+2966: 
+2967:                     // on successful decode, restore the original batch size
+2968:                     n_batch = llama_n_batch(ctx_tgt);
+2969:                     retry = 0;
+2970:                 } else {
+2971:                     // try again with the updated n_batch
+2972:                     retry++;
+2973:                     continue;
+2974:                 }
+2975:             } catch (const std::exception & e) {
+
+... 3610-3633 ...
+3610:                         add_ok &= batch.add(slot.id,
+3611:                             slot.task->id,
+3612:                             cur_tok,
+3613:                             slot.prompt.tokens.pos_next(),
+3614:                             slot.need_embd(),
+3615:                             SERVER_BATCH_PHASE_PREFILL);
+3616:                         slot.prompt.tokens.push_back(cur_tok);
+3617: 
+3618:                         slot.n_prompt_tokens_processed++;
+3619: 
+3620:                         // break at the last user message, or at user messages at least min step past the last checkpoint
+3621:                         if (do_checkpoint && spans.is_user_start(slot.prompt.n_tokens())) {
+3622:                             const auto pos = slot.prompt.n_tokens();
+3623:                             const auto & checkpoints = slot.prompt.checkpoints;
+3624: 
+3625:                             if (pos == last_user_pos || checkpoints.empty() || pos > checkpoints.back().n_tokens + params_base.checkpoint_min_step) {
+3626:                                 break;
+3627:                             }
+3628:                         }
+3629: 
+3630:                         // process the last few tokens of the prompt separately in order to allow for a checkpoint to be created.
+3631:                         // create checkpoints that many tokens before the end of the prompt:
+3632:                         //  - 4 + n_ubatch
+3633:                         //  - 4
+
+... 3749-3772 ...
+3749: 
+3750:         int32_t n_prefill = 0;
+3751:         int32_t n_decode  = 0;
+3752:         int32_t n_unknown = classify_phase ? 0 : batch_view.n_tokens;
+3753:         if (classify_phase) {
+3754:             for (int32_t i = off; i < off + batch_view.n_tokens; ++i) {
+3755:                 const auto & token = batch.tokens[i];
+3756:                 switch (token.phase) {
+3757:                     case SERVER_BATCH_PHASE_PREFILL: n_prefill++; break;
+3758:                     case SERVER_BATCH_PHASE_DECODE:  n_decode++;  break;
+3759:                     case SERVER_BATCH_PHASE_UNKNOWN: n_unknown++; break;
+3760:                     case SERVER_BATCH_PHASE_MIXED:   GGML_ABORT("MIXED is not a token source");
+3761:                 }
+3762:             }
+3763:         }
+3764: 
+3765:         const server_batch_phase phase = server_batch_phase_classify(n_prefill, n_decode, n_unknown);
+3766: 
+3767:         llama_compute_profile requested_profile = LLAMA_COMPUTE_PROFILE_AUTO;
+3768:         const bool use_options = profile_mode != COMMON_SERVER_COMPUTE_PROFILE_MODE_LEGACY;
+3769:         if (profile_mode == COMMON_SERVER_COMPUTE_PROFILE_MODE_PHASE) {
+3770:             if (phase == SERVER_BATCH_PHASE_PREFILL) {
+3771:                 requested_profile = LLAMA_COMPUTE_PROFILE_BATCH;
+3772:             } else if (phase == SERVER_BATCH_PHASE_DECODE) {
+
+... 3775-3798 ...
+3775:         }
+3776: 
+3777:         if (newa_resource.enabled()) {
+3778:             if (profile_mode != COMMON_SERVER_COMPUTE_PROFILE_MODE_PHASE)
+3779:                 throw std::invalid_argument("decode resource experiment requires phase mode");
+3780:             requested_profile = newa_resource.select(phase, batch_view, batch.tokens, off, ctx_tgt, requested_profile);
+3781:         }
+3782: 
+3783: #ifdef LLAMA_SCX_PHASE_TRACE
+3784:         const uint64_t call_id = trace_profile || params_base.scx_phase_run_id ? ++compute_profile_call_id : 0;
+3785: #else
+3786:         const uint64_t call_id = trace_profile ? ++compute_profile_call_id : 0;
+3787: #endif
+3788:         int64_t t_start_us = 0;
+3789: 
+3790:         if (trace_profile) {
+3791:             if (compute_profile_run_id == 0) {
+3792:                 compute_profile_run_id = ggml_time_us();
+3793:             }
+3794:             std::set<int> slot_ids;
+3795:             std::set<int> task_ids;
+3796:             for (int32_t i = off; i < off + batch_view.n_tokens; ++i) {
+3797:                 const auto & token = batch.tokens[i];
+3798:                 slot_ids.insert(token.id_slot);
+
+... 3820-3851 ...
+3820: #ifdef LLAMA_SCX_PHASE_TRACE
+3821:         server_scx_scope scx_scope(ctx_tgt, { 1, params_base.scx_phase_run_id, call_id, uint64_t(retry),
+3822:                 uint64_t(phase), uint64_t(requested_profile), uint64_t(n_prefill), uint64_t(n_decode), uint64_t(n_unknown), -1 });
+3823: #endif
+3824: #ifdef LLAMA_SCX_PHASE_HINT
+3825:         scx_phase_state.transition(static_cast<server_scx_phase>(phase), llama_scx_phase_v1);
+3826: #endif
+3827:         int ret;
+3828:         newa_resource.begin();
+3829:         try {
+3830:             if (use_options) {
+3831:                 auto options = llama_decode_default_options();
+3832:                 options.compute_profile = requested_profile;
+3833:                 ret = llama_decode_with_options(ctx_tgt, batch_view, options);
+3834:             } else {
+3835:                 ret = llama_decode(ctx_tgt, batch_view);
+3836:             }
+3837:         } catch (...) {
+3838:             newa_resource.reset();
+3839:             throw;
+3840:         }
+3841:         newa_resource.finish(ret);
+3842: 
+3843:         const int64_t t_return_us = trace_profile ? ggml_time_us() : 0;
+3844: #ifdef LLAMA_SCX_PHASE_TRACE
+3845:         scx_scope.finish(ret);
+3846: #endif
+3847:         int64_t t_complete_us = t_return_us;
+3848:         if (trace_profile && ret == 0) {
+3849:             llama_synchronize(ctx_tgt);
+3850:             t_complete_us = ggml_time_us();
+3851:         }
+
+... 3897-3920 ...
+3897:                 }
+3898:             }
+3899: 
+3900:             // retry with half the batch size to try to find a free slot in the KV cache
+3901:             if (!try_clear_idle_slots()) {
+3902:                 n_batch /= 2;
+3903:             }
+3904: 
+3905:             SRV_WRN("failed to find free space in the KV cache, retrying with smaller batch size, off = %d, n_batch = %d, ret = %d\n", off, n_batch, ret);
+3906: 
+3907:             return false; // retry with the updated n_batch
+3908:         }
+3909: 
+3910:         // TODO: avoid restoring the draft context and re-evaluating the drafted tokens when not needed [TAG_SPEC_AVOID_DRAFT_REEVAL]
+3911:         //       for now, always re-evaluate for simplicity
+3912:         //       ref: https://github.com/ggml-org/llama.cpp/pull/22728#issuecomment-4400925384
+3913:         if (!common_speculative_process(spec.get(), batch_view)) {
+3914:             SRV_ERR("%s", "failed to process speculative batch\n");
+3915: 
+3916:             // TODO: handle error
+3917:             throw std::runtime_error("failed to process speculative batch");
+3918:         }
+3919: 
+3920:         // handle `n_cmpl > 1` tasks - when the main prompt is processed, activate all child tasks too

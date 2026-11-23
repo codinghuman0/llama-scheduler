@@ -1,0 +1,129 @@
+--- /home/codinghuman/projects/new-a-workspace/experiments/final-team-integration-audit-v1/sources/base-59abec4/tools/server/server-context.cpp
++++ /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp
+@@ -1,6 +1,7 @@
+ #include "server-context.h"
+ #include "server-phase.h"
+ #include "server-scx.h"
++#include "newa-prefill-pressure.h"
+ #include "server-chat.h"
+ #include "server-common.h"
+ #include "server-http.h"
+@@ -10,6 +11,10 @@
+ #include "server-stream.h"
+ 
+ #include "build-info.h"
++#include "ggml-backend.h"
++#include <cstdlib>
++#include <cstdio>
++#include <cstring>
+ #include "common.h"
+ #include "fit.h"
+ #include "llama.h"
+@@ -974,6 +979,8 @@
+     common_init_result_ptr llama_init;
+ 
+     llama_context * ctx_tgt = nullptr;
++    ggml_threadpool_t newa_pool = nullptr;
++    void (*newa_pool_free)(ggml_threadpool_t) = nullptr;
+ 
+     server_batch batch;
+ 
+@@ -1005,6 +1012,7 @@
+     uint64_t compute_profile_call_id = 0;
+ #ifdef LLAMA_SCX_PHASE_HINT
+     server_scx_phase_state scx_phase_state;
++    newa_decode_policy newa_resource;
+ #endif
+ 
+     std::unique_ptr<server_prompt_cache> prompt_cache;
+@@ -1025,6 +1033,12 @@
+     int64_t t_last_load_progress_ms = 0;
+ 
+     void destroy() {
++        if (newa_pool) {
++            llama_synchronize(ctx_tgt);
++            llama_detach_threadpool(ctx_tgt);
++            newa_pool_free(newa_pool);
++            newa_pool = nullptr;
++        }
+         spec.reset();
+         spec_init.reset();
+ 
+@@ -1253,6 +1267,28 @@
+         if (ctx_tgt == nullptr) {
+             SRV_ERR("failed to create_context with model '%s'\n", params_base.model.path.c_str());
+             return false;
++        }
++
++        const char * pool_mode = std::getenv("GGML_NEWA_POOL");
++        if (pool_mode && std::strcmp(pool_mode, "off") != 0) {
++            if (std::strcmp(pool_mode, "on") != 0) GGML_ABORT("invalid GGML_NEWA_POOL");
++            auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
++            if (!dev) return false;
++            auto * reg = ggml_backend_dev_backend_reg(dev);
++            using create_fn = ggml_threadpool_t (*)(ggml_threadpool_params *);
++            auto create = (create_fn) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_new");
++            newa_pool_free = (void (*)(ggml_threadpool_t)) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_free");
++            if (!create || !newa_pool_free) return false;
++            const int threads = std::max(params_base.cpuparams.n_threads, params_base.cpuparams_batch.n_threads);
++            auto pool_params = ggml_threadpool_params_default(threads);
++            pool_params.poll = 0;
++            pool_params.paused = true;
++            newa_pool = create(&pool_params);
++            if (!newa_pool) return false;
++            llama_attach_threadpool(ctx_tgt, newa_pool, newa_pool);
++            std::fprintf(stderr, "NEWA_POOL attached=1 threads=%d poll=0\n", threads);
++        } else {
++            std::fprintf(stderr, "NEWA_POOL attached=0\n");
+         }
+ 
+         if (params.scx_phase_run_id && (llama_model_has_encoder(model_tgt) || !llama_model_has_decoder(model_tgt))) {
+@@ -2865,6 +2901,7 @@
+             }
+ 
+             if (all_idle) {
++                newa_resource.reset();
+                 SRV_TRC("%s", "all slots are idle\n");
+                 return; // skip further processing
+ 
+@@ -3737,6 +3774,12 @@
+             }
+         }
+ 
++        if (newa_resource.enabled()) {
++            if (profile_mode != COMMON_SERVER_COMPUTE_PROFILE_MODE_PHASE)
++                throw std::invalid_argument("decode resource experiment requires phase mode");
++            requested_profile = newa_resource.select(phase, batch_view, batch.tokens, off, ctx_tgt, requested_profile);
++        }
++
+ #ifdef LLAMA_SCX_PHASE_TRACE
+         const uint64_t call_id = trace_profile || params_base.scx_phase_run_id ? ++compute_profile_call_id : 0;
+ #else
+@@ -3782,13 +3825,20 @@
+         scx_phase_state.transition(static_cast<server_scx_phase>(phase), llama_scx_phase_v1);
+ #endif
+         int ret;
+-        if (use_options) {
+-            auto options = llama_decode_default_options();
+-            options.compute_profile = requested_profile;
+-            ret = llama_decode_with_options(ctx_tgt, batch_view, options);
+-        } else {
+-            ret = llama_decode(ctx_tgt, batch_view);
+-        }
++        newa_resource.begin();
++        try {
++            if (use_options) {
++                auto options = llama_decode_default_options();
++                options.compute_profile = requested_profile;
++                ret = llama_decode_with_options(ctx_tgt, batch_view, options);
++            } else {
++                ret = llama_decode(ctx_tgt, batch_view);
++            }
++        } catch (...) {
++            newa_resource.reset();
++            throw;
++        }
++        newa_resource.finish(ret);
+ 
+         const int64_t t_return_us = trace_profile ? ggml_time_us() : 0;
+ #ifdef LLAMA_SCX_PHASE_TRACE

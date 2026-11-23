@@ -1,5 +1,16 @@
 # llama-scheduler
 
+## NEW_A workspace and Intel experiments
+
+The preserved NEW_A runtime sources and research evidence are in
+[`new-a-workspace/`](new-a-workspace/). For Intel i5-1240P / Ubuntu, start with
+the [experiment guide](new-a-workspace/docs/INTEL_EXPERIMENT.ko.md),
+[local compatibility check](new-a-workspace/docs/INTEL_COMPATIBILITY_CHECK.ko.md),
+and [Codex troubleshooting handoff](new-a-workspace/docs/INTEL_CODEX_HANDOFF.ko.md).
+Model weights and compiled runtimes are excluded; the script rebuilds the pinned
+baseline and A for AVX2. This path uses the default Linux scheduler and does not
+load the archived BPF scheduler. The original base project documentation follows.
+
 CPU-only llama.cpp semantic phase-aware `sched_ext` Base Project
 
 ## 1. 프로젝트 소개

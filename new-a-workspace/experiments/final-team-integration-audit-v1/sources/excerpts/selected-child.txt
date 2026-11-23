@@ -1,0 +1,38 @@
+SOURCE: /home/codinghuman/projects/new-a-workspace/scheduler/llama_scx_child.c
+SHA256: 93638218e23ccacd061b35594e69c4900fef382918ec715fda55278cb263ba11
+Original line numbers follow; omitted regions are explicit.
+
+... 163-195 ...
+163: 		_exit(EXIT_FAILURE);
+164: 	close(gate_fd);
+165: 	if (!dry_run) {
+166: 		struct sched_attr attr = {
+167: 			.size = sizeof(attr),
+168: 			.sched_policy = SCHED_EXT,
+169: 		};
+170: 
+171: 		if (syscall(SYS_sched_setattr, 0, &attr, 0)) {
+172: 			fprintf(stderr, "child %ld: cannot enter SCHED_EXT: %s\n",
+173: 				(long)getpid(), strerror(errno));
+174: 			_exit(126);
+175: 		}
+176: 	}
+177: 	execvp(command[0], command);
+178: 	fprintf(stderr, "child %ld: execvp(%s): %s\n", (long)getpid(),
+179: 		command[0], strerror(errno));
+180: 	_exit(127);
+181: }
+182: 
+183: int main(int argc, char **argv)
+184: {
+185: 	enum {
+186: 		OPTION_PHASE_REGISTER_SOCKET = 1000,
+187: 	};
+188: 	static const struct option options[] = {
+189: 		{ "dry-run", no_argument, NULL, 'n' },
+190: 		{ "state-path", required_argument, NULL, 's' },
+191: 		{ "phase-register-socket", required_argument, NULL, OPTION_PHASE_REGISTER_SOCKET },
+192: 		{ "help", no_argument, NULL, 'h' },
+193: 		{ NULL, 0, NULL, 0 },
+194: 	};
+195: 	const char *state_path = SCX_STATE_PATH;

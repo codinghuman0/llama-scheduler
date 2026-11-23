@@ -1,0 +1,19 @@
+SOURCE: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q6-policy.h
+SHA256: 605cf933b96dc6ee4af7c635bdddb4dcdb04429d215b538bf0e59849f30b6d42
+Original line numbers follow; omitted regions are explicit.
+
+... 34-47 ...
+34: 
+35: static void newa_q6_configure(void) {
+36:     GGML_ASSERT(pthread_once(&newa_q6_once, newa_q6_init) == 0);
+37: }
+38: 
+39: static inline bool newa_q6_phase_allowed(unsigned phase) {
+40:     return newa_q6_enabled && (phase == 1 || (newa_q6_phase_batch && (phase == 2 || phase == 3)));
+41: }
+42: 
+43: static void newa_q6_record(unsigned phase) {
+44:     GGML_ASSERT(newa_q6_phase_allowed(phase));
+45:     atomic_fetch_add_explicit(&newa_q6_chunks[phase], 1, memory_order_relaxed);
+46: }
+47: #endif

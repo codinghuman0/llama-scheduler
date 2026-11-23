@@ -1,0 +1,95 @@
+{
+  "status": "ACTIVE_NO_CROSS_DEVICE_PERFORMANCE_CLAIM",
+  "user_intel_availability": "Intel is currently unavailable",
+  "original_amd_baseline": {
+    "run": "/home/codinghuman/projects/new-a-runs/20261114T043703Z-ef545c78",
+    "http_change_pct": -0.805544577822348,
+    "scope": "One independent six-pair AMD campaign; no pooling"
+  },
+  "quantum": {
+    "run": "/home/codinghuman/projects/new-a-performance/scheduler-quantum/20261114T063233Z-55862369",
+    "responses_checked": 60,
+    "decision": "HYPOTHESIS_NOT_SUPPORTED",
+    "q5_http_change_pct": 0.0362959087697734,
+    "q80_http_change_pct": 0.06173728544702217,
+    "original_q20_vs_linux_http_change_pct": -0.844678631208931,
+    "static_instructions": 3138,
+    "static_maps": 5,
+    "new_instructions": 0,
+    "new_maps": 0,
+    "new_callbacks": 0,
+    "new_kfuncs": 0
+  },
+  "openmp_spin": {
+    "run": "/home/codinghuman/projects/new-a-performance/openmp-spin/amd-linux-pilot-v1",
+    "responses_checked": 30,
+    "linux_screen_pass": false,
+    "changes": {
+      "prefill_tps": -0.46206861498354623,
+      "decode_tps": 0.3095962832398297,
+      "http_ms": 0.08242585833980742,
+      "cpu_time_s": -4.863525968591209,
+      "mean_cpu_cores": -4.932172923804812,
+      "selected_cpu_busy_pct": -4.16187928728807
+    },
+    "descriptive_means": {
+      "LINUX_DEFAULT": {
+        "context_switches": 281.25,
+        "migrations": 3.25,
+        "http_ms": 17688.00527575,
+        "cpu_time_s": 106.1075
+      },
+      "LINUX_SPIN1000": {
+        "context_switches": 76917.25,
+        "migrations": 260,
+        "http_ms": 17701.70934625,
+        "cpu_time_s": 100.9425
+      }
+    },
+    "context_switch_ratio": 273.48355555555554,
+    "actual_new_a_callback_work": "NOT_RUN",
+    "promotion": false
+  },
+  "requirement_audit": [
+    {
+      "requirement": "Analyze code and predeclare hypotheses",
+      "status": "VERIFIED",
+      "evidence": "Experiment source/hypothesis files and adjacent ggml_barrier inspection; five studied directions"
+    },
+    {
+      "requirement": "Build experiments and meaningful tests",
+      "status": "VERIFIED",
+      "evidence": "152 portable cases completed:151 PASS and one optional native quantum check SKIP; native quantum check passed separately; fresh clone source-patch apply/check/test PASS"
+    },
+    {
+      "requirement": "Improve performance on both AMD and Intel",
+      "status": "NOT_ACHIEVED",
+      "evidence": "No tested candidate met its complete AMD criterion; Intel is explicitly unavailable and new-protocol Intel evidence is absent"
+    },
+    {
+      "requirement": "Try not to make BPF heavier",
+      "status": "STATIC_VERIFIED_RUNTIME_SCOPE_LIMITED",
+      "evidence": "Original eight policy hashes unchanged. Quantum only declared constants differ, with existing FULL count/rate guards passing. OpenMP uses unchanged BPF but Linux wakeup evidence raises runtime-cost concern; no privileged promotion"
+    },
+    {
+      "requirement": "Provide sudo-v-first terminal scripts",
+      "status": "VERIFIED",
+      "evidence": "Experiment run.sh files authenticate with sudo -v before running Python; quantum AMD actual campaign completed"
+    },
+    {
+      "requirement": "Create new result analysis folders",
+      "status": "VERIFIED",
+      "evidence": "Each actual campaign has automatic analysis plus independent raw-evidence reviews; this overall review preserves separate campaigns"
+    }
+  ],
+  "strict_acceptance": "FAILED",
+  "safety_verdict": "FAIL",
+  "campaigns_pooled": false,
+  "next_investigation": {
+    "status": "DESIGN_ONLY_NOT_IMPLEMENTED",
+    "idea": "Milder Decode team reduction: selected physical cores minus one, while Prefill batch retains all physical cores",
+    "amd": "5/6/2 Compute/Batch/HTTP",
+    "intel": "3/4/2 Compute/Batch/HTTP",
+    "reason": "The earlier4/6 AMD setting saved CPU but reduced Decode; test a less aggressive reduction without changing BPF, while keeping Intel verification pending"
+  }
+}

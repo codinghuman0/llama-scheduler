@@ -1,0 +1,129 @@
+--- 7a2db1a0cf38e5f4eb278a58c3903d295258d0ea/src/llama-context.cpp
++++ a94326390a8fb8686881e0463321acce4419ddcc/src/llama-context.cpp
+@@ -29,6 +29,16 @@
+         case LLAMA_CONTEXT_TYPE_MTP    : return LLM_GRAPH_TYPE_DECODER_MTP;
+     }
+     throw std::runtime_error("Unsupported ctx type");
++}
++
++static const char * compute_profile_to_string(llama_compute_profile compute_profile) {
++    switch (compute_profile) {
++        case LLAMA_COMPUTE_PROFILE_AUTO:       return "auto";
++        case LLAMA_COMPUTE_PROFILE_GENERATION: return "generation";
++        case LLAMA_COMPUTE_PROFILE_BATCH:      return "batch";
++    }
++
++    return "invalid";
+ }
+ 
+ struct llm_fused_op_probe {
+@@ -1317,7 +1327,12 @@
+     return res;
+ }
+ 
+-llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, llm_graph_type gtype, llama_memory_context_i * mctx, ggml_status & ret) {
++llm_graph_result * llama_context::process_ubatch(
++            const llama_ubatch & ubatch,
++                llm_graph_type   gtype,
++        llama_memory_context_i * mctx,
++                   ggml_status & ret,
++         llama_compute_profile   compute_profile) {
+     if (mctx && !mctx->apply()) {
+         LLAMA_LOG_ERROR("%s: failed to apply memory context\n", __func__);
+         ret = GGML_STATUS_FAILED;
+@@ -1377,7 +1392,7 @@
+         //LLAMA_LOG_INFO("graph set inputs time: %.3f ms\n", (ggml_time_us() - t_start_us)/1000.0);
+     }
+ 
+-    const auto status = graph_compute(res->get_gf(), ubatch.n_tokens > 1);
++    const auto status = graph_compute(res->get_gf(), compute_profile, ubatch.n_tokens);
+     if (status != GGML_STATUS_SUCCESS) {
+         LLAMA_LOG_ERROR("%s: failed to compute graph, compute status: %d\n", __func__, status);
+         ret = status;
+@@ -1455,7 +1470,7 @@
+     cparams.causal_attn = false;
+ 
+     ggml_status status;
+-    const auto * res = process_ubatch(ubatch, LLM_GRAPH_TYPE_ENCODER, nullptr, status);
++    const auto * res = process_ubatch(ubatch, LLM_GRAPH_TYPE_ENCODER, nullptr, status, LLAMA_COMPUTE_PROFILE_AUTO);
+ 
+     cparams.causal_attn = causal_attn_org;
+ 
+@@ -1697,7 +1712,7 @@
+     return false; // all sequences use backend sampling
+ }
+ 
+-int llama_context::decode(const llama_batch & batch_inp) {
++int llama_context::decode(const llama_batch & batch_inp, llama_compute_profile compute_profile) {
+     // MTP hook batches carry both token (next-token id) and embd (h_nextn row),
+     // so accept either present rather than requiring exactly one.
+     GGML_ASSERT(batch_inp.token || batch_inp.embd);
+@@ -1865,7 +1880,7 @@
+ 
+         ggml_status status;
+ 
+-        const auto * res = process_ubatch(ubatch, ctx_type_to_graph_type(cparams.ctx_type), mctx.get(), status);
++        const auto * res = process_ubatch(ubatch, ctx_type_to_graph_type(cparams.ctx_type), mctx.get(), status, compute_profile);
+ 
+         if (!res) {
+             // the last ubatch failed or was aborted -> remove all positions of that ubatch from the memory module
+@@ -2450,10 +2465,17 @@
+ }
+ 
+ ggml_status llama_context::graph_compute(
+-            ggml_cgraph * gf,
+-                   bool   batched) {
+-    int n_threads        = batched ? cparams.n_threads_batch : cparams.n_threads;
+-    ggml_threadpool_t tp = batched ? threadpool_batch        : threadpool;
++                 ggml_cgraph * gf,
++        llama_compute_profile   compute_profile,
++                     uint32_t   n_tokens) {
++    const auto resolved_profile = llama_compute_profile_resolve(compute_profile, n_tokens);
++    const bool use_batch = resolved_profile == LLAMA_COMPUTE_PROFILE_BATCH;
++
++    int n_threads        = use_batch ? cparams.n_threads_batch : cparams.n_threads;
++    ggml_threadpool_t tp = use_batch ? threadpool_batch        : threadpool;
++
++    LLAMA_LOG_DEBUG("%s: requested profile = %s, resolved profile = %s, n_tokens = %u, n_threads = %d, threadpool = %s\n",
++            __func__, compute_profile_to_string(compute_profile), compute_profile_to_string(resolved_profile), n_tokens, n_threads, use_batch ? "batch" : "normal");
+ 
+     if (backend_cpu != nullptr) {
+         auto * reg = ggml_backend_dev_backend_reg(ggml_backend_get_device(backend_cpu));
+@@ -3519,6 +3541,14 @@
+     return result;
+ }
+ 
++llama_decode_options llama_decode_default_options() {
++    llama_decode_options result = {
++        /*.compute_profile =*/ LLAMA_COMPUTE_PROFILE_AUTO,
++    };
++
++    return result;
++}
++
+ llama_context * llama_init_from_model(
+                  llama_model * model,
+         llama_context_params   params) {
+@@ -4097,7 +4127,21 @@
+ int32_t llama_decode(
+         llama_context * ctx,
+           llama_batch   batch) {
+-    const int ret = ctx->decode(batch);
++    llama_decode_options options = llama_decode_default_options();
++
++    return llama_decode_with_options(ctx, batch, options);
++}
++
++int32_t llama_decode_with_options(
++        llama_context * ctx,
++          llama_batch   batch,
++ llama_decode_options   options) {
++    if (!llama_compute_profile_is_valid(options.compute_profile)) {
++        LLAMA_LOG_ERROR("%s: invalid compute profile: %d\n", __func__, (int) options.compute_profile);
++        return -1;
++    }
++
++    const int ret = ctx->decode(batch, options.compute_profile);
+     if (ret != 0 && ret != 1) {
+         LLAMA_LOG_ERROR("%s: failed to decode, ret = %d\n", __func__, ret);
+     }

@@ -1,0 +1,23 @@
+SOURCE: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h
+SHA256: 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029
+Original line numbers follow; omitted regions are explicit.
+
+... 33-50 ...
+33:         return on;
+34:     }();
+35:     return enabled;
+36: }
+37: 
+38: static bool newa_q4_try(int n,float * s,size_t bs,const void * vx,const void * vy,int nr,int nc) {
+39:     if (!newa_q4_enabled()) return false;
+40:     const uint32_t phase=ggml_backend_cpu_newa_phase_current();
+41:     if (phase==1) {
+42:         return false; // Keep semantic Prefill on the reference body.
+43:     } else if (!newa_q4_phase_batch || (phase!=2 && phase!=3) || nr<4 || nr>=16) {
+44:         return false;
+45:     }
+46:     if (phase==1) newa_q4_candidate(n,s,bs,vx,vy,nr,nc);
+47:     else newa_q4_decode_exact(n,s,bs,vx,vy,nr,nc);
+48:     if (omp_get_thread_num()==0) newa_q4_calls[phase].fetch_add(1,std::memory_order_relaxed);
+49:     return true;
+50: }

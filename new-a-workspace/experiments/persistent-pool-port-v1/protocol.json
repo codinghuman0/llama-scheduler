@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "status": "PREDECLARED_CONDITIONAL_NOT_ADMITTED",
+  "numerical_baseline": {
+    "identity": null,
+    "required": "Externally completed R or preregistered equivalent; free-generation equality on both heldout eight-request cohorts and singleton. Preserve its arithmetic DSOs and E policy exactly.",
+    "missing_status": "WAITING_NUMERICAL_BASELINE"
+  },
+  "scope": "Independent persistent pool port; no phase v2, scheduler change, native backend switch, arithmetic change or baseline substitution.",
+  "current_model_use_allowed": false,
+  "scheduler": "default Linux only; no sudo/BPF",
+  "primary": {
+    "metric": "actual generated tokens / complete cohort HTTP wall seconds",
+    "aggregation": "mean paired block percent gain 100*(candidate/baseline-1)",
+    "includes": [
+      "queueing",
+      "prefill",
+      "decode",
+      "policy switches"
+    ],
+    "excludes": [
+      "model loading",
+      "one identical excluded warmup cohort per fresh server"
+    ]
+  },
+  "pilot": {
+    "conditions": [
+      "ambient",
+      "cpu25"
+    ],
+    "complete_paired_blocks_per_condition": 4,
+    "order": [
+      "BASELINE,CANDIDATE",
+      "CANDIDATE,BASELINE",
+      "BASELINE,CANDIDATE",
+      "CANDIDATE,BASELINE"
+    ],
+    "cohorts": [
+      "heldout-1",
+      "heldout-2",
+      "heldout-1",
+      "heldout-2"
+    ],
+    "requests": 8,
+    "distinct": true,
+    "output_tokens": 128,
+    "cohort_arrival": "barrier simultaneous launch in fixture index order, same client implementation for both arms",
+    "stop_rule": "Exactly four completed planned pairs; record failures without data-dependent exclusions or extra repetitions. Pilot is not confirmation.",
+    "cpu25": {
+      "cpu_seconds_per_second": 0.25,
+      "period_s": 0.05,
+      "cpu_budget_s": 0.0125,
+      "normal_priority": true,
+      "affinity": "single CPU 10 inside the verified server envelope; same for both arms; verify current physical topology before admission",
+      "record": "identity, affinity, CPU seconds and wall window; delivered range 0.22..0.28 cores; outside range marks condition inconclusive, no cherry-picked replacement",
+      "cpu": 10,
+      "historical_definition": "matches original study: 12.5ms process CPU per 50ms period, CPU10, normal Linux priority"
+    }
+  },
+  "cpu_envelope": [
+    0,
+    2,
+    4,
+    6,
+    8,
+    10
+  ],
+  "threads": 5,
+  "threads_batch": 6,
+  "OpenMP": "ON (libgomp)",
+  "environment": {
+    "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+    "LC_ALL": "C",
+    "LD_LIBRARY_PATH": "@NUMERICAL_BASELINE_RUNTIME@",
+    "OMP_NUM_THREADS": "6",
+    "OMP_DYNAMIC": "FALSE",
+    "OMP_DISPLAY_AFFINITY": "TRUE",
+    "OMP_AFFINITY_FORMAT": "NEWA_TEAM pid=%P team=%N index=%n native=%i",
+    "GGML_NEWA_POOL": "off",
+    "GGML_NEWA_Q6_BATCH": "phase_batch",
+    "GGML_NEWA_PREFILL_ATTN": "off",
+    "GGML_NEWA_REPACK_PAGES": "huge",
+    "GGML_NEWA_Q4_TILE32": "phase_batch",
+    "NEWA_DECODE_RESOURCE": "pressure"
+  },
+  "pool_delta": {
+    "baseline": "GGML_NEWA_POOL=off, disposable GGML pools; default poll=50; normal priority and unrestricted role masks",
+    "candidate": "GGML_NEWA_POOL=donor, persistent generation5/batch6 pools; poll=50 both; initially paused; normal priority; no per-role masks",
+    "legacy_on": "Existing on/max(5,6)/poll0 retained in source but excluded from primary comparison"
+  },
+  "kernel_and_resource_policy": "same E worker threshold/continuity/fallback, Q4/Q6 arithmetic, sampler, FA/KV; record GGML_NEWA_* and NEWA_DECODE_RESOURCE explicitly; compare decision counters as a pool-policy interaction",
+  "auxiliary_metrics": [
+    "TTFT",
+    "prefill/decode rates with actual tokens and execution intervals",
+    "CPU seconds (not energy)",
+    "E worker choice counts"
+  ],
+  "correctness_gate": [
+    "both distinct cohorts free-generation token equality with R",
+    "singleton free-generation equality",
+    "cancel then new request",
+    "two sleep/resume cycles",
+    "normal and exception teardown",
+    "owned process cleanup",
+    "diagnostic disposable pool absence in steady state (separate from timing)"
+  ],
+  "uncertainty": {
+    "unit": "paired block",
+    "bootstrap_replicates": 10000,
+    "seed": 20261122,
+    "interval": "95% percentile",
+    "faster_pair_fraction": true
+  },
+  "decision_rule": {
+    "PILOT_PROMISING": "positive mean and bootstrap lower>0, >=3/4 faster in both conditions with all functional gates; not a 5% guarantee",
+    "PILOT_REGRESSION": "negative mean and bootstrap upper<0 in any primary condition; preserve other conditions separately",
+    "PILOT_INCONCLUSIVE": "otherwise, including partial conditions or measurement invalidity"
+  },
+  "confirmation": "Propose one separate confirmation as a next step only; do not auto-run or combine techniques",
+  "environment_snapshot": {
+    "kernel": "7.0.0-42-generic",
+    "machine": "x86_64",
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ]
+  },
+  "fixtures": {
+    "path": "fixtures.json",
+    "sha256": "8a52c77cef94413732d722f32f005155c548fbbd0d8a9d01e234eaca09a07105",
+    "functional": [
+      "heldout-1",
+      "heldout-2",
+      "single-short"
+    ],
+    "pilot": [
+      "heldout-1",
+      "heldout-2"
+    ],
+    "input_tokens": "already tokenized historical fixtures; verify tokenizer/model identity against approved R before any model call"
+  },
+  "model": {
+    "path": "../../models/model.gguf",
+    "sha256": "f3bdf9cf31dee4b57ae4e455a1cb0d01b5c2c1b50d72d3112141c195506c2840"
+  },
+  "server_argv_template": [
+    "@R_OR_CANDIDATE_RUNTIME@/llama-server",
+    "-m",
+    "@MODEL@",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "51337",
+    "--n-gpu-layers",
+    "0",
+    "--threads",
+    "5",
+    "--threads-batch",
+    "6",
+    "--threads-http",
+    "8",
+    "--ctx-size",
+    "8192",
+    "--parallel",
+    "8",
+    "--batch-size",
+    "512",
+    "--ubatch-size",
+    "256",
+    "--flash-attn",
+    "on",
+    "--no-ui",
+    "--perf",
+    "--server-compute-profile-mode",
+    "phase",
+    "--log-verbosity",
+    "4",
+    "--no-kv-unified",
+    "--spec-type",
+    "none"
+  ],
+  "candidate_environment_delta": {
+    "GGML_NEWA_POOL": "donor",
+    "LD_LIBRARY_PATH": "@CANDIDATE_RUNTIME@ (only server ownership DSO changes; all arithmetic DSOs must match R)"
+  },
+  "note": "Protocol and fixtures are frozen before any model run, but admission remains closed until a separately approved R identity and functional gates exist. This review package has no model execution entry point."
+}

@@ -1,0 +1,978 @@
+warning: no usable GPU found, --gpu-layers option will be ignored
+warning: one possible reason is that llama.cpp was compiled without GPU support
+warning: consult docs/build.md for compilation instructions
+0.00.006.624 I cmn  common_param: common_params_print_info: build 10249 (59abec45f) with GNU 13.3.0 for Linux x86_64
+0.00.006.637 I cmn  common_param: common_params_print_info: verbosity = 4 (adjust with the `-lv N` CLI arg)
+0.00.006.639 I cmn  common_param: device_info:
+0.00.006.660 I cmn  common_param:   - CPU     : AMD Ryzen 5 5500U with Radeon Graphics (17823 MiB, 17823 MiB free)
+0.00.006.788 I cmn  common_param: system_info: n_threads = 5 (n_threads_batch = 6) / 12 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.00.006.911 I srv          init: running without SSL
+0.00.007.032 I srv          init: using 8 threads for HTTP server
+0.00.007.037 I srv          init: The UI is disabled
+0.00.007.040 I srv          init: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.007.362 W srv  llama_server: -----------------
+0.00.007.368 W srv  llama_server: CORS is set to allow all origins ('*') and no API key is set
+0.00.007.370 W srv  llama_server: this can be a security risk (cross-origin attacks)
+0.00.007.373 W srv  llama_server: more info: https://github.com/ggml-org/llama.cpp/pull/25655
+0.00.007.375 W srv  llama_server: -----------------
+0.00.007.431 I srv         start: binding port with default address family
+0.00.008.970 I srv    load_model: loading model '/home/codinghuman/projects/new-a-workspace/models/model.gguf'
+0.00.008.978 I srv    load_model: local path '/home/codinghuman/projects/new-a-workspace/models/model.gguf'
+0.00.009.017 I cmn  common_init_: fitting params to device memory ...
+0.00.009.020 I cmn  common_init_: (for bugs during this step try to reproduce them with -fit off, or provide --verbose logs if the bug only occurs with -fit on)
+0.00.009.036 I common_params_fit_impl: getting device memory data for initial parameters:
+NEWA_PREFILL_ATTN mode=off cache=ordinary_transposed_v
+0.00.328.828 I common_memory_breakdown_print: | memory breakdown [MiB] | total   free    self   model   context   compute    unaccounted |
+0.00.328.835 I common_memory_breakdown_print: |   - Host               |                  720 =   463 +     224 +      32                |
+0.00.328.837 I common_memory_breakdown_print: |   - CPU_REPACK         |                  596 =   596 +       0 +       0                |
+0.00.373.187 I common_params_fit_impl: projected to use 720 MiB of host memory vs. 17823 MiB of total host memory
+0.00.373.197 I common_params_fit_impl: will leave 17102 >= 1024 MiB of system memory, no changes needed
+0.00.373.199 I common_fit_params: successfully fit params to free device memory
+0.00.373.206 I common_fit_params: fitting params to free memory took 0.36 seconds
+0.00.402.314 I llama_model_loader: loaded meta data with 38 key-value pairs and 339 tensors from /home/codinghuman/projects/new-a-workspace/models/model.gguf (version GGUF V3 (latest))
+0.00.402.330 I llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+0.00.402.335 I llama_model_loader: - kv   0:                       general.architecture str              = qwen2
+0.00.402.336 I llama_model_loader: - kv   1:                               general.type str              = model
+0.00.402.339 I llama_model_loader: - kv   2:                               general.name str              = Deepseek-R1-Distill-Qwen-1.5B
+0.00.402.340 I llama_model_loader: - kv   3:                           general.basename str              = Deepseek-R1-Distill-Qwen-1.5B
+0.00.402.342 I llama_model_loader: - kv   4:                       general.quantized_by str              = Unsloth
+0.00.402.344 I llama_model_loader: - kv   5:                         general.size_label str              = 1.5B
+0.00.402.346 I llama_model_loader: - kv   6:                            general.license str              = mit
+0.00.402.348 I llama_model_loader: - kv   7:                           general.repo_url str              = https://huggingface.co/unsloth
+0.00.402.350 I llama_model_loader: - kv   8:                   general.base_model.count u32              = 1
+0.00.402.352 I llama_model_loader: - kv   9:                  general.base_model.0.name str              = DeepSeek R1 Distill Qwen 1.5B
+0.00.402.354 I llama_model_loader: - kv  10:          general.base_model.0.organization str              = Deepseek Ai
+0.00.402.357 I llama_model_loader: - kv  11:              general.base_model.0.repo_url str              = https://huggingface.co/deepseek-ai/De...
+0.00.402.365 I llama_model_loader: - kv  12:                               general.tags arr[str,1]       = ["unsloth"]
+0.00.402.367 I llama_model_loader: - kv  13:                          qwen2.block_count u32              = 28
+0.00.402.369 I llama_model_loader: - kv  14:                       qwen2.context_length u32              = 131072
+0.00.402.390 I llama_model_loader: - kv  15:                     qwen2.embedding_length u32              = 1536
+0.00.402.393 I llama_model_loader: - kv  16:                  qwen2.feed_forward_length u32              = 8960
+0.00.402.395 I llama_model_loader: - kv  17:                 qwen2.attention.head_count u32              = 12
+0.00.402.396 I llama_model_loader: - kv  18:              qwen2.attention.head_count_kv u32              = 2
+0.00.402.403 I llama_model_loader: - kv  19:                       qwen2.rope.freq_base f32              = 10000.000000
+0.00.402.405 I llama_model_loader: - kv  20:     qwen2.attention.layer_norm_rms_epsilon f32              = 0.000001
+0.00.402.407 I llama_model_loader: - kv  21:                       tokenizer.ggml.model str              = gpt2
+0.00.402.408 I llama_model_loader: - kv  22:                         tokenizer.ggml.pre str              = deepseek-r1-qwen
+0.00.421.610 I llama_model_loader: - kv  23:                      tokenizer.ggml.tokens arr[str,151936]  = ["!", "\"", "#", "$", "%", "&", "'", ...
+0.00.426.602 I llama_model_loader: - kv  24:                  tokenizer.ggml.token_type arr[i32,151936]  = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ...
+0.00.446.002 I llama_model_loader: - kv  25:                      tokenizer.ggml.merges arr[str,151387]  = ["Ġ Ġ", "ĠĠ ĠĠ", "i n", "Ġ t",...
+0.00.446.017 I llama_model_loader: - kv  26:                tokenizer.ggml.bos_token_id u32              = 151646
+0.00.446.019 I llama_model_loader: - kv  27:                tokenizer.ggml.eos_token_id u32              = 151643
+0.00.446.021 I llama_model_loader: - kv  28:            tokenizer.ggml.padding_token_id u32              = 151643
+0.00.446.023 I llama_model_loader: - kv  29:               tokenizer.ggml.add_bos_token bool             = true
+0.00.446.025 I llama_model_loader: - kv  30:               tokenizer.ggml.add_eos_token bool             = false
+0.00.446.029 I llama_model_loader: - kv  31:                    tokenizer.chat_template str              = {% if not add_generation_prompt is de...
+0.00.446.031 I llama_model_loader: - kv  32:               general.quantization_version u32              = 2
+0.00.446.032 I llama_model_loader: - kv  33:                          general.file_type u32              = 15
+0.00.446.034 I llama_model_loader: - kv  34:                      quantize.imatrix.file str              = DeepSeek-R1-Distill-Qwen-1.5B-GGUF/im...
+0.00.446.037 I llama_model_loader: - kv  35:                   quantize.imatrix.dataset str              = unsloth_calibration_DeepSeek-R1-Disti...
+0.00.446.039 I llama_model_loader: - kv  36:             quantize.imatrix.entries_count i32              = 196
+0.00.446.041 I llama_model_loader: - kv  37:              quantize.imatrix.chunks_count i32              = 34
+0.00.446.043 I llama_model_loader: - type  f32:  141 tensors
+0.00.446.045 I llama_model_loader: - type q4_K:  169 tensors
+0.00.446.047 I llama_model_loader: - type q6_K:   29 tensors
+0.00.446.050 I print_info: file format = GGUF V3 (latest)
+0.00.446.053 I print_info: file type   = Q4_K - Medium
+0.00.446.057 I print_info: file size   = 1.04 GiB (5.00 BPW) 
+0.00.558.302 I load: 0 unused tokens
+0.00.559.469 W load: control-looking token: 128247 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.00.591.432 I load: printing all EOG tokens:
+0.00.591.443 I load:   - 128247 ('</s>')
+0.00.591.445 I load:   - 151643 ('<｜end▁of▁sentence｜>')
+0.00.591.447 I load:   - 151662 ('<|fim_pad|>')
+0.00.591.448 I load:   - 151663 ('<|repo_name|>')
+0.00.591.450 I load:   - 151664 ('<|file_sep|>')
+0.00.591.826 I load: special tokens cache size = 23
+0.00.646.688 I load: token to piece cache size = 0.9310 MB
+0.00.646.715 I print_info: arch                  = qwen2
+0.00.646.719 I print_info: vocab_only            = 0
+0.00.646.720 I print_info: no_alloc              = 0
+0.00.646.721 I print_info: n_ctx_train           = 131072
+0.00.646.723 I print_info: n_embd_inp            = 1536
+0.00.646.725 I print_info: n_embd                = 1536
+0.00.646.727 I print_info: n_embd_out            = 1536
+0.00.646.728 I print_info: n_layer               = 28
+0.00.646.730 I print_info: n_layer_all           = 28
+0.00.646.740 I print_info: n_head                = 12
+0.00.646.742 I print_info: n_head_kv             = 2
+0.00.646.745 I print_info: n_rot                 = 128
+0.00.646.746 I print_info: n_swa                 = 0
+0.00.646.749 I print_info: is_swa_any            = 0
+0.00.646.750 I print_info: n_embd_head_k         = 128
+0.00.646.752 I print_info: n_embd_head_v         = 128
+0.00.646.754 I print_info: n_gqa                 = 6
+0.00.646.758 I print_info: n_embd_k_gqa          = 256
+0.00.646.765 I print_info: n_embd_v_gqa          = 256
+0.00.646.768 I print_info: f_norm_eps            = 0.0e+00
+0.00.646.770 I print_info: f_norm_rms_eps        = 1.0e-06
+0.00.646.772 I print_info: f_clamp_kqv           = 0.0e+00
+0.00.646.774 I print_info: f_max_alibi_bias      = 0.0e+00
+0.00.646.775 I print_info: f_logit_scale         = 0.0e+00
+0.00.646.777 I print_info: f_attn_scale          = 0.0e+00
+0.00.646.779 I print_info: f_attn_value_scale    = 0.0000
+0.00.646.782 I print_info: n_ff                  = 8960
+0.00.646.783 I print_info: n_expert              = 0
+0.00.646.785 I print_info: n_expert_used         = 0
+0.00.646.787 I print_info: n_expert_groups       = 0
+0.00.646.788 I print_info: n_group_used          = 0
+0.00.646.790 I print_info: causal attn           = 1
+0.00.646.792 I print_info: pooling type          = -1
+0.00.646.794 I print_info: rope type             = 2
+0.00.646.795 I print_info: rope scaling          = linear
+0.00.646.798 I print_info: freq_base_train       = 10000.0
+0.00.646.800 I print_info: freq_scale_train      = 1
+0.00.646.802 I print_info: n_ctx_orig_yarn       = 131072
+0.00.646.804 I print_info: rope_yarn_log_mul     = 0.0000
+0.00.646.806 I print_info: rope_finetuned        = unknown
+0.00.646.808 I print_info: model type            = 1.5B
+0.00.646.810 I print_info: model params          = 1.78 B
+0.00.646.813 I print_info: general.name          = Deepseek-R1-Distill-Qwen-1.5B
+0.00.646.815 I print_info: vocab type            = BPE
+0.00.646.817 I print_info: n_vocab               = 151936
+0.00.646.819 I print_info: n_merges              = 151387
+0.00.646.821 I print_info: BOS token             = 151646 '<｜begin▁of▁sentence｜>'
+0.00.646.823 I print_info: EOS token             = 151643 '<｜end▁of▁sentence｜>'
+0.00.646.825 I print_info: EOT token             = 151643 '<｜end▁of▁sentence｜>'
+0.00.646.826 I print_info: PAD token             = 151643 '<｜end▁of▁sentence｜>'
+0.00.646.828 I print_info: LF token              = 198 'Ċ'
+0.00.646.830 I print_info: FIM PRE token         = 151659 '<|fim_prefix|>'
+0.00.646.831 I print_info: FIM SUF token         = 151661 '<|fim_suffix|>'
+0.00.646.833 I print_info: FIM MID token         = 151660 '<|fim_middle|>'
+0.00.646.835 I print_info: FIM PAD token         = 151662 '<|fim_pad|>'
+0.00.646.837 I print_info: FIM REP token         = 151663 '<|repo_name|>'
+0.00.646.838 I print_info: FIM SEP token         = 151664 '<|file_sep|>'
+0.00.646.840 I print_info: EOG token             = 128247 '</s>'
+0.00.646.842 I print_info: EOG token             = 151643 '<｜end▁of▁sentence｜>'
+0.00.646.843 I print_info: EOG token             = 151662 '<|fim_pad|>'
+0.00.646.844 I print_info: EOG token             = 151663 '<|repo_name|>'
+0.00.646.846 I print_info: EOG token             = 151664 '<|file_sep|>'
+0.00.646.847 I print_info: max token length      = 256
+0.00.646.850 I load_tensors: loading model tensors, this can take a while... (load_mode = mmap)
+NEWA_REPACK_PAGES mode=huge base=135154032406592 size=625508352 first=135154032410624 length=625504256 rc=0 errno=0
+0.00.718.900 I load_tensors:   CPU_Mapped model buffer size =  1052.50 MiB
+0.00.718.913 I load_tensors:   CPU_REPACK model buffer size =   596.53 MiB
+0.01.145.673 I cmn  common_init_: added </s> logit bias = -inf
+0.01.145.879 I cmn  common_init_: added <｜end▁of▁sentence｜> logit bias = -inf
+0.01.145.883 I cmn  common_init_: added <|fim_pad|> logit bias = -inf
+0.01.145.885 I cmn  common_init_: added <|repo_name|> logit bias = -inf
+0.01.145.887 I cmn  common_init_: added <|file_sep|> logit bias = -inf
+0.01.146.018 I llama_context: constructing llama_context
+0.01.146.025 I llama_context: n_seq_max     = 8
+0.01.146.028 I llama_context: n_ctx         = 8192
+0.01.146.029 I llama_context: n_ctx_seq     = 1024
+0.01.146.030 I llama_context: n_batch       = 512
+0.01.146.032 I llama_context: n_ubatch      = 256
+0.01.146.034 I llama_context: causal_attn   = 1
+0.01.146.036 I llama_context: flash_attn    = enabled
+0.01.146.037 I llama_context: kv_unified    = false
+0.01.146.044 I llama_context: freq_base     = 10000.0
+0.01.146.046 I llama_context: freq_scale    = 1
+0.01.146.048 I llama_context: n_rs_seq      = 0
+0.01.146.049 I llama_context: n_outputs_max = 8
+0.01.146.052 I llama_context: n_ctx_seq (1024) < n_ctx_train (131072) -- the full capacity of the model will not be utilized
+0.01.146.476 I llama_context:        CPU  output buffer size =     4.64 MiB
+0.01.146.747 I llama_kv_cache:        CPU KV buffer size =   224.00 MiB
+0.01.253.721 I llama_kv_cache: size =  224.00 MiB (  1024 cells,  28 layers,  8/8 seqs), K (f16):  112.00 MiB, V (f16):  112.00 MiB
+0.01.253.736 I llama_kv_cache: attn_rot_k = 0, n_embd_head_k_all = 128
+0.01.253.738 I llama_kv_cache: attn_rot_v = 0, n_embd_head_k_all = 128
+0.01.253.748 I sched_reserve: reserving ...
+0.01.254.405 I resolve_fused_ops: resolving fused Gated Delta Net support:
+0.01.254.931 I resolve_fused_ops: fused Gated Delta Net (autoregressive) enabled
+0.01.255.221 I resolve_fused_ops: fused Gated Delta Net (chunked) enabled
+0.01.255.224 I resolve_fused_ops: resolving fused Lightning Indexer support:
+0.01.255.517 I resolve_fused_ops: Lightning Indexer enabled
+0.01.255.520 I resolve_fused_ops: resolving fused DeepSeek V4 HC support:
+0.01.255.830 I resolve_fused_ops: fused DeepSeek V4 HC pre enabled
+0.01.256.125 I resolve_fused_ops: fused DeepSeek V4 HC comb enabled
+0.01.256.419 I resolve_fused_ops: fused DeepSeek V4 HC post enabled
+0.01.257.797 I sched_reserve:        CPU compute buffer size =    32.76 MiB
+0.01.257.801 I sched_reserve: graph nodes  = 1014
+0.01.257.803 I sched_reserve: graph splits = 1
+0.01.257.807 I sched_reserve: reserve took 4.05 ms, sched copies = 1
+0.01.258.115 I cmn  common_init_: warming up the model with an empty run - please wait ... (--no-warmup to disable)
+NEWA_Q6 mode=phase_batch columns=4 prefill_only=0
+NEWA_TEAM pid=117473 team=6 index=0 native=0x7aec90ea9400
+NEWA_TEAM pid=117473 team=6 index=1 native=0x7aec857fa6c0
+NEWA_TEAM pid=117473 team=6 index=2 native=0x7aec84ff96c0
+NEWA_TEAM pid=117473 team=6 index=3 native=0x7aebfcd2e6c0
+NEWA_TEAM pid=117473 team=6 index=4 native=0x7aebe7f3c6c0
+NEWA_TEAM pid=117473 team=6 index=5 native=0x7aebe773b6c0
+NEWA_POOL attached=0
+0.01.448.635 I srv    load_model: initializing, n_slots = 8, n_ctx_slot = 1024, kv_unified = 'false'
+0.01.448.670 I spec common_specu: no implementations specified for speculative decoding
+0.01.448.677 I slot   load_model: id  0 | task -1 | new slot, n_ctx = 1024
+0.01.448.688 I slot   load_model: id  1 | task -1 | new slot, n_ctx = 1024
+0.01.448.690 I slot   load_model: id  2 | task -1 | new slot, n_ctx = 1024
+0.01.448.692 I slot   load_model: id  3 | task -1 | new slot, n_ctx = 1024
+0.01.448.694 I slot   load_model: id  4 | task -1 | new slot, n_ctx = 1024
+0.01.448.695 I slot   load_model: id  5 | task -1 | new slot, n_ctx = 1024
+0.01.448.697 I slot   load_model: id  6 | task -1 | new slot, n_ctx = 1024
+0.01.448.698 I slot   load_model: id  7 | task -1 | new slot, n_ctx = 1024
+0.01.448.727 I srv    load_model: prompt cache is enabled, size limit: 8192 MiB
+0.01.448.729 I srv    load_model: use `--cache-ram 0` to disable the prompt cache
+0.01.448.731 I srv    load_model: for more info see https://github.com/ggml-org/llama.cpp/pull/16391
+0.01.448.733 I srv    load_model: context checkpoints enabled, max = 32, min spacing = 8192
+0.01.448.773 I srv          init: idle slots will be saved to prompt cache upon starting a new task
+0.01.453.642 I srv          init: init: chat template, example_format: 'You are a helpful assistant<｜User｜>Hello<｜Assistant｜>Hi there<｜end▁of▁sentence｜><｜User｜>How are you?<｜Assistant｜><think>
+'
+0.01.455.870 I srv          init: init: chat template, thinking = 1
+0.01.455.913 I srv  llama_server: model loaded
+0.01.455.919 I srv  llama_server: listening on http://127.0.0.1:54259
+0.01.455.926 I srv  update_slots: all slots are idle
+0.01.687.266 I srv  server_strea: conv_id= (empty=1)
+0.01.687.897 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.01.687.904 I slot get_availabl: id  1 | task -1 |  - skipping, slot is empty
+0.01.687.907 I slot get_availabl: id  2 | task -1 |  - skipping, slot is empty
+0.01.687.908 I slot get_availabl: id  3 | task -1 |  - skipping, slot is empty
+0.01.687.910 I slot get_availabl: id  4 | task -1 |  - skipping, slot is empty
+0.01.687.911 I slot get_availabl: id  5 | task -1 |  - skipping, slot is empty
+0.01.687.913 I slot get_availabl: id  6 | task -1 |  - skipping, slot is empty
+0.01.687.914 I slot get_availabl: id  7 | task -1 |  - skipping, slot is empty
+0.01.687.916 I slot get_availabl: id  7 | task -1 | selected slot by LRU, t_last = -1
+0.01.687.918 I srv  get_availabl: updating prompt cache
+0.01.687.929 I srv          load:  - looking for better prompt, base f_keep = -1.000, f_sim = 0.000
+0.01.687.935 I srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 8192 tokens, 8589934592 est)
+0.01.687.939 I srv  get_availabl: prompt cache update took 0.02 ms
+0.01.687.983 I slot launch_slot_: id  7 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.01.687.995 I slot launch_slot_: id  7 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.01.687.998 I slot launch_slot_: id  7 | task 0 | processing task, is_child = 0
+0.01.687.999 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.01.688.001 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.01.688.003 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.01.688.005 I slot process_sing: id  3 | task -1 | saving idle slot to prompt cache
+0.01.688.006 I slot process_sing: id  4 | task -1 | saving idle slot to prompt cache
+0.01.688.007 I slot process_sing: id  5 | task -1 | saving idle slot to prompt cache
+0.01.688.009 I slot process_sing: id  6 | task -1 | saving idle slot to prompt cache
+0.01.688.011 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.01.688.013 I slot get_availabl: id  1 | task -1 |  - skipping, slot is empty
+0.01.688.014 I slot get_availabl: id  2 | task -1 |  - skipping, slot is empty
+0.01.688.016 I slot get_availabl: id  3 | task -1 |  - skipping, slot is empty
+0.01.688.018 I slot get_availabl: id  4 | task -1 |  - skipping, slot is empty
+0.01.688.019 I slot get_availabl: id  5 | task -1 |  - skipping, slot is empty
+0.01.688.021 I slot get_availabl: id  6 | task -1 |  - skipping, slot is empty
+0.01.688.022 I slot get_availabl: id  7 | task 0 |  - skipping, is_processing = 1
+0.01.688.024 I slot get_availabl: id  6 | task -1 | selected slot by LRU, t_last = -1
+0.01.688.026 I srv  get_availabl: updating prompt cache
+0.01.688.029 I srv          load:  - looking for better prompt, base f_keep = -1.000, f_sim = 0.000
+0.01.688.031 I srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 8192 tokens, 8589934592 est)
+0.01.688.035 I srv  get_availabl: prompt cache update took 0.01 ms
+0.01.688.044 I slot launch_slot_: id  6 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.01.688.051 I slot launch_slot_: id  6 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.01.688.053 I slot launch_slot_: id  6 | task 1 | processing task, is_child = 0
+0.01.688.055 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.01.688.056 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.01.688.058 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.01.688.059 I slot process_sing: id  3 | task -1 | saving idle slot to prompt cache
+0.01.688.061 I slot process_sing: id  4 | task -1 | saving idle slot to prompt cache
+0.01.688.063 I slot process_sing: id  5 | task -1 | saving idle slot to prompt cache
+0.01.688.065 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.01.688.066 I slot get_availabl: id  1 | task -1 |  - skipping, slot is empty
+0.01.688.067 I slot get_availabl: id  2 | task -1 |  - skipping, slot is empty
+0.01.688.069 I slot get_availabl: id  3 | task -1 |  - skipping, slot is empty
+0.01.688.071 I slot get_availabl: id  4 | task -1 |  - skipping, slot is empty
+0.01.688.072 I slot get_availabl: id  5 | task -1 |  - skipping, slot is empty
+0.01.688.074 I slot get_availabl: id  6 | task 1 |  - skipping, is_processing = 1
+0.01.688.075 I slot get_availabl: id  7 | task 0 |  - skipping, is_processing = 1
+0.01.688.077 I slot get_availabl: id  5 | task -1 | selected slot by LRU, t_last = -1
+0.01.688.078 I srv  get_availabl: updating prompt cache
+0.01.688.081 I srv          load:  - looking for better prompt, base f_keep = -1.000, f_sim = 0.000
+0.01.688.084 I srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 8192 tokens, 8589934592 est)
+0.01.688.087 I srv  get_availabl: prompt cache update took 0.01 ms
+0.01.688.096 I slot launch_slot_: id  5 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.01.688.102 I slot launch_slot_: id  5 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.01.688.112 I slot launch_slot_: id  5 | task 2 | processing task, is_child = 0
+0.01.688.114 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.01.688.115 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.01.688.117 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.01.688.118 I slot process_sing: id  3 | task -1 | saving idle slot to prompt cache
+0.01.688.119 I slot process_sing: id  4 | task -1 | saving idle slot to prompt cache
+0.01.688.122 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.01.688.123 I slot get_availabl: id  1 | task -1 |  - skipping, slot is empty
+0.01.688.125 I slot get_availabl: id  2 | task -1 |  - skipping, slot is empty
+0.01.688.127 I slot get_availabl: id  3 | task -1 |  - skipping, slot is empty
+0.01.688.136 I slot get_availabl: id  4 | task -1 |  - skipping, slot is empty
+0.01.688.138 I slot get_availabl: id  5 | task 2 |  - skipping, is_processing = 1
+0.01.688.139 I slot get_availabl: id  6 | task 1 |  - skipping, is_processing = 1
+0.01.688.141 I slot get_availabl: id  7 | task 0 |  - skipping, is_processing = 1
+0.01.688.142 I slot get_availabl: id  4 | task -1 | selected slot by LRU, t_last = -1
+0.01.688.144 I srv  get_availabl: updating prompt cache
+0.01.688.147 I srv          load:  - looking for better prompt, base f_keep = -1.000, f_sim = 0.000
+0.01.688.149 I srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 8192 tokens, 8589934592 est)
+0.01.688.159 I srv  get_availabl: prompt cache update took 0.01 ms
+0.01.688.168 I slot launch_slot_: id  4 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.01.688.174 I slot launch_slot_: id  4 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.01.688.177 I slot launch_slot_: id  4 | task 3 | processing task, is_child = 0
+0.01.688.178 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.01.688.180 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.01.688.181 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.01.688.183 I slot process_sing: id  3 | task -1 | saving idle slot to prompt cache
+0.01.688.185 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.01.688.187 I slot get_availabl: id  1 | task -1 |  - skipping, slot is empty
+0.01.688.188 I slot get_availabl: id  2 | task -1 |  - skipping, slot is empty
+0.01.688.190 I slot get_availabl: id  3 | task -1 |  - skipping, slot is empty
+0.01.688.191 I slot get_availabl: id  4 | task 3 |  - skipping, is_processing = 1
+0.01.688.192 I slot get_availabl: id  5 | task 2 |  - skipping, is_processing = 1
+0.01.688.194 I slot get_availabl: id  6 | task 1 |  - skipping, is_processing = 1
+0.01.688.196 I slot get_availabl: id  7 | task 0 |  - skipping, is_processing = 1
+0.01.688.198 I slot get_availabl: id  3 | task -1 | selected slot by LRU, t_last = -1
+0.01.688.199 I srv  get_availabl: updating prompt cache
+0.01.688.202 I srv          load:  - looking for better prompt, base f_keep = -1.000, f_sim = 0.000
+0.01.688.204 I srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 8192 tokens, 8589934592 est)
+0.01.688.207 I srv  get_availabl: prompt cache update took 0.01 ms
+0.01.688.216 I slot launch_slot_: id  3 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.01.688.220 I slot launch_slot_: id  3 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.01.688.222 I slot launch_slot_: id  3 | task 4 | processing task, is_child = 0
+0.01.688.224 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.01.688.225 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.01.688.227 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.01.688.229 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.01.688.230 I slot get_availabl: id  1 | task -1 |  - skipping, slot is empty
+0.01.688.232 I slot get_availabl: id  2 | task -1 |  - skipping, slot is empty
+0.01.688.234 I slot get_availabl: id  3 | task 4 |  - skipping, is_processing = 1
+0.01.688.235 I slot get_availabl: id  4 | task 3 |  - skipping, is_processing = 1
+0.01.688.237 I slot get_availabl: id  5 | task 2 |  - skipping, is_processing = 1
+0.01.688.238 I slot get_availabl: id  6 | task 1 |  - skipping, is_processing = 1
+0.01.688.240 I slot get_availabl: id  7 | task 0 |  - skipping, is_processing = 1
+0.01.688.242 I slot get_availabl: id  2 | task -1 | selected slot by LRU, t_last = -1
+0.01.688.243 I srv  get_availabl: updating prompt cache
+0.01.688.246 I srv          load:  - looking for better prompt, base f_keep = -1.000, f_sim = 0.000
+0.01.688.248 I srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 8192 tokens, 8589934592 est)
+0.01.688.250 I srv  get_availabl: prompt cache update took 0.01 ms
+0.01.688.259 I slot launch_slot_: id  2 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.01.688.264 I slot launch_slot_: id  2 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.01.688.267 I slot launch_slot_: id  2 | task 5 | processing task, is_child = 0
+0.01.688.269 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.01.688.270 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.01.688.273 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.01.688.274 I slot get_availabl: id  1 | task -1 |  - skipping, slot is empty
+0.01.688.275 I slot get_availabl: id  2 | task 5 |  - skipping, is_processing = 1
+0.01.688.277 I slot get_availabl: id  3 | task 4 |  - skipping, is_processing = 1
+0.01.688.279 I slot get_availabl: id  4 | task 3 |  - skipping, is_processing = 1
+0.01.688.280 I slot get_availabl: id  5 | task 2 |  - skipping, is_processing = 1
+0.01.688.281 I slot get_availabl: id  6 | task 1 |  - skipping, is_processing = 1
+0.01.688.283 I slot get_availabl: id  7 | task 0 |  - skipping, is_processing = 1
+0.01.688.285 I slot get_availabl: id  1 | task -1 | selected slot by LRU, t_last = -1
+0.01.688.286 I srv  get_availabl: updating prompt cache
+0.01.688.290 I srv          load:  - looking for better prompt, base f_keep = -1.000, f_sim = 0.000
+0.01.688.292 I srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 8192 tokens, 8589934592 est)
+0.01.688.295 I srv  get_availabl: prompt cache update took 0.01 ms
+0.01.688.303 I slot launch_slot_: id  1 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.01.688.308 I slot launch_slot_: id  1 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.01.688.310 I slot launch_slot_: id  1 | task 6 | processing task, is_child = 0
+0.01.688.312 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.01.688.313 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.01.688.315 I slot get_availabl: id  1 | task 6 |  - skipping, is_processing = 1
+0.01.688.316 I slot get_availabl: id  2 | task 5 |  - skipping, is_processing = 1
+0.01.688.318 I slot get_availabl: id  3 | task 4 |  - skipping, is_processing = 1
+0.01.688.319 I slot get_availabl: id  4 | task 3 |  - skipping, is_processing = 1
+0.01.688.321 I slot get_availabl: id  5 | task 2 |  - skipping, is_processing = 1
+0.01.688.322 I slot get_availabl: id  6 | task 1 |  - skipping, is_processing = 1
+0.01.688.324 I slot get_availabl: id  7 | task 0 |  - skipping, is_processing = 1
+0.01.688.325 I slot get_availabl: id  0 | task -1 | selected slot by LRU, t_last = -1
+0.01.688.327 I srv  get_availabl: updating prompt cache
+0.01.688.329 I srv          load:  - looking for better prompt, base f_keep = -1.000, f_sim = 0.000
+0.01.688.332 I srv        update:  - cache state: 0 prompts, 0.000 MiB (limits: 8192.000 MiB, 8192 tokens, 8589934592 est)
+0.01.688.335 I srv  get_availabl: prompt cache update took 0.01 ms
+0.01.688.343 I slot launch_slot_: id  0 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.01.688.349 I slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.01.688.351 I slot launch_slot_: id  0 | task 7 | processing task, is_child = 0
+0.01.688.370 I slot   operator(): id  0 | task 7 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 105
+0.01.688.375 I slot   operator(): id  0 | task 7 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.01.688.924 I slot init_sampler: id  0 | task 7 | init sampler, took 0.54 ms, tokens: text = 105, total = 105
+0.01.688.930 I slot   operator(): id  1 | task 6 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 105
+0.01.688.932 I slot   operator(): id  1 | task 6 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.01.689.449 I slot init_sampler: id  1 | task 6 | init sampler, took 0.51 ms, tokens: text = 105, total = 105
+0.01.689.452 I slot   operator(): id  2 | task 5 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 104
+0.01.689.455 I slot   operator(): id  2 | task 5 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.01.689.978 I slot init_sampler: id  2 | task 5 | init sampler, took 0.51 ms, tokens: text = 104, total = 104
+0.01.689.983 I slot   operator(): id  3 | task 4 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 106
+0.01.689.987 I slot   operator(): id  3 | task 4 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.01.690.510 I slot init_sampler: id  3 | task 4 | init sampler, took 0.51 ms, tokens: text = 106, total = 106
+0.01.690.515 I slot   operator(): id  4 | task 3 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 109
+0.01.690.518 I slot   operator(): id  4 | task 3 | cached n_tokens = 0, memory_seq_rm [0, end)
+NEWA_Q4_TILE32 mode=phase_batch prefill_reference=1 batch_tokens_min=4 batch_tokens_max=12 exact=1 prefill_only=0
+0.05.090.753 I slot print_timing: id  4 | task 3 | prompt processing, n_tokens =     92, progress = 0.84, t =   3.40 s / 27.06 tokens per second
+0.05.090.771 I slot   operator(): id  4 | task 3 | cached n_tokens = 92, memory_seq_rm [92, end)
+0.05.091.369 I slot init_sampler: id  4 | task 3 | init sampler, took 0.56 ms, tokens: text = 109, total = 109
+0.05.091.394 I slot   operator(): id  5 | task 2 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 102
+0.05.091.400 I slot   operator(): id  5 | task 2 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.05.091.990 I slot init_sampler: id  5 | task 2 | init sampler, took 0.56 ms, tokens: text = 102, total = 102
+0.05.091.999 I slot   operator(): id  6 | task 1 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 106
+0.05.092.003 I slot   operator(): id  6 | task 1 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.05.092.588 I slot init_sampler: id  6 | task 1 | init sampler, took 0.57 ms, tokens: text = 106, total = 106
+0.05.092.596 I slot   operator(): id  7 | task 0 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 101
+0.05.092.599 I slot   operator(): id  7 | task 0 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.05.093.148 I slot init_sampler: id  7 | task 0 | init sampler, took 0.54 ms, tokens: text = 101, total = 101
+0.16.493.734 I slot print_timing: id  0 | task 7 | n_decoded =    100, tg =   8.77 t/s, tg_3s =   8.77 t/s
+0.16.494.114 I slot print_timing: id  1 | task 6 | n_decoded =    100, tg =   8.77 t/s, tg_3s =   8.77 t/s
+0.16.494.535 I slot print_timing: id  2 | task 5 | n_decoded =    100, tg =   8.77 t/s, tg_3s =   8.77 t/s
+0.16.495.030 I slot print_timing: id  3 | task 4 | n_decoded =    100, tg =   8.77 t/s, tg_3s =   8.77 t/s
+0.16.590.084 I slot print_timing: id  4 | task 3 | n_decoded =    100, tg =  10.93 t/s, tg_3s =  10.93 t/s
+0.16.590.577 I slot print_timing: id  5 | task 2 | n_decoded =    100, tg =  10.93 t/s, tg_3s =  10.93 t/s
+0.16.591.022 I slot print_timing: id  6 | task 1 | n_decoded =    100, tg =  10.93 t/s, tg_3s =  10.93 t/s
+0.16.591.461 I slot print_timing: id  7 | task 0 | n_decoded =    100, tg =  10.93 t/s, tg_3s =  10.93 t/s
+0.19.165.074 I slot print_timing: id  0 | task 7 | prompt eval time =    3397.12 ms /   105 tokens (   32.35 ms per token,    30.91 tokens per second)
+0.19.165.153 I slot print_timing: id  0 | task 7 |        eval time =   14079.56 ms /   128 tokens (  110.00 ms per token,     9.09 tokens per second)
+0.19.165.179 I slot print_timing: id  0 | task 7 |       total time =   17476.68 ms /   233 tokens
+0.19.165.210 I slot print_timing: id  0 | task 7 |    graphs reused =        126
+0.19.165.358 I slot      release: id  0 | task 7 | stop processing: n_tokens = 232, truncated = 0
+0.19.165.781 I slot print_timing: id  1 | task 6 | prompt eval time =    3397.78 ms /   105 tokens (   32.36 ms per token,    30.90 tokens per second)
+0.19.165.824 I slot print_timing: id  1 | task 6 |        eval time =   14079.06 ms /   128 tokens (  109.99 ms per token,     9.09 tokens per second)
+0.19.165.848 I slot print_timing: id  1 | task 6 |       total time =   17476.84 ms /   233 tokens
+0.19.165.873 I slot print_timing: id  1 | task 6 |    graphs reused =        126
+0.19.165.960 I slot      release: id  1 | task 6 | stop processing: n_tokens = 232, truncated = 0
+0.19.166.391 I slot print_timing: id  2 | task 5 | prompt eval time =    3399.13 ms /   104 tokens (   32.68 ms per token,    30.60 tokens per second)
+0.19.166.426 I slot print_timing: id  2 | task 5 |        eval time =   14077.80 ms /   128 tokens (  109.98 ms per token,     9.09 tokens per second)
+0.19.166.450 I slot print_timing: id  2 | task 5 |       total time =   17476.93 ms /   232 tokens
+0.19.166.474 I slot print_timing: id  2 | task 5 |    graphs reused =        126
+0.19.166.572 I slot      release: id  2 | task 5 | stop processing: n_tokens = 231, truncated = 0
+0.19.167.020 I slot print_timing: id  3 | task 4 | prompt eval time =    3400.66 ms /   106 tokens (   32.08 ms per token,    31.17 tokens per second)
+0.19.167.053 I slot print_timing: id  3 | task 4 |        eval time =   14076.36 ms /   128 tokens (  109.97 ms per token,     9.09 tokens per second)
+0.19.167.078 I slot print_timing: id  3 | task 4 |       total time =   17477.03 ms /   234 tokens
+0.19.167.122 I slot print_timing: id  3 | task 4 |    graphs reused =        126
+0.19.167.203 I slot      release: id  3 | task 4 | stop processing: n_tokens = 233, truncated = 0
+0.19.234.864 I slot print_timing: id  4 | task 3 | prompt eval time =    5746.32 ms /   109 tokens (   52.72 ms per token,    18.97 tokens per second)
+0.19.234.927 I slot print_timing: id  4 | task 3 |        eval time =   11798.01 ms /   128 tokens (   92.17 ms per token,    10.85 tokens per second)
+0.19.234.950 I slot print_timing: id  4 | task 3 |       total time =   17544.33 ms /   237 tokens
+0.19.234.973 I slot print_timing: id  4 | task 3 |    graphs reused =        126
+0.19.235.077 I slot      release: id  4 | task 3 | stop processing: n_tokens = 236, truncated = 0
+0.19.235.498 I slot print_timing: id  5 | task 2 | prompt eval time =    2346.75 ms /   102 tokens (   23.01 ms per token,    43.46 tokens per second)
+0.19.235.529 I slot print_timing: id  5 | task 2 |        eval time =   11797.34 ms /   128 tokens (   92.17 ms per token,    10.85 tokens per second)
+0.19.235.565 I slot print_timing: id  5 | task 2 |       total time =   14144.10 ms /   230 tokens
+0.19.235.595 I slot print_timing: id  5 | task 2 |    graphs reused =        126
+0.19.235.639 I slot      release: id  5 | task 2 | stop processing: n_tokens = 229, truncated = 0
+0.19.236.099 I slot print_timing: id  6 | task 1 | prompt eval time =    2347.40 ms /   106 tokens (   22.15 ms per token,    45.16 tokens per second)
+0.19.236.131 I slot print_timing: id  6 | task 1 |        eval time =   11796.69 ms /   128 tokens (   92.16 ms per token,    10.85 tokens per second)
+0.19.236.153 I slot print_timing: id  6 | task 1 |       total time =   14144.09 ms /   234 tokens
+0.19.236.175 I slot print_timing: id  6 | task 1 |    graphs reused =        126
+0.19.236.216 I slot      release: id  6 | task 1 | stop processing: n_tokens = 233, truncated = 0
+0.19.236.704 I slot print_timing: id  7 | task 0 | prompt eval time =    2348.04 ms /   101 tokens (   23.25 ms per token,    43.01 tokens per second)
+0.19.236.746 I slot print_timing: id  7 | task 0 |        eval time =   11796.06 ms /   128 tokens (   92.16 ms per token,    10.85 tokens per second)
+0.19.236.768 I slot print_timing: id  7 | task 0 |       total time =   14144.10 ms /   229 tokens
+0.19.236.790 I slot print_timing: id  7 | task 0 |    graphs reused =        126
+0.19.236.830 I slot      release: id  7 | task 0 | stop processing: n_tokens = 228, truncated = 0
+0.19.238.033 I srv  update_slots: all slots are idle
+0.19.346.867 I srv  server_strea: conv_id= (empty=1)
+0.19.347.339 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.020 (2/101) > 0.100
+0.19.347.345 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.010 (1/101) > 0.100
+0.19.347.348 I slot get_availabl: id  2 | task -1 |  - checking sim = 0.020 (2/101) > 0.100
+0.19.347.350 I slot get_availabl: id  3 | task -1 |  - checking sim = 0.020 (2/101) > 0.100
+0.19.347.352 I slot get_availabl: id  4 | task -1 |  - checking sim = 0.020 (2/101) > 0.100
+0.19.347.354 I slot get_availabl: id  5 | task -1 |  - checking sim = 0.020 (2/101) > 0.100
+0.19.347.355 I slot get_availabl: id  6 | task -1 |  - checking sim = 0.020 (2/101) > 0.100
+0.19.347.357 I slot get_availabl: id  7 | task -1 |  - checking sim = 1.000 (101/101) > 0.100
+0.19.347.360 I slot get_availabl: id  7 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.443
+0.19.347.361 I srv  get_availabl: updating prompt cache
+0.19.347.409 I srv   prompt_save:  - saving prompt with length 228, total state size = 6.238 MiB (draft: 0.000 MiB)
+0.19.352.880 I srv          load:  - looking for better prompt, base f_keep = 0.443, f_sim = 1.000
+0.19.352.891 I srv          load:    - prompt with length     228, lcp =     101, f_keep = 0.443, f_sim = 1.000
+0.19.352.895 I srv        update:  - cache state: 1 prompts, 6.238 MiB (limits: 8192.000 MiB, 8192 tokens, 299434 est)
+0.19.352.897 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.352.901 I srv  get_availabl: prompt cache update took 5.54 ms
+0.19.352.950 I slot launch_slot_: id  7 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.19.352.958 I slot launch_slot_: id  7 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.19.352.963 I slot launch_slot_: id  7 | task 137 | processing task, is_child = 0
+0.19.352.964 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.19.352.999 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.357.187 I srv        update:  - cache state: 2 prompts, 12.585 MiB (limits: 8192.000 MiB, 8192 tokens, 299434 est)
+0.19.357.198 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.357.199 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.357.202 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.19.357.238 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.361.427 I srv        update:  - cache state: 3 prompts, 18.932 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.361.436 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.361.438 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.361.440 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.361.442 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.19.361.479 I srv   prompt_save:  - saving prompt with length 231, total state size = 6.320 MiB (draft: 0.000 MiB)
+0.19.365.588 I srv        update:  - cache state: 4 prompts, 25.252 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.365.595 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.365.597 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.365.599 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.365.601 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.365.604 I slot process_sing: id  3 | task -1 | saving idle slot to prompt cache
+0.19.365.646 I srv   prompt_save:  - saving prompt with length 233, total state size = 6.374 MiB (draft: 0.000 MiB)
+0.19.369.853 I srv        update:  - cache state: 5 prompts, 31.626 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.369.861 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.369.863 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.369.865 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.369.866 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.369.868 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.369.870 I slot process_sing: id  4 | task -1 | saving idle slot to prompt cache
+0.19.369.906 I srv   prompt_save:  - saving prompt with length 236, total state size = 6.457 MiB (draft: 0.000 MiB)
+0.19.374.128 I srv        update:  - cache state: 6 prompts, 38.083 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.374.139 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.374.141 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.374.143 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.374.144 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.374.146 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.374.148 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.374.150 I slot process_sing: id  5 | task -1 | saving idle slot to prompt cache
+0.19.374.184 I srv   prompt_save:  - saving prompt with length 229, total state size = 6.265 MiB (draft: 0.000 MiB)
+0.19.378.294 I srv        update:  - cache state: 7 prompts, 44.348 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.378.305 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.378.306 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.378.308 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.378.310 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.378.312 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.378.313 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.378.315 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.378.317 I slot process_sing: id  6 | task -1 | saving idle slot to prompt cache
+0.19.378.352 I srv   prompt_save:  - saving prompt with length 233, total state size = 6.374 MiB (draft: 0.000 MiB)
+0.19.382.674 I srv        update:  - cache state: 8 prompts, 50.722 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.382.683 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.382.684 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.382.686 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.382.688 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.382.690 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.382.691 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.382.693 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.382.695 I srv        update:    - prompt 0x5c0b8233b490:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.382.706 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.019 (2/106) > 0.100
+0.19.382.708 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.009 (1/106) > 0.100
+0.19.382.710 I slot get_availabl: id  2 | task -1 |  - checking sim = 0.019 (2/106) > 0.100
+0.19.382.712 I slot get_availabl: id  3 | task -1 |  - checking sim = 0.019 (2/106) > 0.100
+0.19.382.714 I slot get_availabl: id  4 | task -1 |  - checking sim = 0.019 (2/106) > 0.100
+0.19.382.717 I slot get_availabl: id  5 | task -1 |  - checking sim = 0.019 (2/106) > 0.100
+0.19.382.719 I slot get_availabl: id  6 | task -1 |  - checking sim = 1.000 (106/106) > 0.100
+0.19.382.722 I slot get_availabl: id  7 | task 137 |  - skipping, is_processing = 1
+0.19.382.725 I slot get_availabl: id  6 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.455
+0.19.382.727 I srv  get_availabl: updating prompt cache
+0.19.382.769 I srv   prompt_save:  - saving prompt with length 233, total state size = 6.374 MiB (draft: 0.000 MiB)
+0.19.382.772 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.382.774 I srv          load:  - looking for better prompt, base f_keep = 0.455, f_sim = 1.000
+0.19.382.777 I srv          load:    - prompt with length     228, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.382.779 I srv          load:    - prompt with length     232, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.382.781 I srv          load:    - prompt with length     232, lcp =       1, f_keep = 0.004, f_sim = 0.009
+0.19.382.782 I srv          load:    - prompt with length     231, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.382.784 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.382.786 I srv          load:    - prompt with length     236, lcp =       2, f_keep = 0.008, f_sim = 0.019
+0.19.382.788 I srv          load:    - prompt with length     229, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.382.790 I srv          load:    - prompt with length     233, lcp =     106, f_keep = 0.455, f_sim = 1.000
+0.19.382.792 I srv        update:  - cache state: 8 prompts, 50.722 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.382.793 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.382.795 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.382.797 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.382.799 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.382.800 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.382.802 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.382.804 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.382.805 I srv        update:    - prompt 0x5c0b8233b490:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.382.808 I srv  get_availabl: prompt cache update took 0.08 ms
+0.19.382.846 I slot launch_slot_: id  6 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.19.382.852 I slot launch_slot_: id  6 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.19.382.855 I slot launch_slot_: id  6 | task 138 | processing task, is_child = 0
+0.19.382.857 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.19.382.878 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.382.880 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.382.882 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.19.382.902 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.382.904 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.382.906 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.19.382.925 I srv   prompt_save:  - saving prompt with length 231, total state size = 6.320 MiB (draft: 0.000 MiB)
+0.19.382.928 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.382.929 I slot process_sing: id  3 | task -1 | saving idle slot to prompt cache
+0.19.382.949 I srv   prompt_save:  - saving prompt with length 233, total state size = 6.374 MiB (draft: 0.000 MiB)
+0.19.382.951 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.382.952 I slot process_sing: id  4 | task -1 | saving idle slot to prompt cache
+0.19.382.972 I srv   prompt_save:  - saving prompt with length 236, total state size = 6.457 MiB (draft: 0.000 MiB)
+0.19.382.974 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.382.975 I slot process_sing: id  5 | task -1 | saving idle slot to prompt cache
+0.19.382.995 I srv   prompt_save:  - saving prompt with length 229, total state size = 6.265 MiB (draft: 0.000 MiB)
+0.19.382.997 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.001 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.020 (2/102) > 0.100
+0.19.383.003 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.010 (1/102) > 0.100
+0.19.383.005 I slot get_availabl: id  2 | task -1 |  - checking sim = 0.020 (2/102) > 0.100
+0.19.383.007 I slot get_availabl: id  3 | task -1 |  - checking sim = 0.020 (2/102) > 0.100
+0.19.383.009 I slot get_availabl: id  4 | task -1 |  - checking sim = 0.020 (2/102) > 0.100
+0.19.383.011 I slot get_availabl: id  5 | task -1 |  - checking sim = 1.000 (102/102) > 0.100
+0.19.383.013 I slot get_availabl: id  6 | task 138 |  - skipping, is_processing = 1
+0.19.383.014 I slot get_availabl: id  7 | task 137 |  - skipping, is_processing = 1
+0.19.383.016 I slot get_availabl: id  5 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.445
+0.19.383.018 I srv  get_availabl: updating prompt cache
+0.19.383.038 I srv   prompt_save:  - saving prompt with length 229, total state size = 6.265 MiB (draft: 0.000 MiB)
+0.19.383.040 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.042 I srv          load:  - looking for better prompt, base f_keep = 0.445, f_sim = 1.000
+0.19.383.044 I srv          load:    - prompt with length     228, lcp =       2, f_keep = 0.009, f_sim = 0.020
+0.19.383.045 I srv          load:    - prompt with length     232, lcp =       2, f_keep = 0.009, f_sim = 0.020
+0.19.383.047 I srv          load:    - prompt with length     232, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.049 I srv          load:    - prompt with length     231, lcp =       2, f_keep = 0.009, f_sim = 0.020
+0.19.383.051 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.020
+0.19.383.053 I srv          load:    - prompt with length     236, lcp =       2, f_keep = 0.008, f_sim = 0.020
+0.19.383.055 I srv          load:    - prompt with length     229, lcp =     102, f_keep = 0.445, f_sim = 1.000
+0.19.383.056 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.020
+0.19.383.058 I srv        update:  - cache state: 8 prompts, 50.722 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.383.060 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.383.062 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.064 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.066 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.383.067 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.069 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.383.070 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.383.072 I srv        update:    - prompt 0x5c0b8233b490:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.075 I srv  get_availabl: prompt cache update took 0.05 ms
+0.19.383.091 I slot launch_slot_: id  5 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.19.383.095 I slot launch_slot_: id  5 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.19.383.098 I slot launch_slot_: id  5 | task 139 | processing task, is_child = 0
+0.19.383.100 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.19.383.118 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.120 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.122 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.19.383.140 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.142 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.144 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.19.383.162 I srv   prompt_save:  - saving prompt with length 231, total state size = 6.320 MiB (draft: 0.000 MiB)
+0.19.383.164 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.166 I slot process_sing: id  3 | task -1 | saving idle slot to prompt cache
+0.19.383.184 I srv   prompt_save:  - saving prompt with length 233, total state size = 6.374 MiB (draft: 0.000 MiB)
+0.19.383.186 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.188 I slot process_sing: id  4 | task -1 | saving idle slot to prompt cache
+0.19.383.206 I srv   prompt_save:  - saving prompt with length 236, total state size = 6.457 MiB (draft: 0.000 MiB)
+0.19.383.208 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.211 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.018 (2/109) > 0.100
+0.19.383.212 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.009 (1/109) > 0.100
+0.19.383.214 I slot get_availabl: id  2 | task -1 |  - checking sim = 0.018 (2/109) > 0.100
+0.19.383.216 I slot get_availabl: id  3 | task -1 |  - checking sim = 0.018 (2/109) > 0.100
+0.19.383.218 I slot get_availabl: id  4 | task -1 |  - checking sim = 1.000 (109/109) > 0.100
+0.19.383.219 I slot get_availabl: id  5 | task 139 |  - skipping, is_processing = 1
+0.19.383.221 I slot get_availabl: id  6 | task 138 |  - skipping, is_processing = 1
+0.19.383.222 I slot get_availabl: id  7 | task 137 |  - skipping, is_processing = 1
+0.19.383.224 I slot get_availabl: id  4 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.462
+0.19.383.225 I srv  get_availabl: updating prompt cache
+0.19.383.245 I srv   prompt_save:  - saving prompt with length 236, total state size = 6.457 MiB (draft: 0.000 MiB)
+0.19.383.247 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.248 I srv          load:  - looking for better prompt, base f_keep = 0.462, f_sim = 1.000
+0.19.383.250 I srv          load:    - prompt with length     228, lcp =       2, f_keep = 0.009, f_sim = 0.018
+0.19.383.253 I srv          load:    - prompt with length     232, lcp =       2, f_keep = 0.009, f_sim = 0.018
+0.19.383.255 I srv          load:    - prompt with length     232, lcp =       1, f_keep = 0.004, f_sim = 0.009
+0.19.383.257 I srv          load:    - prompt with length     231, lcp =       2, f_keep = 0.009, f_sim = 0.018
+0.19.383.267 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.018
+0.19.383.269 I srv          load:    - prompt with length     236, lcp =     109, f_keep = 0.462, f_sim = 1.000
+0.19.383.270 I srv          load:    - prompt with length     229, lcp =       2, f_keep = 0.009, f_sim = 0.018
+0.19.383.272 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.018
+0.19.383.275 I srv        update:  - cache state: 8 prompts, 50.722 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.383.276 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.383.278 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.280 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.281 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.383.284 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.290 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.383.291 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.383.293 I srv        update:    - prompt 0x5c0b8233b490:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.296 I srv  get_availabl: prompt cache update took 0.07 ms
+0.19.383.305 I slot launch_slot_: id  4 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.19.383.310 I slot launch_slot_: id  4 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.19.383.311 I slot launch_slot_: id  4 | task 140 | processing task, is_child = 0
+0.19.383.313 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.19.383.331 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.333 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.335 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.19.383.353 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.355 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.356 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.19.383.375 I srv   prompt_save:  - saving prompt with length 231, total state size = 6.320 MiB (draft: 0.000 MiB)
+0.19.383.377 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.378 I slot process_sing: id  3 | task -1 | saving idle slot to prompt cache
+0.19.383.397 I srv   prompt_save:  - saving prompt with length 233, total state size = 6.374 MiB (draft: 0.000 MiB)
+0.19.383.398 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.401 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.019 (2/106) > 0.100
+0.19.383.403 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.009 (1/106) > 0.100
+0.19.383.405 I slot get_availabl: id  2 | task -1 |  - checking sim = 0.019 (2/106) > 0.100
+0.19.383.407 I slot get_availabl: id  3 | task -1 |  - checking sim = 1.000 (106/106) > 0.100
+0.19.383.409 I slot get_availabl: id  4 | task 140 |  - skipping, is_processing = 1
+0.19.383.410 I slot get_availabl: id  5 | task 139 |  - skipping, is_processing = 1
+0.19.383.412 I slot get_availabl: id  6 | task 138 |  - skipping, is_processing = 1
+0.19.383.414 I slot get_availabl: id  7 | task 137 |  - skipping, is_processing = 1
+0.19.383.416 I slot get_availabl: id  3 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.455
+0.19.383.417 I srv  get_availabl: updating prompt cache
+0.19.383.437 I srv   prompt_save:  - saving prompt with length 233, total state size = 6.374 MiB (draft: 0.000 MiB)
+0.19.383.438 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.440 I srv          load:  - looking for better prompt, base f_keep = 0.455, f_sim = 1.000
+0.19.383.442 I srv          load:    - prompt with length     228, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.444 I srv          load:    - prompt with length     232, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.446 I srv          load:    - prompt with length     232, lcp =       1, f_keep = 0.004, f_sim = 0.009
+0.19.383.447 I srv          load:    - prompt with length     231, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.449 I srv          load:    - prompt with length     233, lcp =     106, f_keep = 0.455, f_sim = 1.000
+0.19.383.451 I srv          load:    - prompt with length     236, lcp =       2, f_keep = 0.008, f_sim = 0.019
+0.19.383.453 I srv          load:    - prompt with length     229, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.454 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.457 I srv        update:  - cache state: 8 prompts, 50.722 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.383.459 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.383.461 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.462 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.464 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.383.465 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.467 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.383.469 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.383.471 I srv        update:    - prompt 0x5c0b8233b490:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.473 I srv  get_availabl: prompt cache update took 0.05 ms
+0.19.383.482 I slot launch_slot_: id  3 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.19.383.486 I slot launch_slot_: id  3 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.19.383.488 I slot launch_slot_: id  3 | task 141 | processing task, is_child = 0
+0.19.383.489 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.19.383.507 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.509 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.510 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.19.383.529 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.530 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.532 I slot process_sing: id  2 | task -1 | saving idle slot to prompt cache
+0.19.383.564 I srv   prompt_save:  - saving prompt with length 231, total state size = 6.320 MiB (draft: 0.000 MiB)
+0.19.383.566 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.569 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.019 (2/104) > 0.100
+0.19.383.571 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.010 (1/104) > 0.100
+0.19.383.573 I slot get_availabl: id  2 | task -1 |  - checking sim = 1.000 (104/104) > 0.100
+0.19.383.574 I slot get_availabl: id  3 | task 141 |  - skipping, is_processing = 1
+0.19.383.576 I slot get_availabl: id  4 | task 140 |  - skipping, is_processing = 1
+0.19.383.577 I slot get_availabl: id  5 | task 139 |  - skipping, is_processing = 1
+0.19.383.579 I slot get_availabl: id  6 | task 138 |  - skipping, is_processing = 1
+0.19.383.580 I slot get_availabl: id  7 | task 137 |  - skipping, is_processing = 1
+0.19.383.582 I slot get_availabl: id  2 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.450
+0.19.383.583 I srv  get_availabl: updating prompt cache
+0.19.383.604 I srv   prompt_save:  - saving prompt with length 231, total state size = 6.320 MiB (draft: 0.000 MiB)
+0.19.383.606 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.608 I srv          load:  - looking for better prompt, base f_keep = 0.450, f_sim = 1.000
+0.19.383.609 I srv          load:    - prompt with length     228, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.611 I srv          load:    - prompt with length     232, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.614 I srv          load:    - prompt with length     232, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.616 I srv          load:    - prompt with length     231, lcp =     104, f_keep = 0.450, f_sim = 1.000
+0.19.383.618 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.620 I srv          load:    - prompt with length     236, lcp =       2, f_keep = 0.008, f_sim = 0.019
+0.19.383.621 I srv          load:    - prompt with length     229, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.623 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.383.626 I srv        update:  - cache state: 8 prompts, 50.722 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.383.627 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.383.629 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.631 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.632 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.383.634 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.636 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.383.637 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.383.639 I srv        update:    - prompt 0x5c0b8233b490:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.642 I srv  get_availabl: prompt cache update took 0.06 ms
+0.19.383.650 I slot launch_slot_: id  2 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.19.383.654 I slot launch_slot_: id  2 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.19.383.656 I slot launch_slot_: id  2 | task 142 | processing task, is_child = 0
+0.19.383.658 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.19.383.676 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.678 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.679 I slot process_sing: id  1 | task -1 | saving idle slot to prompt cache
+0.19.383.698 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.699 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.702 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.010 (1/105) > 0.100
+0.19.383.704 I slot get_availabl: id  1 | task -1 |  - checking sim = 1.000 (105/105) > 0.100
+0.19.383.706 I slot get_availabl: id  2 | task 142 |  - skipping, is_processing = 1
+0.19.383.707 I slot get_availabl: id  3 | task 141 |  - skipping, is_processing = 1
+0.19.383.709 I slot get_availabl: id  4 | task 140 |  - skipping, is_processing = 1
+0.19.383.710 I slot get_availabl: id  5 | task 139 |  - skipping, is_processing = 1
+0.19.383.712 I slot get_availabl: id  6 | task 138 |  - skipping, is_processing = 1
+0.19.383.713 I slot get_availabl: id  7 | task 137 |  - skipping, is_processing = 1
+0.19.383.715 I slot get_availabl: id  1 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.453
+0.19.383.716 I srv  get_availabl: updating prompt cache
+0.19.383.736 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.383.737 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.383.739 I srv          load:  - looking for better prompt, base f_keep = 0.453, f_sim = 1.000
+0.19.383.741 I srv          load:    - prompt with length     228, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.743 I srv          load:    - prompt with length     232, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.745 I srv          load:    - prompt with length     232, lcp =     105, f_keep = 0.453, f_sim = 1.000
+0.19.383.747 I srv          load:    - prompt with length     231, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.749 I srv          load:    - prompt with length     233, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.751 I srv          load:    - prompt with length     236, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.753 I srv          load:    - prompt with length     229, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.754 I srv          load:    - prompt with length     233, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.383.756 I srv        update:  - cache state: 8 prompts, 50.722 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.383.758 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.383.760 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.762 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.383.763 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.383.765 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.766 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.383.768 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.383.770 I srv        update:    - prompt 0x5c0b8233b490:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.383.773 I srv  get_availabl: prompt cache update took 0.05 ms
+0.19.385.095 I slot launch_slot_: id  1 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.19.385.110 I slot launch_slot_: id  1 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.19.385.116 I slot launch_slot_: id  1 | task 143 | processing task, is_child = 0
+0.19.385.118 I slot process_sing: id  0 | task -1 | saving idle slot to prompt cache
+0.19.385.167 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.385.172 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.385.182 I slot get_availabl: id  0 | task -1 |  - checking sim = 1.000 (105/105) > 0.100
+0.19.385.184 I slot get_availabl: id  1 | task 143 |  - skipping, is_processing = 1
+0.19.385.185 I slot get_availabl: id  2 | task 142 |  - skipping, is_processing = 1
+0.19.385.187 I slot get_availabl: id  3 | task 141 |  - skipping, is_processing = 1
+0.19.385.188 I slot get_availabl: id  4 | task 140 |  - skipping, is_processing = 1
+0.19.385.190 I slot get_availabl: id  5 | task 139 |  - skipping, is_processing = 1
+0.19.385.191 I slot get_availabl: id  6 | task 138 |  - skipping, is_processing = 1
+0.19.385.193 I slot get_availabl: id  7 | task 137 |  - skipping, is_processing = 1
+0.19.385.195 I slot get_availabl: id  0 | task -1 | selected slot by LCP similarity, f_sim_best = 1.000 (> 0.100 thold), f_keep = 0.453
+0.19.385.196 I srv  get_availabl: updating prompt cache
+0.19.385.216 I srv   prompt_save:  - saving prompt with length 232, total state size = 6.347 MiB (draft: 0.000 MiB)
+0.19.385.218 I srv         alloc:  - prompt is already in the cache, skipping
+0.19.385.220 I srv          load:  - looking for better prompt, base f_keep = 0.453, f_sim = 1.000
+0.19.385.223 I srv          load:    - prompt with length     228, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.385.224 I srv          load:    - prompt with length     232, lcp =     105, f_keep = 0.453, f_sim = 1.000
+0.19.385.226 I srv          load:    - prompt with length     232, lcp =       1, f_keep = 0.004, f_sim = 0.010
+0.19.385.229 I srv          load:    - prompt with length     231, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.385.231 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.385.232 I srv          load:    - prompt with length     236, lcp =       2, f_keep = 0.008, f_sim = 0.019
+0.19.385.235 I srv          load:    - prompt with length     229, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.385.237 I srv          load:    - prompt with length     233, lcp =       2, f_keep = 0.009, f_sim = 0.019
+0.19.385.240 I srv        update:  - cache state: 8 prompts, 50.722 MiB (limits: 8192.000 MiB, 8192 tokens, 299435 est)
+0.19.385.242 I srv        update:    - prompt 0x5c0b7ff36d40:     228 tokens, checkpoints:  0,     6.238 MiB
+0.19.385.244 I srv        update:    - prompt 0x5c0b7ff36df0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.385.245 I srv        update:    - prompt 0x5c0b7ef6c1e0:     232 tokens, checkpoints:  0,     6.347 MiB
+0.19.385.247 I srv        update:    - prompt 0x5c0b7fe73180:     231 tokens, checkpoints:  0,     6.320 MiB
+0.19.385.249 I srv        update:    - prompt 0x5c0b7ef6ced0:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.385.250 I srv        update:    - prompt 0x5c0b7ef74990:     236 tokens, checkpoints:  0,     6.457 MiB
+0.19.385.252 I srv        update:    - prompt 0x5c0b7ef6d8c0:     229 tokens, checkpoints:  0,     6.265 MiB
+0.19.385.254 I srv        update:    - prompt 0x5c0b8233b490:     233 tokens, checkpoints:  0,     6.374 MiB
+0.19.385.257 I srv  get_availabl: prompt cache update took 0.06 ms
+0.19.385.284 I slot launch_slot_: id  0 | task -1 | sampler chain: logits -> logit-bias -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.19.385.289 I slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 1024
+	top_k = 40, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.000
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.19.385.292 I slot launch_slot_: id  0 | task 144 | processing task, is_child = 0
+0.19.385.315 I slot   operator(): id  0 | task 144 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 105
+0.19.385.321 I slot   operator(): id  0 | task 144 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.19.385.897 I slot init_sampler: id  0 | task 144 | init sampler, took 0.52 ms, tokens: text = 105, total = 105
+0.19.385.902 I slot   operator(): id  1 | task 143 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 105
+0.19.385.905 I slot   operator(): id  1 | task 143 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.19.386.418 I slot init_sampler: id  1 | task 143 | init sampler, took 0.48 ms, tokens: text = 105, total = 105
+0.19.386.422 I slot   operator(): id  2 | task 142 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 104
+0.19.386.425 I slot   operator(): id  2 | task 142 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.19.386.939 I slot init_sampler: id  2 | task 142 | init sampler, took 0.48 ms, tokens: text = 104, total = 104
+0.19.386.944 I slot   operator(): id  3 | task 141 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 106
+0.19.386.946 I slot   operator(): id  3 | task 141 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.19.387.461 I slot init_sampler: id  3 | task 141 | init sampler, took 0.47 ms, tokens: text = 106, total = 106
+0.19.387.465 I slot   operator(): id  4 | task 140 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 109
+0.19.387.468 I slot   operator(): id  4 | task 140 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.23.020.954 I slot print_timing: id  4 | task 140 | prompt processing, n_tokens =     92, progress = 0.84, t =   3.63 s / 25.32 tokens per second
+0.23.020.970 I slot   operator(): id  4 | task 140 | cached n_tokens = 92, memory_seq_rm [92, end)
+0.23.021.508 I slot init_sampler: id  4 | task 140 | init sampler, took 0.53 ms, tokens: text = 109, total = 109
+0.23.021.513 I slot   operator(): id  5 | task 139 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 102
+0.23.021.516 I slot   operator(): id  5 | task 139 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.23.022.068 I slot init_sampler: id  5 | task 139 | init sampler, took 0.50 ms, tokens: text = 102, total = 102
+0.23.022.073 I slot   operator(): id  6 | task 138 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 106
+0.23.022.076 I slot   operator(): id  6 | task 138 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.23.022.634 I slot init_sampler: id  6 | task 138 | init sampler, took 0.53 ms, tokens: text = 106, total = 106
+0.23.022.639 I slot   operator(): id  7 | task 137 | new prompt, n_ctx_slot = 1024, n_keep = 0, task.n_tokens = 101
+0.23.022.642 I slot   operator(): id  7 | task 137 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.23.023.161 I slot init_sampler: id  7 | task 137 | init sampler, took 0.49 ms, tokens: text = 101, total = 101
+0.34.447.345 I slot print_timing: id  0 | task 144 | n_decoded =    100, tg =   8.75 t/s, tg_3s =   8.75 t/s
+0.34.448.195 I slot print_timing: id  1 | task 143 | n_decoded =    100, tg =   8.75 t/s, tg_3s =   8.75 t/s
+0.34.448.697 I slot print_timing: id  2 | task 142 | n_decoded =    100, tg =   8.75 t/s, tg_3s =   8.75 t/s
+0.34.449.177 I slot print_timing: id  3 | task 141 | n_decoded =    100, tg =   8.75 t/s, tg_3s =   8.75 t/s
+0.34.549.271 I slot print_timing: id  4 | task 140 | n_decoded =    100, tg =  10.96 t/s, tg_3s =  10.96 t/s
+0.34.549.823 I slot print_timing: id  5 | task 139 | n_decoded =    100, tg =  10.96 t/s, tg_3s =  10.96 t/s
+0.34.550.301 I slot print_timing: id  6 | task 138 | n_decoded =    100, tg =  10.96 t/s, tg_3s =  10.96 t/s
+0.34.550.801 I slot print_timing: id  7 | task 137 | n_decoded =    100, tg =  10.96 t/s, tg_3s =  10.96 t/s
+0.37.085.540 I slot print_timing: id  0 | task 144 | prompt eval time =    3631.91 ms /   105 tokens (   34.59 ms per token,    28.91 tokens per second)
+0.37.085.642 I slot print_timing: id  0 | task 144 |        eval time =   14068.29 ms /   128 tokens (  109.91 ms per token,     9.10 tokens per second)
+0.37.085.672 I slot print_timing: id  0 | task 144 |       total time =   17700.20 ms /   233 tokens
+0.37.085.701 I slot print_timing: id  0 | task 144 |    graphs reused =        251
+0.37.085.815 I slot      release: id  0 | task 144 | stop processing: n_tokens = 232, truncated = 0
+0.37.086.225 I slot print_timing: id  1 | task 143 | prompt eval time =    3632.60 ms /   105 tokens (   34.60 ms per token,    28.90 tokens per second)
+0.37.086.266 I slot print_timing: id  1 | task 143 |        eval time =   14067.71 ms /   128 tokens (  109.90 ms per token,     9.10 tokens per second)
+0.37.086.295 I slot print_timing: id  1 | task 143 |       total time =   17700.31 ms /   233 tokens
+0.37.086.344 I slot print_timing: id  1 | task 143 |    graphs reused =        251
+0.37.086.430 I slot      release: id  1 | task 143 | stop processing: n_tokens = 232, truncated = 0
+0.37.086.890 I slot print_timing: id  2 | task 142 | prompt eval time =    3633.30 ms /   104 tokens (   34.94 ms per token,    28.62 tokens per second)
+0.37.086.934 I slot print_timing: id  2 | task 142 |        eval time =   14067.17 ms /   128 tokens (  109.90 ms per token,     9.10 tokens per second)
+0.37.086.959 I slot print_timing: id  2 | task 142 |       total time =   17700.46 ms /   232 tokens
+0.37.086.983 I slot print_timing: id  2 | task 142 |    graphs reused =        251
+0.37.087.027 I slot      release: id  2 | task 142 | stop processing: n_tokens = 231, truncated = 0
+0.37.087.497 I slot print_timing: id  3 | task 141 | prompt eval time =    3633.97 ms /   106 tokens (   34.28 ms per token,    29.17 tokens per second)
+0.37.087.531 I slot print_timing: id  3 | task 141 |        eval time =   14066.58 ms /   128 tokens (  109.90 ms per token,     9.10 tokens per second)
+0.37.087.571 I slot print_timing: id  3 | task 141 |       total time =   17700.55 ms /   234 tokens
+0.37.087.594 I slot print_timing: id  3 | task 141 |    graphs reused =        251
+0.37.087.638 I slot      release: id  3 | task 141 | stop processing: n_tokens = 233, truncated = 0
+0.37.149.516 I slot print_timing: id  4 | task 140 | prompt eval time =    6036.57 ms /   109 tokens (   55.38 ms per token,    18.06 tokens per second)
+0.37.149.614 I slot print_timing: id  4 | task 140 |        eval time =   11725.45 ms /   128 tokens (   91.61 ms per token,    10.92 tokens per second)
+0.37.149.638 I slot print_timing: id  4 | task 140 |       total time =   17762.03 ms /   237 tokens
+0.37.149.664 I slot print_timing: id  4 | task 140 |    graphs reused =        251
+0.37.149.719 I slot      release: id  4 | task 140 | stop processing: n_tokens = 236, truncated = 0
+0.37.150.218 I slot print_timing: id  5 | task 139 | prompt eval time =    2403.75 ms /   102 tokens (   23.57 ms per token,    42.43 tokens per second)
+0.37.150.257 I slot print_timing: id  5 | task 139 |        eval time =   11724.95 ms /   128 tokens (   91.60 ms per token,    10.92 tokens per second)
+0.37.150.281 I slot print_timing: id  5 | task 139 |       total time =   14128.70 ms /   230 tokens
+0.37.150.305 I slot print_timing: id  5 | task 139 |    graphs reused =        251
+0.37.150.351 I slot      release: id  5 | task 139 | stop processing: n_tokens = 229, truncated = 0
+0.37.150.870 I slot print_timing: id  6 | task 138 | prompt eval time =    2404.42 ms /   106 tokens (   22.68 ms per token,    44.09 tokens per second)
+0.37.150.915 I slot print_timing: id  6 | task 138 |        eval time =   11724.37 ms /   128 tokens (   91.60 ms per token,    10.92 tokens per second)
+0.37.150.940 I slot print_timing: id  6 | task 138 |       total time =   14128.79 ms /   234 tokens
+0.37.150.964 I slot print_timing: id  6 | task 138 |    graphs reused =        251
+0.37.151.009 I slot      release: id  6 | task 138 | stop processing: n_tokens = 233, truncated = 0
+0.37.151.493 I slot print_timing: id  7 | task 137 | prompt eval time =    2405.05 ms /   101 tokens (   23.81 ms per token,    42.00 tokens per second)
+0.37.151.531 I slot print_timing: id  7 | task 137 |        eval time =   11723.80 ms /   128 tokens (   91.59 ms per token,    10.92 tokens per second)
+0.37.151.577 I slot print_timing: id  7 | task 137 |       total time =   14128.85 ms /   229 tokens
+0.37.151.602 I slot print_timing: id  7 | task 137 |    graphs reused =        251
+0.37.151.646 I slot      release: id  7 | task 137 | stop processing: n_tokens = 228, truncated = 0
+0.37.152.908 I srv  update_slots: all slots are idle
+0.37.238.603 I srv    operator(): operator(): cleaning up before exit...
+0.37.239.866 I common_memory_breakdown_print: | memory breakdown [MiB] | total   free    self   model   context   compute    unaccounted |
+0.37.239.874 I common_memory_breakdown_print: |   - Host               |                 1309 =  1052 +     224 +      32                |
+0.37.239.877 I common_memory_breakdown_print: |   - CPU_REPACK         |                  596 =   596 +       0 +       0                |
+NEWA_PREFILL_POLICY {"mode":"fixed6","failures":0,"read_errors":0,"reports_dropped":0,"ticks_per_second":100,"cpus":[0,2,4,6,8,10],"threshold":0.125,"accounting_margin_cores":0.02,"epochs":[{"calls":129,"locked":true,"invalidated":false,"reason":0,"active_mask":240,"eligible_calls":127,"first_decode_ns":116920369135370,"sample_age_ns":2356558471,"members":[{"task":7,"slot":0,"first_position":0,"last_position":231,"prefill_seen":true},{"task":6,"slot":1,"first_position":0,"last_position":231,"prefill_seen":true},{"task":5,"slot":2,"first_position":0,"last_position":230,"prefill_seen":true},{"task":4,"slot":3,"first_position":0,"last_position":232,"prefill_seen":true},{"task":3,"slot":4,"first_position":0,"last_position":235,"prefill_seen":true},{"task":2,"slot":5,"first_position":0,"last_position":228,"prefill_seen":true},{"task":1,"slot":6,"first_position":0,"last_position":232,"prefill_seen":true},{"task":0,"slot":7,"first_position":0,"last_position":227,"prefill_seen":true}],"decisions_5_6":[[0,0],[0,1],[0,127],[0,1]],"eligible_by_size_5_6":[[0,0],[0,0],[0,0],[0,0],[0,1],[0,0],[0,0],[0,0],[0,126]],"sample":{"captured":true,"counters_valid":true,"usable":true,"n_tokens":512,"model_start":116914619160022,"model_end":116918012414725,"wall_s":3.3935563520000001,"task_cpu_s":20.370000000000001,"own_cpu_upper_s":20.338323883000001,"rounding_cpu_s":0.17999999999999999,"score":-0.06370750552369199,"shadow_choice":6,"before":{"wall_first":116914619020547,"wall_last":116914619159044,"cpu_first":2054169021,"cpu_last":2054382290,"task_ticks":27111920,"ok":true,"fields":[[4525645,678,62000],[4424703,727,60686],[4495611,1788,57329],[4556009,920,66225],[4498305,1438,59558],[4223224,1554,75520]]},"after":{"wall_first":116918012417099,"wall_last":116918012576899,"cpu_first":22392339216,"cpu_last":22392492904,"task_ticks":27113957,"ok":true,"fields":[[4525983,678,62001],[4425042,727,60687],[4495950,1788,57329],[4556348,920,66226],[4498644,1438,59558],[4223562,1554,75522]]}}},{"calls":129,"locked":true,"invalidated":false,"reason":0,"active_mask":240,"eligible_calls":127,"first_decode_ns":116938356175620,"sample_age_ns":2411135488,"members":[{"task":144,"slot":0,"first_position":0,"last_position":231,"prefill_seen":true},{"task":143,"slot":1,"first_position":0,"last_position":231,"prefill_seen":true},{"task":142,"slot":2,"first_position":0,"last_position":230,"prefill_seen":true},{"task":141,"slot":3,"first_position":0,"last_position":232,"prefill_seen":true},{"task":140,"slot":4,"first_position":0,"last_position":235,"prefill_seen":true},{"task":139,"slot":5,"first_position":0,"last_position":228,"prefill_seen":true},{"task":138,"slot":6,"first_position":0,"last_position":232,"prefill_seen":true},{"task":137,"slot":7,"first_position":0,"last_position":227,"prefill_seen":true}],"decisions_5_6":[[0,0],[0,1],[0,127],[0,1]],"eligible_by_size_5_6":[[0,0],[0,0],[0,0],[0,0],[0,1],[0,0],[0,0],[0,0],[0,126]],"sample":{"captured":true,"counters_valid":true,"usable":true,"n_tokens":512,"model_start":116932316183571,"model_end":116935944842060,"wall_s":3.629059313,"task_cpu_s":21.760000000000002,"own_cpu_upper_s":21.752728596000001,"rounding_cpu_s":0.17999999999999999,"score":-0.067595969396601369,"shadow_choice":6,"before":{"wall_first":116932315980819,"wall_last":116932316182104,"cpu_first":107261857174,"cpu_last":107262104139,"task_ticks":27122447,"ok":true,"fields":[[4527395,678,62001],[4426456,727,60688],[4497363,1788,57331],[4557761,920,66227],[4500058,1438,59559],[4224967,1554,75536]]},"after":{"wall_first":116935944844923,"wall_last":116935945040132,"cpu_first":129009429413,"cpu_last":129014585770,"task_ticks":27124623,"ok":true,"fields":[[4527757,678,62001],[4426818,727,60688],[4497726,1788,57331],[4558124,920,66227],[4500421,1438,59559],[4225328,1554,75538]]}}}]}
+NEWA_Q4_TILE32 stats worker0_calls=0/0/165009/2518
+NEWA_Q6 stats worker0_chunks=0/15411/459325/13363

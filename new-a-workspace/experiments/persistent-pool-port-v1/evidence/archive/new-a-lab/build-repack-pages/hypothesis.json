@@ -1,0 +1,35 @@
+{
+  "id": "repacked-weights-huge-pages-v1",
+  "hypothesis": "Request transparent huge pages before first touch of the existing large repacked CPU weight buffer, keeping its allocator, byte layout and matrix arithmetic unchanged. Test the full six/five plus Prefill-only attention and Q6 batching candidate against original six/six.",
+  "scope": "Private Qwen2 CPU-only experiment, one sequence, F16 K/V cache, unchanged model and quantized weights. Context Flash Attention flag remains disabled. Unsupported graph configurations fail closed.",
+  "baseline": "Original six/six OpenMP runtime, attention off, original CPU library",
+  "candidate": "Six/five with retained graph policy and Q6 batch4; new CPU library differs only by MADV_HUGEPAGE on page-aligned interior of large CPU_REPACK allocations.",
+  "correctness": "Retained runtime, new advice-off runtime and huge-page runtime must match repeated canonical output and single-token transitions. Off and huge modes must have identical complete repacked-buffer SHA256. Actual smaps coverage must reach95 percent of fully eligible2MiB interior, off must have zero huge pages. Same graph library as validated five-worker trial; same OpenMP teams and CPU kernels. No graph tracing or weight hashing during timing.",
+  "canonical_output_sha256": "114cd534f8d7cfcb5f5a6159cc8f282f7c4b082c8d0b90f5c78b4f1cba266c7a",
+  "arms": [
+    "LINUX_ORIGINAL",
+    "LINUX_PREFILL_ATTN"
+  ],
+  "prompt_tokens": 920,
+  "predict_tokens": 128,
+  "warmups_per_session": 2,
+  "pilot_blocks": 4,
+  "confirmation_minimum_blocks": 8,
+  "background_conditions": [
+    "ambient",
+    "cpu25"
+  ],
+  "target_http_change_pct": -5.0,
+  "minimum_fraction_pairs_faster": 0.75,
+  "phase_regression_limit_pct": -1.0,
+  "cpu_time_limit_pct": 0.5,
+  "protocol": "Fresh server per visit, two warmups then one measured request,920 prompt and128 generated tokens, cache disabled, same six physical representatives. Four balanced paired pilot blocks per ambient/cpu25 condition with Codex active. Original six/six control; candidate six/five. Same model, binaries, power settings and requests. Include all conversions in latency.",
+  "pilot_gate": "Mean paired HTTP latency change <=-5 percent in both conditions, at least3/4 pairs faster, Decode throughput change >=-1 percent, CPU-time change <=0.5 percent, canonical outputs and all provenance/cleanup/load checks pass. No pooling with previous campaigns.",
+  "confirmation": "Only after pilot passage: at least eight fresh balanced pairs per condition, same limits and95-percent paired bootstrap interval for latency below zero. Success requires both conditions; no component percentages are added.",
+  "limitations": "A passing graph check establishes execution choice, not performance. Existing scheduler strict acceptance FAILED and safety FAIL are unchanged. No GPU, energy or cross-device claim.",
+  "decode_threads": 5,
+  "selection_evidence": "Untimed baseline server has zero AnonHugePages. Host THP setting is madvise. Five-worker attention pilot achieved4.16 percent ambient reduction, below target; no component gains are added.",
+  "page_scope": "Only anonymous CPU_REPACK buffer interiors, >=2MiB; no global kernel setting, explicit huge-page reservation, allocation replacement or GPU.",
+  "page_coverage_minimum_fraction": 0.95,
+  "thp_primary_documentation": "https://docs.kernel.org/admin-guide/mm/transhuge.html"
+}

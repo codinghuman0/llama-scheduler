@@ -1,0 +1,70 @@
+--- 542850645a54fc2e35a9a8189ff8dfcf35b9c51d/tools/server/server-context.cpp
++++ c2c398510f69180cfc29026cb1e0ca133b01d548/tools/server/server-context.cpp
+@@ -1,4 +1,5 @@
+ #include "server-context.h"
++#include "server-phase.h"
+ #include "server-scx.h"
+ #include "server-chat.h"
+ #include "server-common.h"
+@@ -65,13 +66,6 @@
+     SLOT_STATE_PROCESSING_PROMPT,
+     SLOT_STATE_DONE_PROMPT,
+     SLOT_STATE_GENERATING,
+-};
+-
+-enum server_batch_phase {
+-    SERVER_BATCH_PHASE_UNKNOWN,
+-    SERVER_BATCH_PHASE_PREFILL,
+-    SERVER_BATCH_PHASE_DECODE,
+-    SERVER_BATCH_PHASE_MIXED,
+ };
+ 
+ #ifdef LLAMA_SCX_PHASE_TRACE
+@@ -1010,6 +1004,9 @@
+     int n_empty_consecutive = 0;
+     int64_t compute_profile_run_id = 0;
+     uint64_t compute_profile_call_id = 0;
++#ifdef LLAMA_SCX_PHASE_TRACE
++    server_scx_phase_state scx_phase_state;
++#endif
+ 
+     std::unique_ptr<server_prompt_cache> prompt_cache;
+ 
+@@ -3708,7 +3705,11 @@
+ 
+         const auto profile_mode = params_base.server_compute_profile_mode;
+         const bool trace_profile = params_base.server_compute_profile_trace;
++#ifdef LLAMA_SCX_PHASE_TRACE
++        const bool classify_phase = true;
++#else
+         const bool classify_phase = trace_profile || params_base.scx_phase_run_id || profile_mode == COMMON_SERVER_COMPUTE_PROFILE_MODE_PHASE;
++#endif
+ 
+         int32_t n_prefill = 0;
+         int32_t n_decode  = 0;
+@@ -3731,16 +3732,7 @@
+             }
+         }
+ 
+-        server_batch_phase phase = SERVER_BATCH_PHASE_UNKNOWN;
+-        if (n_unknown == 0) {
+-            if (n_prefill > 0 && n_decode > 0) {
+-                phase = SERVER_BATCH_PHASE_MIXED;
+-            } else if (n_prefill > 0) {
+-                phase = SERVER_BATCH_PHASE_PREFILL;
+-            } else if (n_decode > 0) {
+-                phase = SERVER_BATCH_PHASE_DECODE;
+-            }
+-        }
++        const server_batch_phase phase = server_batch_phase_classify(n_prefill, n_decode, n_unknown);
+ 
+         llama_compute_profile requested_profile = LLAMA_COMPUTE_PROFILE_AUTO;
+         const bool use_options = profile_mode != COMMON_SERVER_COMPUTE_PROFILE_MODE_LEGACY;
+@@ -3777,6 +3769,7 @@
+ #ifdef LLAMA_SCX_PHASE_TRACE
+         server_scx_scope scx_scope(ctx_tgt, { 1, params_base.scx_phase_run_id, call_id, uint64_t(retry),
+                 uint64_t(phase), uint64_t(requested_profile), uint64_t(n_prefill), uint64_t(n_decode), uint64_t(n_unknown), -1 });
++        scx_phase_state.transition(static_cast<server_scx_phase>(phase), llama_scx_phase_v1);
+ #endif
+         int ret;
+         if (use_options) {

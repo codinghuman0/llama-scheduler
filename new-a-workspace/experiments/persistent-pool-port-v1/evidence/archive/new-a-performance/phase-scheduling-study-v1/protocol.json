@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "status": "FROZEN_BEFORE_CONFIRMATION",
+  "primary_metric": {
+    "name": "aggregate_generated_tokens_per_second",
+    "definition": "sum of actual generated tokens for the complete declared cohort divided by cohort wall seconds, from client admission start through receipt of every response",
+    "includes": [
+      "queueing",
+      "prefill",
+      "decode",
+      "policy transitions",
+      "response completion"
+    ],
+    "excludes_equally": [
+      "model loading",
+      "one excluded warmup cohort per fresh server"
+    ],
+    "aggregation": "mean paired-block percentage gain; not a ratio of accumulated percentages",
+    "paired_gain_pct": "100 * (candidate_metric / baseline_metric - 1)",
+    "bootstrap_unit": "complete paired block",
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 20261122,
+    "timer": "HTTP request transmission start to complete response byte receipt; JSON parsing, validation and hashing excluded. Admission payload prepared before timer."
+  },
+  "success_comparison": "C/B0",
+  "auxiliary_comparisons": [
+    "B1/B0",
+    "C/B1",
+    "C/C-off"
+  ],
+  "success_gate_per_campaign_per_condition": {
+    "mean_gain_pct_at_least": 5.0,
+    "bootstrap95_lower_strictly_above": 0.0,
+    "fraction_faster_at_least": 0.75,
+    "stronger_evidence_bootstrap95_lower_at_least": 5.0,
+    "auxiliary_comparisons_have_no_extra_5_percent_requirement": true
+  },
+  "conditions": {
+    "ambient": {
+      "controlled_background_load": null
+    },
+    "cpu25": {
+      "demand": "12.5ms process CPU time per 50ms period, ordinary Linux scheduling",
+      "target_mean_cpu_cores": 0.25,
+      "per_visit_delivered_range": [
+        0.22,
+        0.28
+      ],
+      "verify": [
+        "process identity",
+        "affinity",
+        "raw policy 0",
+        "before/after CPU ticks",
+        "cleanup"
+      ],
+      "cpu_selection": "one freshly verified server CPU, frozen before first performance pilot; same in every arm",
+      "cpu": 10
+    }
+  },
+  "exploration": {
+    "cohort": "existing eight distinct short requests from phase_generalization; exact text/token identity will be copied and checked against both runtimes",
+    "concurrency": 8,
+    "generated_tokens_per_request": 128,
+    "pilot_blocks": 2,
+    "pilot_order": "forward/reverse, fixed before each pilot",
+    "pilots_are_not_confirmations": true
+  },
+  "confirmation": {
+    "independent_campaigns": 2,
+    "blocks_per_condition_per_campaign": 8,
+    "arms": [
+      "B0",
+      "B1",
+      "C",
+      "C-off"
+    ],
+    "balanced_arm_orders": [
+      [
+        0,
+        1,
+        3,
+        2
+      ],
+      [
+        1,
+        2,
+        0,
+        3
+      ],
+      [
+        2,
+        3,
+        1,
+        0
+      ],
+      [
+        3,
+        0,
+        2,
+        1
+      ]
+    ],
+    "held_out_cohorts_at_least": 2,
+    "cohort_sequence_campaign_1": [
+      0,
+      1,
+      0,
+      1,
+      1,
+      0,
+      1,
+      0
+    ],
+    "cohort_sequence_campaign_2": [
+      1,
+      0,
+      1,
+      0,
+      0,
+      1,
+      0,
+      1
+    ],
+    "condition_order_campaign_1": [
+      "ambient",
+      "cpu25"
+    ],
+    "condition_order_campaign_2": [
+      "cpu25",
+      "ambient"
+    ],
+    "policy_tuning_between_campaigns": false,
+    "held_out_workload_identity": {
+      "path": "/home/codinghuman/projects/new-a-performance/phase-scheduling-study-v1/heldout-prompts.json",
+      "sha256": "0e0778e1709e009b4f80630eaeda65303f659ff304f92b2a0294e25c9d34de87"
+    },
+    "selected_candidate_identity": {
+      "registry": "E-pressure-observe",
+      "sha256": "57f05f96b1347a7a3ef78ea5f0bed50d3289eb121f17d0327d7fb8c0f48b061a"
+    },
+    "fixed_ablation_identity": {
+      "registry": "E-fixed6-observe",
+      "sha256": "b61f82f573caaa2119723c6e9ecbac9df88000689f19e6b45ccab5b8273cc16d"
+    },
+    "freeze_required_before_start": true
+  },
+  "correctness": {
+    "new_policy_on_off": "exact deterministic token equality on the same NEW_A runtime",
+    "B0_B1_differences": "record separately as existing runtime differences, including raw outputs; do not hide or treat as a new policy mismatch",
+    "sampling": {
+      "temperature": 0,
+      "seed": 424242,
+      "ignore_eos": true,
+      "stop": []
+    },
+    "request_cache_reuse": false,
+    "speculation": false,
+    "gpu_layers": 0,
+    "model_sha256": "f3bdf9cf31dee4b57ae4e455a1cb0d01b5c2c1b50d72d3112141c195506c2840"
+  },
+  "regressions_required": [
+    "single request",
+    "different input length",
+    "different output length"
+  ],
+  "exclusions": {
+    "discard_slow_blocks": false,
+    "extend_until_significant": false,
+    "validity_failure": "abort and preserve the entire failed attempt with reason; a repaired candidate uses a new campaign identity",
+    "failed_confirmations_preserved": true
+  },
+  "safety": {
+    "measurement_lock": "/home/codinghuman/projects/new-a-runs/.measurement.lock",
+    "serial_performance_runs": true,
+    "no_concurrent_build_or_profiling": true,
+    "ordinary_user_build_and_inference": true,
+    "sudo_scope": "guarded selected-child loader, scoped diagnostics, owned cleanup only",
+    "fixed_affinity_only": true,
+    "historical_dynamic_affinity_failure_unresolved": true,
+    "cohort_timeout_seconds": 360,
+    "resource_checks": [
+      "disk",
+      "memory",
+      "CPU temperature",
+      "AC/governor/boost consistency",
+      "kernel/BTF/topology",
+      "owned process cleanup"
+    ]
+  },
+  "regression_design": {
+    "fixtures": [
+      "single-short",
+      "single-longer-input",
+      "batch8-shorter-output"
+    ],
+    "conditions": [
+      "ambient"
+    ],
+    "blocks_per_fixture": 2,
+    "arm_order": "B0,B1,C,C-off then reverse",
+    "functional_reference_arms": [
+      "B1",
+      "B0"
+    ],
+    "reference_scope": "Independent B0/B1 outputs only; new-policy equality is checked in every regression/confirmation visit.",
+    "success_requirement": "No extra5% requirement; report per-cohort uncertainty and warn for end-to-end point regression exceeding2%."
+  }
+}

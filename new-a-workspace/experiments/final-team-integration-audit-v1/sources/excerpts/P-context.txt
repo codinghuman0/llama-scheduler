@@ -1,0 +1,81 @@
+SOURCE: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-context.cpp
+SHA256: 378d0f745e44b4da887820fc85bef3c143170bb5a949c3c5633ac198809a7410
+Original line numbers follow; omitted regions are explicit.
+
+... 975-998 ...
+975:     // use server_context methods instead
+976: 
+977:     common_params params_base;
+978: 
+979:     // note: keep these alive - they determine the lifetime of the model, context, etc.
+980:     server_threadpools newa_donor_pools;
+981:     common_init_result_ptr llama_init;
+982: 
+983:     llama_context * ctx_tgt = nullptr;
+984:     ggml_threadpool_t newa_pool = nullptr;
+985:     void (*newa_pool_free)(ggml_threadpool_t) = nullptr;
+986: 
+987:     server_batch batch;
+988: 
+989:     llama_model   * model_dft = nullptr;
+990:     llama_context * ctx_dft   = nullptr;
+991: 
+992:     common_speculative_init_result_ptr spec_init;
+993: 
+994:     common_context_seq_rm_type ctx_tgt_seq_rm_type = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+995:     common_context_seq_rm_type ctx_dft_seq_rm_type = COMMON_CONTEXT_SEQ_RM_TYPE_NO;
+996: 
+997:     common_speculative_ptr spec;
+998: 
+
+... 1050-1073 ...
+1050: 
+1051:         ctx_dft   = nullptr;
+1052:         model_dft = nullptr;
+1053: 
+1054:         llama_init.reset();
+1055:         newa_donor_pools.reset();
+1056: 
+1057:         ctx_tgt = nullptr;
+1058:         model_tgt = nullptr;
+1059: 
+1060:         mtmd_free(mctx);
+1061:         mctx = nullptr;
+1062:     }
+1063: 
+1064:     void handle_sleeping_state(bool new_state) {
+1065:         GGML_ASSERT(sleeping != new_state);
+1066:         if (new_state) {
+1067:             SRV_INF("%s", "server is entering sleeping state\n");
+1068:             destroy();
+1069:         } else {
+1070:             SRV_INF("%s", "server is exiting sleeping state\n");
+1071:             if (!load_model(params_base)) {
+1072:                 GGML_ABORT("failed to reload model after sleeping");
+1073:             }
+
+... 1275-1298 ...
+1275:             SRV_ERR("failed to create_context with model '%s'\n", params_base.model.path.c_str());
+1276:             return false;
+1277:         }
+1278: 
+1279:         const char * pool_mode = std::getenv("GGML_NEWA_POOL");
+1280:         if (pool_mode && std::strcmp(pool_mode, "donor") == 0) {
+1281:             const auto unrestricted = [](const common_cpu_params & cpu) {
+1282:                 return !cpu.mask_valid && !cpu.strict_cpu && cpu.priority == GGML_SCHED_PRIO_NORMAL && cpu.poll == 50;
+1283:             };
+1284:             const bool has_tensor_overrides = std::any_of(params_base.tensor_buft_overrides.begin(), params_base.tensor_buft_overrides.end(),
+1285:                 [](const llama_model_tensor_buft_override & item) { return item.pattern || item.buft; });
+1286:             if (params_base.n_gpu_layers != 0 || has_tensor_overrides ||
+1287:                     has_mmproj || has_spec || scx_has_spec || params_base.embedding ||
+1288:                     llama_model_has_encoder(model_tgt) || !llama_model_has_decoder(model_tgt) ||
+1289:                     !unrestricted(params_base.cpuparams) || !unrestricted(params_base.cpuparams_batch) ||
+1290:                     params_base.cpuparams.n_threads != 5 || params_base.cpuparams_batch.n_threads != 6) {
+1291:                 SRV_ERR("%s", "donor pool candidate requires CPU decoder, threads5/6, normal priority, poll50 and unrestricted roles\n");
+1292:                 return false;
+1293:             }
+1294:             auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+1295:             auto * reg = dev ? ggml_backend_dev_backend_reg(dev) : nullptr;
+1296:             if (!newa_donor_pools.init(reg, params_base.cpuparams, params_base.cpuparams_batch)) {
+1297:                 return false;
+1298:             }

@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "created_utc": "2026-11-22T07:55:03.917566+00:00",
+  "stage": "Gate R",
+  "scope": "Correctness only, no performance claims",
+  "cases_sha256": "fcedcbe668ef007033bcbdee99a30d6951662f598c583b653a35fa2045c9f9fc",
+  "fixtures_sha256": "7ca2485379910a41693e61ffa55b7097557bf6c21f38b159896737ca08de0714",
+  "original_protocol_sha256": "e798ff3c285e4ba35bde0410e10e9923a8871d219b73dc64eae3a5d49c82d55e",
+  "spec_resolution": "User authorized current goal plus preserved diagnosis; older standalone R specification was not found",
+  "free_generation": {
+    "cohorts": [
+      "heldout-1",
+      "heldout-2",
+      "h1-request3-singleton",
+      "single-short"
+    ],
+    "fresh_server_repeats_per_arm_cohort": 2,
+    "order": [
+      "B0",
+      "R",
+      "R",
+      "B0"
+    ],
+    "per_server": [
+      "warmup",
+      "measured"
+    ],
+    "arrival": "single atomic prompt-array /completion request, original index order",
+    "output_tokens": 128,
+    "stop_on_environment_or_server_failure": true,
+    "finish_declared_R_scope_on_output_difference": true,
+    "admission": "Every warmup/measured run equals the same-fixture B0 tokens exactly; internal repeatability also required"
+  },
+  "numeric": {
+    "cohorts": {
+      "heldout-1": 3,
+      "h1-request3-singleton": 0
+    },
+    "generations": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "fresh_servers_per_arm_cohort": 1,
+    "arms": [
+      "B0",
+      "R"
+    ],
+    "teacher_force": false,
+    "gate": "All checkpoints present, same full all-sequence history/batch/physical ubatch/seq/position/worker profile; all finite, equal argmax, maxabs=0 and byte equality",
+    "trace": "Previously built and hashed observers, original source and ABI identities retained; R changes only CPU Q4 policy"
+  },
+  "route": {
+    "model": "One fresh R-diagnostic h1 visit, warmup and measured; actual original Q4 body counter plus retained exact Q4 and Q6 counters",
+    "synthetic": "One separate probe exercising phase0/1/2/3 and eligible/guarded nr; not model correctness"
+  },
+  "bounded_failure_control": {
+    "when": "Any residual numeric or free-generation mismatch",
+    "maximum_fresh_visits": 2,
+    "policy": "same first affected fixture under full Q4off, B0 oracle reused; optional all-request teacher forcing only for first unresolved checkpoint",
+    "no_downstream_performance": true
+  },
+  "cpu_envelope": [
+    0,
+    2,
+    4,
+    6,
+    8,
+    10
+  ],
+  "housekeeping": [
+    11
+  ],
+  "bounds": {
+    "server_ready_timeout_s": 90,
+    "http_timeout_s": 180,
+    "server_lifetime_timeout_s": 480,
+    "min_free_disk_bytes": 536870912,
+    "min_mem_available_kib": 3000000,
+    "max_cpu_temperature_c": 85
+  },
+  "model": {
+    "path": "/home/codinghuman/projects/model.gguf",
+    "sha256": "f3bdf9cf31dee4b57ae4e455a1cb0d01b5c2c1b50d72d3112141c195506c2840"
+  },
+  "normal_build": "HINT ON, TRACE OFF; route/observer diagnostics explicitly separate",
+  "singleton_note": "h1 request3 is diagnostic singleton (109 prompt tokens); single-short is original pool fixture (132), kept separately. Neither substitutes for atomic 8-request cohorts."
+}

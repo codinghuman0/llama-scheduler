@@ -1,0 +1,13 @@
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -1281,7 +1281,9 @@
+             const auto unrestricted = [](const common_cpu_params & cpu) {
+                 return !cpu.mask_valid && !cpu.strict_cpu && cpu.priority == GGML_SCHED_PRIO_NORMAL && cpu.poll == 50;
+             };
+-            if (params_base.n_gpu_layers != 0 || !params_base.tensor_buft_overrides.empty() ||
++            const bool has_tensor_overrides = std::any_of(params_base.tensor_buft_overrides.begin(), params_base.tensor_buft_overrides.end(),
++                [](const llama_model_tensor_buft_override & item) { return item.pattern || item.buft; });
++            if (params_base.n_gpu_layers != 0 || has_tensor_overrides ||
+                     has_mmproj || has_spec || scx_has_spec || params_base.embedding ||
+                     llama_model_has_encoder(model_tgt) || !llama_model_has_decoder(model_tgt) ||
+                     !unrestricted(params_base.cpuparams) || !unrestricted(params_base.cpuparams_batch) ||

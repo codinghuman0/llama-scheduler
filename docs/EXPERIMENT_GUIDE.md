@@ -22,6 +22,26 @@ Before editing policy code, run or review the baseline bootstrap and privileged
 validation on the experiment machine. Keep `scripts/validate_phase.sh` passing
 throughout the work.
 
+## Separate acceptance from performance
+
+`scripts/validate_phase.py` is diagnostic semantic acceptance, not a
+benchmark. Use the CPU-only build commands in the sibling
+`docs/development/compute-profile.md` and record which configuration each run
+uses:
+
+| Run | Provider and runtime settings |
+| --- | --- |
+| Diagnostic acceptance or phase-dependent policy | `LLAMA_SCX_PHASE_TRACE=ON`; server `--scx-phase-run-id`; loader `--phase-uprobe`, `--phase-register-socket`, `--phase-uid`; launcher `--phase-register-socket`. Match phase input and logging in baseline and treatment. |
+| CPU performance baseline without phase observation | `LLAMA_SCX_PHASE_TRACE=OFF`; omit those options, `--server-compute-profile-trace`, and verbose logging; leave the legacy `--phase-socket` source disabled. |
+
+Disabling phase uprobes does not disable per-task/per-CPU instrumentation or
+`PHASE_OBSERVE` lookups; observations use UNKNOWN without an active phase
+source. A phase-dependent policy cannot be evaluated with its phase input
+disabled. Removing the sibling fork's unused worker hooks does not reduce
+the current loader's decode-only uprobe hits or demonstrate a speedup.
+The provider pin remains unchanged; adopting that cleanup needs a separate
+revision update and rebuild after a human commit, preserving M11R.
+
 ## Choose one dimension
 
 Begin with exactly one scheduling dimension. Suitable independent themes

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0
-"""One-terminal M11R semantic phase runtime validation."""
+"""One-terminal validation of the M11R trace and SCX state paths."""
 
 from __future__ import annotations
 
@@ -26,6 +26,8 @@ SCX_STATE = Path("/sys/kernel/sched_ext/state")
 VMLINUX_BTF = Path("/sys/kernel/btf/vmlinux")
 SCHED_EXT = 7
 MARKER_SYMBOLS = ("llama_scx_decode_begin_v1", "llama_scx_decode_end_v1")
+STATE_MARKER_SYMBOLS = ("llama_scx_phase_set_v2",)
+STATE_SOURCE = 3
 FAILURE_COUNTERS = (
     "abi_failures",
     "user_read_failures",
@@ -33,6 +35,11 @@ FAILURE_COUNTERS = (
     "stale_end_events",
     "map_update_failures",
     "filtered_events",
+)
+STATE_FAILURE_COUNTERS = (
+    "abi_failures", "user_read_failures", "unsupported_phases", "invalid_state_events",
+    "run_id_mismatches", "stale_sequences", "map_update_failures", "filtered_events",
+    "cleanup_failures",
 )
 PROMPT = "List three colors and briefly describe each one."
 
@@ -118,9 +125,9 @@ def require_file(path: Path, executable: bool = False) -> None:
         raise ValidationError(f"required file is not executable: {path}")
 
 
-def verify_marker_symbols(marker_elf: Path) -> None:
+def verify_marker_symbols(marker_elf: Path, symbols: tuple[str, ...] = MARKER_SYMBOLS) -> None:
     table = checked_output(["readelf", "--dyn-syms", "--wide", str(marker_elf)])
-    for symbol in MARKER_SYMBOLS:
+    for symbol in symbols:
         pattern = re.compile(
             rf"^\s*\d+:\s+[0-9a-fA-F]+\s+\d+\s+FUNC\s+GLOBAL\s+DEFAULT\s+\d+\s+{symbol}$",
             re.MULTILINE,
@@ -319,6 +326,54 @@ def counters_observed(loader_log: Path) -> dict[str, int] | None:
     return None
 
 
+def state_counters_observed(loader_log: Path, expected_tgid: int) -> bool:
+    pattern = r"^phase_state_tgid=(\d+) applied=(\d+) prefill=(\d+) decode=(\d+) idle=(\d+)$"
+    for match in reversed(re.findall(pattern, read_text(loader_log), re.MULTILINE)):
+        target, applied, prefill, decode, idle = map(int, match)
+        if target == expected_tgid and applied >= 3 and prefill and decode and idle:
+            return True
+    return False
+
+
+def abort_state_decode(port: int, request: dict[str, Any], pidfd: int, evidence: Path) -> None:
+    payload = request | {
+        "prompt": "Count from one to one hundred and describe every number.",
+        "n_predict": 512, "stream": True, "return_tokens": True, "ignore_eos": True,
+    }
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=60)
+    try:
+        connection.request("POST", "/completion", body=json.dumps(payload),
+                           headers={"Content-Type": "application/json"})
+        response = connection.getresponse()
+        if response.status != 200:
+            raise ValidationError(f"termination request returned HTTP {response.status}")
+        tokens = 0
+        deadline = time.monotonic() + 60
+        with evidence.open("xb") as stream:
+            while tokens < 2:
+                if time.monotonic() >= deadline:
+                    raise ValidationError("timed out waiting for DECODE")
+                line = response.readline()
+                if not line:
+                    raise ValidationError("termination request ended before DECODE")
+                stream.write(line)
+                if not line.startswith(b"data:"):
+                    continue
+                event = json.loads(line[5:])
+                if not isinstance(event, dict) or event.get("stop"):
+                    raise ValidationError("termination request completed before the kill checkpoint")
+                token_ids = event.get("tokens", [])
+                if not isinstance(token_ids, list):
+                    raise ValidationError("invalid token list in termination response")
+                tokens += len(token_ids)
+        # The first token comes from prefill logits. The second requires a decode.
+        signal.pidfd_send_signal(pidfd, signal.SIGKILL)
+    except (OSError, http.client.HTTPException, json.JSONDecodeError) as error:
+        raise ValidationError(f"cannot terminate selected server during DECODE: {error}") from error
+    finally:
+        connection.close()
+
+
 def read_cpu_model() -> str:
     try:
         for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
@@ -354,6 +409,7 @@ def write_environment(
     port: int,
     phase_run_id: int,
     semantic_sha: str,
+    candidate: dict[str, Any] | None = None,
 ) -> None:
     distribution = os_release()
     scheduler_sha, scheduler_state = git_identity(REPO_ROOT)
@@ -386,6 +442,8 @@ def write_environment(
         "phase_run_id": phase_run_id,
         "python": sys.version.splitlines()[0],
     }
+    if candidate is not None:
+        data.update(candidate)
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
@@ -431,11 +489,13 @@ def validate_isolation(
     }
 
 
-def validate_report(path: Path, expected_tgid: int) -> dict[str, Any]:
+def read_uprobe_report(path: Path, expected_tgid: int) -> tuple[dict, dict, dict, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ValidationError(f"cannot parse instrumentation report: {error}") from error
+    if not isinstance(data, dict):
+        raise ValidationError("instrumentation report must be an object")
     phase_control = data.get("phase_control")
     uprobe = data.get("phase_uprobe")
     observations = data.get("phase_observations")
@@ -451,6 +511,24 @@ def validate_report(path: Path, expected_tgid: int) -> dict[str, Any]:
     state = uprobe.get("state")
     if not isinstance(counters, dict) or not isinstance(state, dict):
         raise ValidationError("phase uprobe counters/state are missing")
+    return uprobe, counters, state, observations
+
+
+def validate_observations(observations: Any) -> dict[str, dict]:
+    if not isinstance(observations, list):
+        raise ValidationError("phase observations are missing")
+    by_name = {entry.get("name"): entry for entry in observations if isinstance(entry, dict)}
+    for phase in ("UNKNOWN", "PREFILL", "DECODE", "MIXED"):
+        if phase not in by_name:
+            raise ValidationError(f"phase observation is missing: {phase}")
+    for phase in ("PREFILL", "DECODE"):
+        if by_name[phase].get("running", 0) <= 0:
+            raise ValidationError(f"{phase}.running was not observed")
+    return by_name
+
+
+def validate_report(path: Path, expected_tgid: int) -> dict[str, Any]:
+    _, counters, state, observations = read_uprobe_report(path, expected_tgid)
     begin = counters.get("begin_events")
     end = counters.get("end_events")
     if not isinstance(begin, int) or begin <= 0 or begin != end:
@@ -464,16 +542,7 @@ def validate_report(path: Path, expected_tgid: int) -> dict[str, Any]:
         raise ValidationError(f"semantic marker failure counters are nonzero: {nonzero_failures}")
     if state.get("active") != 0 or state.get("phase") != 0 or state.get("phase_name") != "UNKNOWN":
         raise ValidationError(f"final phase state is not inactive/UNKNOWN: {state}")
-    if not isinstance(observations, list):
-        raise ValidationError("phase observations are missing")
-    by_name = {entry.get("name"): entry for entry in observations if isinstance(entry, dict)}
-    for phase in ("UNKNOWN", "PREFILL", "DECODE", "MIXED"):
-        if phase not in by_name:
-            raise ValidationError(f"phase observation is missing: {phase}")
-    if by_name["PREFILL"].get("running", 0) <= 0:
-        raise ValidationError("PREFILL.running was not observed")
-    if by_name["DECODE"].get("running", 0) <= 0:
-        raise ValidationError("DECODE.running was not observed")
+    by_name = validate_observations(observations)
     return {
         "begin_events": begin,
         "end_events": end,
@@ -486,6 +555,41 @@ def validate_report(path: Path, expected_tgid: int) -> dict[str, Any]:
         "final_phase": state["phase_name"],
         "prefill_running": by_name["PREFILL"]["running"],
         "decode_running": by_name["DECODE"]["running"],
+    }
+
+
+def validate_state_report(path: Path, expected_tgid: int, run_id: int, aborted: bool) -> dict[str, Any]:
+    uprobe, counters, state, observations = read_uprobe_report(path, expected_tgid)
+    if uprobe.get("mode") != "state" or uprobe.get("event_semantics") != "phase_transitions":
+        raise ValidationError("state report has the wrong uprobe mode or event semantics")
+    failures = {name: counters.get(name) for name in STATE_FAILURE_COUNTERS}
+    if any(type(value) is not int or value != 0 for value in failures.values()):
+        raise ValidationError(f"state marker failure counters are nonzero or missing: {failures}")
+    transitions = 5 if aborted else 3
+    expected = {
+        "state_events": transitions, "state_applied": transitions, "state_idle": 1,
+        "state_prefill": 2 if aborted else 1, "state_decode": 2 if aborted else 1,
+        "state_mixed": 0, "state_unknown": 0,
+    }
+    if any(type(counters.get(name)) is not int or counters[name] != count for name, count in expected.items()):
+        raise ValidationError(f"unexpected applied state transitions: {counters}")
+    if (state.get("active"), state.get("phase"), state.get("phase_name")) != (0, 0, "UNKNOWN"):
+        raise ValidationError(f"final state is not inactive/UNKNOWN: {state}")
+    if state.get("source") != STATE_SOURCE:
+        raise ValidationError(f"unexpected final state source: {state.get('source')}")
+    if state.get("run_id") != run_id or state.get("sequence") != transitions:
+        raise ValidationError(f"unexpected state run or sequence: {state}")
+    if uprobe.get("target_tgid") != 0 or uprobe.get("target_exited") is not True:
+        raise ValidationError("state target registration was not retired")
+    if uprobe.get("active_at_exit") is not aborted or uprobe.get("phase_at_exit") != ("DECODE" if aborted else "UNKNOWN"):
+        raise ValidationError(f"unexpected phase at target exit: {uprobe.get('phase_at_exit')}")
+    by_name = validate_observations(observations)
+    return {
+        **expected, "run_id": run_id, "sequence": transitions,
+        "active_at_exit": aborted, "phase_at_exit": uprobe["phase_at_exit"],
+        "final_active": state["active"], "final_phase": state["phase_name"],
+        "prefill_running": by_name["PREFILL"]["running"],
+        "decode_running": by_name["DECODE"]["running"], "failure_counters": failures,
     }
 
 
@@ -618,9 +722,15 @@ def stop_processes(
 
 def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> None:
     manifest = parse_manifest()
-    semantic_dir = REPO_ROOT / ".deps" / "llama.cpp-semantic"
-    semantic_server = REPO_ROOT / "build" / "m11r" / "llama-semantic" / "bin" / "llama-server"
-    marker_elf = REPO_ROOT / "build" / "m11r" / "llama-semantic" / "bin" / "libllama-server-impl.so"
+    state_mode = args.phase_uprobe_mode == "state"
+    if state_mode:
+        semantic_dir = args.semantic_dir.expanduser().resolve()
+        semantic_build = args.semantic_build.expanduser().resolve()
+    else:
+        semantic_dir = REPO_ROOT / ".deps" / "llama.cpp-semantic"
+        semantic_build = REPO_ROOT / "build" / "m11r" / "llama-semantic"
+    semantic_server = semantic_build / "bin" / "llama-server"
+    marker_elf = semantic_build / "bin" / "libllama-server-impl.so"
     loader_binary = REPO_ROOT / "build" / "bin" / "llama_scx_simple"
     launcher_binary = REPO_ROOT / "build" / "bin" / "llama_scx_child"
     loader_output = result_dir / "loader-report"
@@ -636,17 +746,36 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
     require_file(loader_binary, executable=True)
     require_file(launcher_binary, executable=True)
     require_file(VMLINUX_BTF)
-    verify_marker_symbols(marker_elf)
+    verify_marker_symbols(marker_elf, STATE_MARKER_SYMBOLS if state_mode else MARKER_SYMBOLS)
     semantic_sha, semantic_state = git_identity(semantic_dir)
-    if semantic_sha != manifest["SEMANTIC_LLAMA_COMMIT"]:
-        raise ValidationError(
-            f"semantic dependency SHA is {semantic_sha}, expected {manifest['SEMANTIC_LLAMA_COMMIT']}"
-        )
-    if semantic_state != "clean":
-        raise ValidationError("semantic dependency worktree is dirty")
-    semantic_origin = checked_output(["git", "-C", str(semantic_dir), "remote", "get-url", "origin"])
-    if semantic_origin != manifest["SEMANTIC_LLAMA_REPO"]:
-        raise ValidationError(f"semantic dependency origin mismatch: {semantic_origin}")
+    candidate = None
+    if state_mode:
+        cache_path = semantic_build / "CMakeCache.txt"
+        require_file(cache_path)
+        cache = cache_path.read_text(encoding="utf-8").splitlines()
+        if f"CMAKE_HOME_DIRECTORY:INTERNAL={semantic_dir}" not in cache or "LLAMA_SCX_PHASE_TRACE:BOOL=ON" not in cache:
+            raise ValidationError("state build cache must identify the selected provider with LLAMA_SCX_PHASE_TRACE=ON")
+        shutil.copyfile(cache_path, result_dir / "provider-CMakeCache.txt")
+        candidate = {
+            "baseline_name": "scx-state-v2-candidate",
+            "kernel_compatibility": "COMPATIBLE-BUT-UNVALIDATED",
+            "phase_uprobe_mode": "state",
+            "semantic_worktree_state": semantic_state,
+            "semantic_source_path": str(semantic_dir),
+            "marker_elf": str(marker_elf),
+            "loader_binary": str(loader_binary),
+            "abort_during_decode": args.state_abort,
+        }
+    else:
+        if semantic_sha != manifest["SEMANTIC_LLAMA_COMMIT"]:
+            raise ValidationError(
+                f"semantic dependency SHA is {semantic_sha}, expected {manifest['SEMANTIC_LLAMA_COMMIT']}"
+            )
+        if semantic_state != "clean":
+            raise ValidationError("semantic dependency worktree is dirty")
+        semantic_origin = checked_output(["git", "-C", str(semantic_dir), "remote", "get-url", "origin"])
+        if semantic_origin != manifest["SEMANTIC_LLAMA_REPO"]:
+            raise ValidationError(f"semantic dependency origin mismatch: {semantic_origin}")
     if read_sched_ext_state() != "disabled":
         raise ValidationError(f"{SCX_STATE} must report disabled before validation")
     servers = existing_llama_servers()
@@ -665,6 +794,7 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
         port,
         args.run_id,
         semantic_sha,
+        candidate,
     )
     request = {
         "prompt": PROMPT,
@@ -672,6 +802,8 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
         "temperature": 0,
         "cache_prompt": False,
     }
+    if state_mode:
+        request["ignore_eos"] = True
     (result_dir / "request.json").write_text(
         json.dumps(request, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -679,7 +811,7 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
     distribution = os_release()
     kernel_status = (
         "VALIDATED"
-        if distribution.get("ID") == "ubuntu"
+        if not state_mode and distribution.get("ID") == "ubuntu"
         and distribution.get("VERSION_ID") == manifest["VALIDATED_UBUNTU_VERSION"]
         and platform.release() == manifest["VALIDATED_KERNEL"]
         and platform.machine() == manifest["VALIDATED_ARCH"]
@@ -689,7 +821,7 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
     logger.log(f"semantic_commit={semantic_sha} semantic_worktree={semantic_state}")
     logger.log(f"result_dir={result_dir}")
 
-    socket_name = f"llama-m11r-{os.getuid()}-{os.getpid()}-{args.run_id}"[:100]
+    socket_name = f"llama-{'state' if state_mode else 'm11r'}-{os.getuid()}-{os.getpid()}-{args.run_id}"[:100]
     loader_command = [
         "sudo",
         "--",
@@ -730,10 +862,15 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
         "--port",
         str(port),
     ]
+    if state_mode:
+        loader_command.extend(["--phase-uprobe-mode", "state"])
+        server_command.extend(["--scx-phase-mode", "state"])
 
     loader: subprocess.Popen[bytes] | None = None
     launcher: subprocess.Popen[bytes] | None = None
     server_pid: int | None = None
+    server_pidfd: int | None = None
+    aborted = False
     run_error: BaseException | None = None
     cleanup_errors: list[str] = []
     loader_stream = None
@@ -796,7 +933,9 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
             30,
             lambda: regex_value(
                 loader_log,
-                r"phase uprobe: attached pid-specific decode markers to tgid=([1-9][0-9]*)",
+                r"phase uprobe: attached pid-specific "
+                + ("state marker" if state_mode else "decode markers")
+                + r" to tgid=([1-9][0-9]*)",
             ),
             [("loader", loader), ("launcher", launcher)],
         )
@@ -808,6 +947,8 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
         )
         logger.log("server_health=PASS")
 
+        if args.state_abort:
+            server_pidfd = os.pidfd_open(server_pid)
         isolation = validate_isolation(
             launcher_pid, server_pid, registration_pid, target_tgid
         )
@@ -827,22 +968,36 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
             result_dir / "completion.json",
         )
         logger.log(f"http_and_inference=PASS tokens_predicted={response['tokens_predicted']}")
-        observed = wait_until(
-            "balanced PREFILL and DECODE phase counters",
-            30,
-            lambda: counters_observed(loader_log),
-            [("loader", loader), ("launcher", launcher)],
-        )
-        logger.log(
-            "live_phase_counters=PASS "
-            f"begin={observed['begin_events']} end={observed['end_events']} "
-            f"prefill={observed['begin_prefill']} decode={observed['begin_decode']} "
-            f"mixed={observed['begin_mixed']}"
-        )
+        if state_mode:
+            wait_until(
+                "applied PREFILL, DECODE, and IDLE state events", 30,
+                lambda: state_counters_observed(loader_log, server_pid),
+                [("loader", loader), ("launcher", launcher)],
+            )
+            logger.log("live_state_counters=PASS")
+            if server_pidfd is not None:
+                abort_state_decode(port, request, server_pidfd, result_dir / "abort.sse")
+                aborted = True
+                launcher.wait(timeout=15)
+        else:
+            observed = wait_until(
+                "balanced PREFILL and DECODE phase counters",
+                30,
+                lambda: counters_observed(loader_log),
+                [("loader", loader), ("launcher", launcher)],
+            )
+            logger.log(
+                "live_phase_counters=PASS "
+                f"begin={observed['begin_events']} end={observed['end_events']} "
+                f"prefill={observed['begin_prefill']} decode={observed['begin_decode']} "
+                f"mixed={observed['begin_mixed']}"
+            )
     except BaseException as error:
         run_error = error
     finally:
-        cleanup_errors = stop_processes(logger, launcher, server_pid, loader)
+        if server_pidfd is not None:
+            os.close(server_pidfd)
+        cleanup_errors = stop_processes(logger, launcher, None if aborted else server_pid, loader)
         if server_stream is not None:
             server_stream.close()
         if loader_stream is not None:
@@ -866,7 +1021,9 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
             run_error = ValidationError(
                 f"loader did not exit successfully: {None if loader is None else loader.returncode}"
             )
-        elif launcher is None or launcher.returncode not in (0, 128 + signal.SIGINT):
+        elif launcher is None or launcher.returncode not in (
+            (128 + signal.SIGKILL,) if aborted else (0, 128 + signal.SIGINT)
+        ):
             run_error = ValidationError(
                 f"launcher/server shutdown status is unexpected: "
                 f"{None if launcher is None else launcher.returncode}"
@@ -877,13 +1034,16 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
         try:
             if server_pid is None:
                 raise ValidationError("server PID was not captured")
-            report_result = validate_report(result_dir / "instrumentation.json", server_pid)
+            if state_mode:
+                report_result = validate_state_report(result_dir / "instrumentation.json", server_pid, args.run_id, aborted)
+            else:
+                report_result = validate_report(result_dir / "instrumentation.json", server_pid)
         except BaseException as error:
             run_error = error
 
     summary_path = result_dir / "summary.txt"
     with summary_path.open("a", encoding="utf-8") as summary:
-        summary.write("\nM11R semantic phase validation\n")
+        summary.write("\nSCX state notification validation\n" if state_mode else "\nM11R semantic phase validation\n")
         summary.write(f"result_dir={result_dir}\n")
         summary.write(f"final_sched_ext_state={read_sched_ext_state()}\n")
         if report_result is not None:
@@ -905,12 +1065,15 @@ def execute(args: argparse.Namespace, result_dir: Path, logger: RunLogger) -> No
         raise ValidationError(str(run_error)) from run_error
 
     assert report_result is not None
-    logger.log(
-        "post_run_report=PASS "
-        f"begin={report_result['begin_events']} end={report_result['end_events']} "
-        f"prefill={report_result['begin_prefill']} decode={report_result['begin_decode']} "
-        f"mixed={report_result['begin_mixed']} mixed_running={report_result['mixed_running']}"
-    )
+    if state_mode:
+        logger.log(f"post_run_report=PASS applied={report_result['state_applied']} sequence={report_result['sequence']}")
+    else:
+        logger.log(
+            "post_run_report=PASS "
+            f"begin={report_result['begin_events']} end={report_result['end_events']} "
+            f"prefill={report_result['begin_prefill']} decode={report_result['begin_decode']} "
+            f"mixed={report_result['begin_mixed']} mixed_running={report_result['mixed_running']}"
+        )
     logger.log("semantic_acceptance=PASS")
     logger.log(f"result_dir={result_dir}")
 
@@ -928,7 +1091,7 @@ def positive_u64(value: str) -> int:
 def parse_arguments(argv: list[str]) -> argparse.Namespace:
     timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d%H%M%S")
     parser = argparse.ArgumentParser(
-        description="Reproduce the M11 semantic llama-server to sched_ext observation path."
+        description="Validate the M11 trace or SCX state llama-server to sched_ext observation path."
     )
     parser.add_argument("--model", required=True, type=Path, help="readable CPU-runnable GGUF model")
     parser.add_argument(
@@ -946,15 +1109,26 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        help="exact new result directory (default: results/m11r/<UTC>-<pid>)",
+        help="exact new result directory (default: results/m11r or results/scx-state)",
     )
-    return parser.parse_args(argv)
+    parser.add_argument("--phase-uprobe-mode", choices=("trace", "state"), default="trace")
+    parser.add_argument("--semantic-dir", type=Path, help="provider source checkout for state mode")
+    parser.add_argument("--semantic-build", type=Path, help="trace-enabled provider CMake build for state mode")
+    parser.add_argument("--state-abort", action="store_true", help="terminate the selected server during a second request")
+    args = parser.parse_args(argv)
+    if args.phase_uprobe_mode == "state":
+        if args.semantic_dir is None or args.semantic_build is None:
+            parser.error("state mode requires --semantic-dir and --semantic-build")
+    elif args.semantic_dir is not None or args.semantic_build is not None or args.state_abort:
+        parser.error("--semantic-dir, --semantic-build, and --state-abort require state mode")
+    return args
 
 
 def make_result_dir(args: argparse.Namespace) -> Path:
     if args.output_dir is None:
         stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
-        result_dir = REPO_ROOT / "results" / "m11r" / f"{stamp}-{os.getpid()}"
+        directory = "scx-state" if args.phase_uprobe_mode == "state" else "m11r"
+        result_dir = REPO_ROOT / "results" / directory / f"{stamp}-{os.getpid()}"
     else:
         result_dir = args.output_dir.expanduser()
         if not result_dir.is_absolute():
@@ -968,7 +1142,7 @@ def make_result_dir(args: argparse.Namespace) -> Path:
     return result_dir
 
 
-def ensure_failure_summary(result_dir: Path, error: str) -> None:
+def ensure_failure_summary(result_dir: Path, error: str, mode: str) -> None:
     summary = result_dir / "summary.txt"
     if summary.exists():
         return
@@ -976,8 +1150,9 @@ def ensure_failure_summary(result_dir: Path, error: str) -> None:
         final_state = read_sched_ext_state()
     except ValidationError:
         final_state = "unavailable"
+    title = "SCX state notification validation" if mode == "state" else "M11R semantic phase validation"
     summary.write_text(
-        "M11R semantic phase validation\n"
+        f"{title}\n"
         f"result_dir={result_dir}\n"
         f"final_sched_ext_state={final_state}\n"
         "semantic_acceptance=FAIL\n"
@@ -1006,12 +1181,12 @@ def main(argv: list[str] | None = None) -> int:
         execute(args, result_dir, logger)
         return 0
     except (ValidationError, TerminationRequested) as error:
-        ensure_failure_summary(result_dir, str(error))
+        ensure_failure_summary(result_dir, str(error), args.phase_uprobe_mode)
         logger.log(f"semantic_acceptance=FAIL error={error}")
         logger.log(f"result_dir={result_dir}")
         return 1
     except KeyboardInterrupt:
-        ensure_failure_summary(result_dir, "received SIGINT")
+        ensure_failure_summary(result_dir, "received SIGINT", args.phase_uprobe_mode)
         logger.log("semantic_acceptance=FAIL error=received SIGINT")
         logger.log(f"result_dir={result_dir}")
         return 130

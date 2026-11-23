@@ -122,21 +122,22 @@ class UprobeIntegrationSourceTests(unittest.TestCase):
         self.child = (ROOT / "src/llama_scx_child.c").read_text()
 
     def test_handlers_read_translate_match_and_count_failures(self) -> None:
-        self.assertGreaterEqual(self.bpf.count('SEC("uprobe")'), 2)
-        self.assertIn("llama_scx_decode_begin_v1_uprobe", self.bpf)
-        self.assertIn("llama_scx_decode_end_v1_uprobe", self.bpf)
-        self.assertEqual(self.bpf.count("bpf_probe_read_user"), 2)
-        self.assertIn("llama_scx_begin_value(&value, &event)", self.bpf)
-        self.assertIn("llama_scx_end_matches(&next, &event)", self.bpf)
-        self.assertIn("BPF_ANY", self.bpf)
-        self.assertIn("BPF_EXIST", self.bpf)
+        trace = self.bpf[self.bpf.index("static __always_inline bool uprobe_target"):
+                         self.bpf.index("int BPF_UPROBE(llama_scx_phase_set_v2_uprobe")]
+        self.assertIn("llama_scx_decode_begin_v1_uprobe", trace)
+        self.assertIn("llama_scx_decode_end_v1_uprobe", trace)
+        self.assertEqual(trace.count("bpf_probe_read_user"), 2)
+        self.assertIn("llama_scx_begin_value(&value, &event)", trace)
+        self.assertIn("llama_scx_end_matches(&next, &event)", trace)
+        self.assertIn("BPF_ANY", trace)
+        self.assertIn("BPF_EXIST", trace)
         for counter in (
             "begin_events", "end_events", "begin_unknown", "begin_prefill",
             "begin_decode", "begin_mixed", "abi_failures", "user_read_failures",
             "unsupported_phases", "stale_end_events", "map_update_failures",
             "filtered_events",
         ):
-            self.assertIn(f"UPROBE_STAT_INC({counter})", self.bpf)
+            self.assertIn(f"UPROBE_STAT_INC({counter})", trace)
 
     def test_pid_specific_attach_and_source_exclusion(self) -> None:
         self.assertIn("bpf_program__attach_uprobe_opts(begin_program, (pid_t)tgid", self.loader)

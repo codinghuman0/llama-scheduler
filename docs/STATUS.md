@@ -355,6 +355,6 @@ execution. Intel uses the same source recipe and still needs native validation.
 
 See [the Intel handoff and kernel procedure](../new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md).
 
-The Intel Linux wrapper accepts missing temperature sensors with a warning and
-checks a 95 C limit when readings are available. Disk requirements are greater
-than 128 MiB for the build and 32 MiB for validation and inference.
+The Intel Linux wrapper skips CPU temperature checks in build, doctor and
+inference. Disk requirements are greater than 128 MiB for the build and 32 MiB
+for validation and inference.

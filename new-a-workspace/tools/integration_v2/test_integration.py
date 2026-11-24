@@ -1,6 +1,4 @@
 """Exercise identity and configuration gates without loading a model."""
-from contextlib import redirect_stderr
-from io import StringIO
 import json
 from pathlib import Path
 import tempfile
@@ -30,17 +28,11 @@ class HostGuardTests(unittest.TestCase):
     def check(self, action="serve-bench", relaxed=True):
         runtime.guard_host(SimpleNamespace(action=action, relaxed_host_checks=relaxed))
 
-    def test_relaxed_temperature_warns_on_missing_sensor_and_stops_at_95(self):
-        self.sensors.clear()
-        warning = StringIO()
-        with redirect_stderr(warning):
-            self.check()
-        self.assertIn("sensor unavailable; continuing", warning.getvalue())
-        self.sensors["coretemp:temp1_input"] = 94.9
-        self.check()
-        self.sensors["coretemp:temp1_input"] = 95.0
-        with self.assertRaisesRegex(RuntimeError, "95 C limit"):
-            self.check()
+    def test_relaxed_host_checks_do_not_read_temperature_sensors(self):
+        with patch.object(intel_experiment, "temperatures", side_effect=AssertionError("Sensor read")) as sensors:
+            for action in ("build", "doctor", "run", "serve-bench"):
+                self.check(action)
+            sensors.assert_not_called()
 
     def test_relaxed_disk_floor_depends_on_stage(self):
         self.disk.free = 64 * 1024**2

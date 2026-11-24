@@ -33,7 +33,7 @@ bash scripts/intel-integration-v2-smoke.sh "$HOME/projects/model.gguf" intel-val
 
 스크립트는 build 입력과 doctor 결과 ZIP 하나, fixture별 실행 결과 ZIP 세 개와 SHA256 sidecar를 만듭니다. 직접 단계별로 실행할 경우 아래 명령을 사용합니다.
 
-`smoke`와 `m4` 실행 스크립트는 기본 Linux 스케줄러용 `--relaxed-host-checks`를 전달합니다. 저장소 파일시스템의 여유 공간 기준은 빌드 시 **128 MiB 초과**, `doctor`와 추론 실행 시 **32 MiB 초과**입니다. 읽을 수 있는 CPU 온도가 **95°C 이상**이면 중단하며, 센서가 보고되지 않으면 경고를 남기고 진행합니다. 매우 적은 여유 공간에서는 실제 빌드·파일 저장이 실패할 수 있으며, 그 경우 도구가 보고한 오류를 확인합니다.
+`smoke`와 `m4` 실행 스크립트는 기본 Linux 스케줄러용 `--relaxed-host-checks`를 전달합니다. 이 모드에서는 CPU 온도 센서를 읽지 않습니다. 저장소 파일시스템의 여유 공간 기준은 빌드 시 **128 MiB 초과**, `doctor`와 추론 실행 시 **32 MiB 초과**입니다. 매우 적은 여유 공간에서는 실제 빌드·파일 저장이 실패할 수 있으며, 그 경우 도구가 보고한 오류를 확인합니다.
 
 ```bash
 set -euo pipefail

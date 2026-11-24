@@ -31,7 +31,7 @@ from intel_experiment import (MODEL_SHA, FIXTURES, clean_env, cpu_list, guard, p
 
 def guard_host(args):
     if args.relaxed_host_checks:
-        guard(min_free_mib=128 if args.action == "build" else 32, max_temp_c=95, allow_missing_temp=True)
+        guard(min_free_mib=128 if args.action == "build" else 32, check_temperature=False)
     else:
         guard()
 
@@ -578,7 +578,7 @@ def main():
     commands = parser.add_subparsers(dest="action", required=True)
     host_checks = argparse.ArgumentParser(add_help=False)
     host_checks.add_argument("--relaxed-host-checks", action="store_true",
-                             help="Allow missing CPU sensors, stop at 95 C, require >128 MiB for build and >32 MiB for doctor/run")
+                             help="Skip CPU temperature checks and require >128 MiB for build or >32 MiB for doctor/run")
     commands.add_parser("test")
     collect = commands.add_parser("collect")
     collect.add_argument("--result", type=Path, required=True)

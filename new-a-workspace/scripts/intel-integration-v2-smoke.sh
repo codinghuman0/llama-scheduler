@@ -32,6 +32,7 @@ if [[ "$mode" == m4 ]]; then
     bash scripts/intel_experiment.sh doctor "${m4_options[@]}" --mixed-prefill head64 \
         > "$build_evidence/head64-doctor.json"
 fi
+printf '%s\n' '{"status":"BUILD_AND_DOCTOR_PASS"}' > "$build_evidence/summary.json"
 bash scripts/intel_experiment.sh collect --result "$build_evidence" --output "$build_evidence.zip"
 if [[ "$mode" == m4 ]]; then
     for policy in cap128 head64; do
@@ -44,6 +45,7 @@ if [[ "$mode" == m4 ]]; then
     mkdir "$comparison"
     python3 -B tools/integration_v2/verify_head64.py "$result-cap128" "$result-head64" \
         > "$comparison/token-equality.json"
+    printf '%s\n' '{"status":"M4_COMPARE_PASS","comparison":"token-equality.json"}' > "$comparison/summary.json"
     bash scripts/intel_experiment.sh collect --result "$comparison" --output "$comparison.zip"
     exit 0
 fi

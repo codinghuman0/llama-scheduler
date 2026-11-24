@@ -15,7 +15,7 @@ class ServingCase:
 
 
 def run(args, runner, directory, manifest, configurations, output, cancel,
-        environment, role_arguments, mixed_prefill_arguments, verify_loaded, verify_effective, check_scheduler):
+        environment, role_arguments, mixed_prefill_arguments, verify_loaded, verify_effective, check_host):
     model = args.model.resolve(strict=True)
     config = runner.DEFAULTS | {
         "server": str(directory / "bin/llama-server"), "model": str(model),
@@ -41,7 +41,7 @@ def run(args, runner, directory, manifest, configurations, output, cancel,
     try:
         for index, spec in enumerate(order):
             require(not cancel.is_set(), "Interrupted serving campaign")
-            check_scheduler(None)
+            check_host()
             configuration = configurations[spec["condition"]]
             case = ServingCase(configuration["profile"], spec["workload"], spec["repetition"])
             dest = output / f"{index:03d}-{case.profile}-{case.workload}"
@@ -77,7 +77,7 @@ def run(args, runner, directory, manifest, configurations, output, cancel,
                         terminal = request["events"][-1]["data"]
                         timings = terminal.get("timings") or {}
                         require(timings.get("cache_n") == 0, "Serving response lacked zero-cache evidence")
-                    check_scheduler(None)
+                    check_host()
                 verify_loaded(directory, manifest, configuration, model, pid, runner.loaded_libraries(pid))
                 row["status"] = "ok"
             except BaseException as error:

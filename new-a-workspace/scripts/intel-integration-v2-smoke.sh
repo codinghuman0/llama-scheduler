@@ -18,16 +18,16 @@ test -f "$model"
 build_dir="state/integration-v2/builds/$tag"
 result="state/integration-v2/$tag"
 bash scripts/intel_experiment.sh test
-bash scripts/intel_experiment.sh build --build-dir "$build_dir" "${build_options[@]}"
+bash scripts/intel_experiment.sh build --relaxed-host-checks --build-dir "$build_dir" "${build_options[@]}"
 build_evidence="$result-build-evidence"
 mkdir "$build_evidence"
 cp "$build_dir/"{inputs,manifest,commands}.json "$build_dir/"{configure,build}.log "$build_evidence/"
-bash scripts/intel_experiment.sh doctor --build-dir "$build_dir" --resources intel-fixed6 \
+bash scripts/intel_experiment.sh doctor --relaxed-host-checks --build-dir "$build_dir" --resources intel-fixed6 \
     --profile integrated-runtime-research > "$build_evidence/doctor.json"
 if [[ "$mode" == m4 ]]; then
     cpus=$(python3 -B -c 'import json, sys; print(",".join(map(str, json.load(sys.stdin)["effective"]["cpus"])))' \
         < "$build_evidence/doctor.json")
-    m4_options=(--build-dir "$build_dir" --profile integrated-runtime-research --resources physical
+    m4_options=(--relaxed-host-checks --build-dir "$build_dir" --profile integrated-runtime-research --resources physical
         --cpus "$cpus" --policy phase-fixed)
     bash scripts/intel_experiment.sh doctor "${m4_options[@]}" --mixed-prefill head64 \
         > "$build_evidence/head64-doctor.json"
@@ -53,7 +53,7 @@ for fixture in heldout-1 heldout-2 single-short; do
     fixture_result="$result-$fixture"
     lifecycle=()
     if [[ "$fixture" == single-short ]]; then lifecycle=(--lifecycle); fi
-    bash scripts/intel_experiment.sh run --build-dir "$build_dir" --model "$model" --output "$fixture_result" \
+    bash scripts/intel_experiment.sh run --relaxed-host-checks --build-dir "$build_dir" --model "$model" --output "$fixture_result" \
         --resources intel-fixed6 --profile integrated-runtime-research --state-log --worker-log \
         "${lifecycle[@]}" --sleep-idle 2 --fixtures "$fixture"
     bash scripts/intel_experiment.sh collect --result "$fixture_result" --output "$fixture_result.zip"

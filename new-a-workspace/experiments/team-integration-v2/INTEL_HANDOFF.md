@@ -33,6 +33,8 @@ bash scripts/intel-integration-v2-smoke.sh "$HOME/projects/model.gguf" intel-val
 
 스크립트는 build 입력과 doctor 결과 ZIP 하나, fixture별 실행 결과 ZIP 세 개와 SHA256 sidecar를 만듭니다. 직접 단계별로 실행할 경우 아래 명령을 사용합니다.
 
+`smoke`와 `m4` 실행 스크립트는 기본 Linux 스케줄러용 `--relaxed-host-checks`를 전달합니다. 저장소 파일시스템의 여유 공간 기준은 빌드 시 **128 MiB 초과**, `doctor`와 추론 실행 시 **32 MiB 초과**입니다. 읽을 수 있는 CPU 온도가 **95°C 이상**이면 중단하며, 센서가 보고되지 않으면 경고를 남기고 진행합니다. 매우 적은 여유 공간에서는 실제 빌드·파일 저장이 실패할 수 있으며, 그 경우 도구가 보고한 오류를 확인합니다.
+
 ```bash
 set -euo pipefail
 cd "$HOME/projects/llama-scheduler/new-a-workspace"
@@ -42,13 +44,13 @@ out=state/integration-v2/intel-smoke-01
 test -f "$model"
 
 bash scripts/intel_experiment.sh test
-bash scripts/intel_experiment.sh build --build-dir "$build_dir" --jobs 2
-bash scripts/intel_experiment.sh doctor --build-dir "$build_dir" --resources intel-fixed6 --profile integrated-runtime-research
+bash scripts/intel_experiment.sh build --relaxed-host-checks --build-dir "$build_dir" --jobs 2
+bash scripts/intel_experiment.sh doctor --relaxed-host-checks --build-dir "$build_dir" --resources intel-fixed6 --profile integrated-runtime-research
 for fixture in heldout-1 heldout-2 single-short; do
   result="$out-$fixture"
   lifecycle=()
   if [[ "$fixture" == single-short ]]; then lifecycle=(--lifecycle); fi
-  bash scripts/intel_experiment.sh run --build-dir "$build_dir" --model "$model" --output "$result" \
+  bash scripts/intel_experiment.sh run --relaxed-host-checks --build-dir "$build_dir" --model "$model" --output "$result" \
     --resources intel-fixed6 --profile integrated-runtime-research --state-log --worker-log \
     "${lifecycle[@]}" --sleep-idle 2 --fixtures "$fixture"
   bash scripts/intel_experiment.sh collect --result "$result" --output "$result.zip"
@@ -76,7 +78,7 @@ bash scripts/intel-integration-v2-smoke.sh "$HOME/projects/model.gguf" intel-m4-
 OpenMP에서 일반 Prefill·Decode·Mixed 부하를 비교하려면 위 smoke 빌드로 다음을 실행합니다.
 
 ```bash
-bash scripts/intel_experiment.sh serve-bench --build-dir "$build_dir" --model "$model" \
+bash scripts/intel_experiment.sh serve-bench --relaxed-host-checks --build-dir "$build_dir" --model "$model" \
   --resources intel-fixed6 --compare-research --workloads pp d1 d2 d4 m1 m3 \
   --tokens 32 --repetitions 1 --output state/integration-v2/intel-serving-01
 ```

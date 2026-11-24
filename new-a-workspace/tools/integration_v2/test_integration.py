@@ -1,11 +1,70 @@
 """Exercise identity and configuration gates without loading a model."""
+from contextlib import redirect_stderr
+from io import StringIO
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 import runtime
+import intel_experiment
+
+
+class HostGuardTests(unittest.TestCase):
+    def setUp(self):
+        self.disk = SimpleNamespace(free=400 * 1024**2)
+        self.sensors = {"coretemp:temp1_input": 85.0}
+        readings = {"/sys/kernel/sched_ext/state": "disabled", "/proc/meminfo": "MemAvailable: 4000000 kB"}
+        for item in (
+            patch.object(intel_experiment.os, "getuid", return_value=1000),
+            patch.object(intel_experiment.os, "sched_getscheduler", return_value=runtime.os.SCHED_OTHER),
+            patch.object(intel_experiment.shutil, "disk_usage", return_value=self.disk),
+            patch.object(intel_experiment, "text", side_effect=lambda path, *_: readings[path]),
+            patch.object(intel_experiment, "temperatures", return_value=self.sensors),
+        ):
+            item.start()
+            self.addCleanup(item.stop)
+
+    def check(self, action="serve-bench", relaxed=True):
+        runtime.guard_host(SimpleNamespace(action=action, relaxed_host_checks=relaxed))
+
+    def test_relaxed_temperature_warns_on_missing_sensor_and_stops_at_95(self):
+        self.sensors.clear()
+        warning = StringIO()
+        with redirect_stderr(warning):
+            self.check()
+        self.assertIn("sensor unavailable; continuing", warning.getvalue())
+        self.sensors["coretemp:temp1_input"] = 94.9
+        self.check()
+        self.sensors["coretemp:temp1_input"] = 95.0
+        with self.assertRaisesRegex(RuntimeError, "95 C limit"):
+            self.check()
+
+    def test_relaxed_disk_floor_depends_on_stage(self):
+        self.disk.free = 64 * 1024**2
+        for action in ("doctor", "run", "serve-bench"):
+            self.check(action)
+        with self.assertRaisesRegex(RuntimeError, "more than 128 MiB"):
+            self.check("build")
+        self.disk.free = 129 * 1024**2
+        self.check("build")
+        self.disk.free = 32 * 1024**2
+        with self.assertRaisesRegex(RuntimeError, "more than 32 MiB"):
+            self.check()
+
+    def test_default_retains_thermal_and_disk_limits(self):
+        self.disk.free = 349 * 1024**2
+        with self.assertRaisesRegex(RuntimeError, "more than 350 MiB"):
+            self.check(relaxed=False)
+        self.disk.free = 400 * 1024**2
+        self.sensors["coretemp:temp1_input"] = 90.0
+        with self.assertRaisesRegex(RuntimeError, "90 C limit"):
+            self.check(relaxed=False)
+        self.sensors.clear()
+        with self.assertRaisesRegex(RuntimeError, "sensor unavailable"):
+            self.check(relaxed=False)
 
 
 class ManifestTests(unittest.TestCase):

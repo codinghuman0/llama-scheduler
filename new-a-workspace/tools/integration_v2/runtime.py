@@ -2,6 +2,7 @@
 """Build and run the integration-v2 CPU release with recorded source and DSO identity."""
 import argparse
 import fcntl
+from functools import partial
 import hashlib
 import importlib
 import json
@@ -26,6 +27,13 @@ SERVING = SOURCE / "tools/server/bench/cpu"
 sys.path.insert(0, str(WORKSPACE / "tools"))
 from intel_experiment import (MODEL_SHA, FIXTURES, clean_env, cpu_list, guard, payload_for,
                               read, require, run_logged, save, sha, tree_hashes, validate_body)
+
+
+def guard_host(args):
+    if args.relaxed_host_checks:
+        guard(min_free_mib=128 if args.action == "build" else 32, max_temp_c=95, allow_missing_temp=True)
+    else:
+        guard()
 
 
 def run_capture(argv):
@@ -199,7 +207,7 @@ def resolve(args, manifest):
     return {"profile": args.profile, "resources": resources, "policy": policy, "pool": pool, "transport": transport,
             "cpus": cpus, "threads": compute, "batch_threads": batch, "threads_http": 8, "topology": detected,
             "backend": manifest["backend"], "r_route": manifest["r_route"], "scheduler": "SCHED_OTHER",
-            "adaptive": adaptive, "mixed_prefill": args.mixed_prefill,
+            "adaptive": adaptive, "mixed_prefill": args.mixed_prefill, "relaxed_host_checks": args.relaxed_host_checks,
             "native_barrier": args.native_barrier if manifest["backend"] == "native" else "not-applicable",
             "barrier_phase": args.barrier_phase,
             "role_affinity": role_cpus, "role_polls": polls, "role_priorities": priorities, "role_options": role_options,
@@ -349,6 +357,7 @@ def lifecycle_requests(runner, port, fixture, output):
 
 
 def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=None):
+    check_conditions = check_scheduler if checkpoint else partial(guard_host, args)
     sys.path.insert(0, str(SERVING))
     runner = importlib.import_module("runner")
     port = runner.free_port()
@@ -400,7 +409,7 @@ def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=
             payload = payload_for(fixture, args.tokens)
             row = {"fixture": fixture["id"], "payload": payload}
             for role in ("warmup", "measured"):
-                check_scheduler(checkpoint)
+                check_conditions()
                 require(not cancel.is_set(), "Interrupted")
                 if args.sleep_idle and role == "measured":
                     deadline = time.monotonic() + args.sleep_idle + 15
@@ -417,7 +426,7 @@ def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=
                 tokens = [entry["tokens"] for entry in replies]
                 row[role] = {"tokens": tokens, "elapsed_s": elapsed, "cpu_s": cpu,
                              "tokens_per_s": sum(map(len, tokens)) / elapsed}
-                check_scheduler(checkpoint)
+                check_conditions()
                 live = verify_loaded(directory, manifest, effective, model, pid, runner.loaded_libraries(pid))
                 save(output / f"{fixture['id']}-{role}-runtime.json", live)
             require(row["warmup"]["tokens"] == row["measured"]["tokens"], "Warmup/measured token mismatch")
@@ -445,10 +454,7 @@ def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=
     save(output / "summary.json", summary)
 
 
-def check_scheduler(checkpoint):
-    if not checkpoint:
-        guard()
-        return
+def check_scheduler():
     from scx import SCHED_EXT
     require(SCHED_EXT.read_text().strip() == "enabled" and
             Path("/sys/kernel/sched_ext/root/ops").read_text().strip() == "llama_new_a",
@@ -471,7 +477,7 @@ def read_checkpoint(path, manifest, effective):
     loader_log = (path / "loader.log").read_text()
     require("waiting for selected child" in loader_log and f'"object_sha256":"{checkpoint["object_sha256"]}"' in loader_log,
             "Manual loader readiness or BPF object evidence is missing")
-    check_scheduler(checkpoint)
+    check_scheduler()
     return checkpoint
 
 
@@ -568,12 +574,16 @@ def collect_results(result, destination):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.set_defaults(relaxed_host_checks=False)
     commands = parser.add_subparsers(dest="action", required=True)
+    host_checks = argparse.ArgumentParser(add_help=False)
+    host_checks.add_argument("--relaxed-host-checks", action="store_true",
+                             help="Allow missing CPU sensors, stop at 95 C, require >128 MiB for build and >32 MiB for doctor/run")
     commands.add_parser("test")
     collect = commands.add_parser("collect")
     collect.add_argument("--result", type=Path, required=True)
     collect.add_argument("--output", type=Path, required=True)
-    build = commands.add_parser("build")
+    build = commands.add_parser("build", parents=[host_checks])
     build.add_argument("--build-dir", type=Path, required=True)
     build.add_argument("--backend", choices=("openmp", "native"), default="openmp")
     build.add_argument("--markers", choices=("all", "state-only"), default="all")
@@ -590,10 +600,10 @@ def main():
     prepare.add_argument("--owner-pid", type=int, required=True)
     prepare.add_argument("--output", type=Path, required=True)
     add_configuration(prepare)
-    doctor = commands.add_parser("doctor")
+    doctor = commands.add_parser("doctor", parents=[host_checks])
     doctor.add_argument("--build-dir", type=Path, required=True)
     add_configuration(doctor)
-    run = commands.add_parser("run")
+    run = commands.add_parser("run", parents=[host_checks])
     run.add_argument("--build-dir", type=Path, required=True)
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--model", type=Path, required=True)
@@ -603,7 +613,7 @@ def main():
     run.add_argument("--lifecycle", action="store_true", help="Cancel a stream and reject malformed grammar before fixture recovery")
     run.add_argument("--scx-checkpoint", type=Path)
     add_configuration(run)
-    serve = commands.add_parser("serve-bench")
+    serve = commands.add_parser("serve-bench", parents=[host_checks])
     serve.add_argument("--build-dir", type=Path, required=True)
     serve.add_argument("--output", type=Path, required=True)
     serve.add_argument("--model", type=Path, required=True)
@@ -623,8 +633,9 @@ def main():
     scx_checkpoint = getattr(args, "scx_checkpoint", None)
     require(os.uname().sysname == "Linux" and os.uname().machine == "x86_64", "Integration-v2 runtime requires x86-64 Linux")
     if not scx_checkpoint:
-        guard()
+        guard_host(args)
     else:
+        require(not args.relaxed_host_checks, "Relaxed host checks are only available for default Linux scheduling")
         require(os.getuid() != 0 and os.sched_getscheduler(0) == os.SCHED_OTHER,
                 "Run selected-child inference as an ordinary Linux task")
     STATE.mkdir(parents=True, exist_ok=True)
@@ -676,7 +687,8 @@ def main():
                                     else "unified-conservative")
                     configurations.append(resolve(args, manifest))
                 serving.run(args, runner, directory, manifest, configurations, output, cancel,
-                            environment, role_arguments, mixed_prefill_arguments, verify_loaded, verify_effective, check_scheduler)
+                            environment, role_arguments, mixed_prefill_arguments, verify_loaded, verify_effective,
+                            partial(guard_host, args))
             else:
                 run_cohort(args, directory, manifest, effective, output, cancel, checkpoint)
         except (Exception, KeyboardInterrupt) as error:

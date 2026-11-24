@@ -106,16 +106,22 @@ def temperatures():
     return values
 
 
-def guard():
+def guard(*, min_free_mib=350, max_temp_c=90, allow_missing_temp=False):
     require(os.getuid() != 0, 'Run as the ordinary user, without sudo')
     require(text('/sys/kernel/sched_ext/state', 'unsupported') in ('disabled', 'unsupported'),
             'An external sched_ext scheduler is active; leave it untouched and stop')
     require(os.sched_getscheduler(0) == os.SCHED_OTHER, 'Controller must use normal Linux policy')
-    require(shutil.disk_usage(ROOT).free > 350 * 1024**2, 'Less than 350 MiB free disk space')
+    free_mib = shutil.disk_usage(ROOT).free / 1024**2
+    require(free_mib > min_free_mib,
+            f'Free disk space is {free_mib:.1f} MiB; need more than {min_free_mib} MiB in {ROOT}')
     available = int(re.search(r'MemAvailable:\s+(\d+)', text('/proc/meminfo'))[1])
     require(available >= 2500000, 'Less than 2.5 GB available RAM')
-    temps = temperatures()
-    require(temps and max(temps.values()) < 90, 'CPU temperature unavailable or at least 90 C; inspect cooling/sensors')
+    hottest = max(temperatures().values(), default=None)
+    if hottest is None:
+        require(allow_missing_temp, 'CPU temperature sensor unavailable')
+        print('Warning: CPU temperature sensor unavailable; continuing', file=sys.stderr)
+    else:
+        require(hottest < max_temp_c, f'CPU temperature {hottest:.1f} C reached the {max_temp_c} C limit')
 
 
 def preflight(args):

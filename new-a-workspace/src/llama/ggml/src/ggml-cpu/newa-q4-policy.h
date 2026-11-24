@@ -4,11 +4,16 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#ifdef GGML_USE_OPENMP
 #include <omp.h>
+#endif
 #include "newa-q4-tile32.h"
 #include "newa-q4-decode-exact.h"
 
 extern "C" uint32_t ggml_backend_cpu_newa_phase_current(void);
+#ifndef GGML_USE_OPENMP
+extern "C" int ggml_backend_cpu_newa_worker_index(void);
+#endif
 static std::atomic<uint64_t> newa_q4_calls[4];
 static bool newa_q4_phase_batch;
 
@@ -25,7 +30,7 @@ static bool newa_q4_enabled(void) {
         newa_q4_phase_batch=mode && std::strcmp(mode,"phase_batch")==0;
         const bool on=newa_q4_phase_batch || (mode && std::strcmp(mode,"prefill")==0);
         if (newa_q4_phase_batch) {
-            std::fprintf(stderr,"NEWA_Q4_TILE32 mode=phase_batch prefill_tokens=32 batch_tokens_min=4 batch_tokens_max=12 exact=1 prefill_only=0\n");
+            std::fprintf(stderr,"NEWA_Q4_TILE32 mode=phase_batch prefill_reference=1 batch_tokens_min=4 batch_tokens_max=12 exact=1 prefill_only=0\n");
         } else {
             std::fprintf(stderr,"NEWA_Q4_TILE32 mode=%s tokens=32 prefill_only=1\n",on?"prefill":"off");
         }
@@ -39,12 +44,17 @@ static bool newa_q4_try(int n,float * s,size_t bs,const void * vx,const void * v
     if (!newa_q4_enabled()) return false;
     const uint32_t phase=ggml_backend_cpu_newa_phase_current();
     if (phase==1) {
-        if (nr<32) return false;
+        return false; // Keep semantic Prefill on the reference body.
     } else if (!newa_q4_phase_batch || (phase!=2 && phase!=3) || nr<4 || nr>=16) {
         return false;
     }
     if (phase==1) newa_q4_candidate(n,s,bs,vx,vy,nr,nc);
     else newa_q4_decode_exact(n,s,bs,vx,vy,nr,nc);
-    if (omp_get_thread_num()==0) newa_q4_calls[phase].fetch_add(1,std::memory_order_relaxed);
+#ifdef GGML_USE_OPENMP
+    const int worker = omp_get_thread_num();
+#else
+    const int worker = ggml_backend_cpu_newa_worker_index();
+#endif
+    if (worker == 0) newa_q4_calls[phase].fetch_add(1, std::memory_order_relaxed);
     return true;
 }

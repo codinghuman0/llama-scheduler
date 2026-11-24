@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 #ifndef NEWA_Q6_POLICY_H
 #define NEWA_Q6_POLICY_H
-#if !defined(__gnu_linux__) || !defined(GGML_USE_OPENMP)
-#error This experiment requires Linux and OpenMP
+#if !defined(__gnu_linux__)
+#error This implementation requires Linux
 #endif
 #include <pthread.h>
 #include "newa-q6-kernel.h"

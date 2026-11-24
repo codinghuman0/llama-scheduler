@@ -1,5 +1,7 @@
 #include "llama-graph.h"
 
+#include "../ggml/src/ggml-impl.h"
+
 #include "llama-impl.h"
 #include "llama-model.h"
 #include "llama-batch.h"
@@ -1338,6 +1340,7 @@ llm_graph_context::llm_graph_context(const llm_graph_params & params) :
     hparams          (params.hparams),
     cparams          (params.cparams),
     ubatch           (params.ubatch),
+    prefill_head64   (params.prefill_head64),
     n_embd           (hparams.n_embd),
     n_layer          (hparams.n_layer()),
     n_layer_nextn    (hparams.n_layer_nextn),
@@ -2468,6 +2471,9 @@ ggml_tensor * llm_graph_context::build_attn_mha(
 
         ggml_flash_attn_ext_add_sinks(cur, sinks);
         ggml_flash_attn_ext_set_prec (cur, GGML_PREC_F32);
+        if (prefill_head64) {
+            ggml_set_op_params_i32(cur, GGML_FLASH_ATTN_EXT_HEAD64, 1);
+        }
 
         if (v_mla) {
 #if 0

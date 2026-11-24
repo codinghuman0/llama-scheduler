@@ -445,6 +445,12 @@ struct lr_opt {
 
 struct ggml_opt_optimizer_params common_opt_lr_pars(void * userdata);
 
+enum common_mixed_prefill_policy {
+    COMMON_MIXED_PREFILL_POLICY_NONE,
+    COMMON_MIXED_PREFILL_POLICY_CAP128,
+    COMMON_MIXED_PREFILL_POLICY_HEAD64,
+};
+
 enum common_server_compute_profile_mode {
     COMMON_SERVER_COMPUTE_PROFILE_MODE_LEGACY,
     COMMON_SERVER_COMPUTE_PROFILE_MODE_AUTO,
@@ -626,6 +632,7 @@ struct common_params {
     bool    cache_idle_slots    = true;  // save and clear idle slots upon starting a new task
     common_server_compute_profile_mode server_compute_profile_mode = COMMON_SERVER_COMPUTE_PROFILE_MODE_LEGACY;
     bool    server_compute_profile_trace = false;
+    common_mixed_prefill_policy mixed_prefill_policy = COMMON_MIXED_PREFILL_POLICY_NONE;
     uint64_t scx_phase_run_id = 0;
     int32_t n_ctx_checkpoints   = 32;    // max number of context checkpoints per slot
     int32_t checkpoint_min_step = 8192;  // minimum spacing between context checkpoints

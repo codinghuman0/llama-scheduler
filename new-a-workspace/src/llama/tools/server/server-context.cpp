@@ -1,6 +1,8 @@
 #include "server-context.h"
 #include "server-phase.h"
+#include "src/llama-ext.h"
 #include "server-scx.h"
+#include "server-threadpool.h"
 #include "newa-prefill-pressure.h"
 #include "server-chat.h"
 #include "server-common.h"
@@ -116,6 +118,7 @@ struct server_slot; // forward declaration
 struct server_batch {
     llama_batch batch;
     bool batch_rendered = false;
+    bool prefill_head64 = false;
 
     struct token {
         int32_t id_slot;
@@ -188,6 +191,7 @@ struct server_batch {
         alora_scale       = -1.0f;
         alora_disabled_id = 0;
         batch_rendered    = false;
+        prefill_head64    = false;
         has_embd          = false;
         if (batch.token == nullptr) {
             batch.token = tokens_ptr;
@@ -979,8 +983,7 @@ private:
     common_init_result_ptr llama_init;
 
     llama_context * ctx_tgt = nullptr;
-    ggml_threadpool_t newa_pool = nullptr;
-    void (*newa_pool_free)(ggml_threadpool_t) = nullptr;
+    server_threadpools newa_pools;
 
     server_batch batch;
 
@@ -1010,10 +1013,12 @@ private:
     int n_empty_consecutive = 0;
     int64_t compute_profile_run_id = 0;
     uint64_t compute_profile_call_id = 0;
-#ifdef LLAMA_SCX_PHASE_HINT
-    server_scx_phase_state scx_phase_state;
+    server_scx_phase_state cpu_phase_state;
+    server_newa_transport phase_transport;
+    server_scx_state_publisher scx_state;
     newa_decode_policy newa_resource;
-#endif
+    bool cap_mixed_prefill = false;
+    uint64_t mixed_prefill_capped_batches = 0;
 
     std::unique_ptr<server_prompt_cache> prompt_cache;
 
@@ -1032,12 +1037,24 @@ private:
 
     int64_t t_last_load_progress_ms = 0;
 
+    void clear_phase() {
+        cpu_phase_state.transition(SERVER_SCX_PHASE_UNKNOWN, server_newa_cpu_phase);
+        if (ctx_tgt && phase_transport.mode == server_newa_transport::state) {
+            llama_synchronize(ctx_tgt);
+            scx_state.publish(phase_transport, SERVER_SCX_PHASE_UNKNOWN, false);
+        }
+    }
+
     void destroy() {
-        if (newa_pool) {
+        clear_phase();
+        newa_resource.reset();
+        if (cap_mixed_prefill && ctx_tgt) {
+            std::fprintf(stderr, "NEWA_MIXED_PREFILL capped_batches=%" PRIu64 "\n", mixed_prefill_capped_batches);
+            mixed_prefill_capped_batches = 0;
+        }
+        if (ctx_tgt && newa_pools.normal) {
             llama_synchronize(ctx_tgt);
             llama_detach_threadpool(ctx_tgt);
-            newa_pool_free(newa_pool);
-            newa_pool = nullptr;
         }
         spec.reset();
         spec_init.reset();
@@ -1046,6 +1063,7 @@ private:
         model_dft = nullptr;
 
         llama_init.reset();
+        newa_pools.reset();
 
         ctx_tgt = nullptr;
         model_tgt = nullptr;
@@ -1121,8 +1139,32 @@ private:
 
         const bool scx_has_spec = std::any_of(params.speculative.types.begin(), params.speculative.types.end(),
                 [](common_speculative_type type) { return type != COMMON_SPECULATIVE_TYPE_NONE; });
-        if (params.scx_phase_run_id && (params.n_gpu_layers != 0 || has_mmproj || has_spec || scx_has_spec || params.embedding)) {
-            SRV_ERR("%s", "SCX phase tracing requires CPU-only text generation without speculative decoding\n");
+        if (!phase_transport.configure(params.scx_phase_run_id)) {
+            SRV_ERR("%s", "invalid or unavailable phase transport/run ID\n");
+            return false;
+        }
+        const char * pool_mode = std::getenv("GGML_NEWA_POOL");
+        const std::string pool = pool_mode ? pool_mode : "off";
+        const bool persistent = pool != "off";
+        if (const char * old_policy = is_resume ? nullptr : std::getenv("NEWA_MIXED_PREFILL_POLICY")) {
+            if (params_base.mixed_prefill_policy != COMMON_MIXED_PREFILL_POLICY_NONE ||
+                    (std::strcmp(old_policy, "cap128") != 0 && std::strcmp(old_policy, "off") != 0)) {
+                SRV_ERR("%s", "invalid or conflicting mixed prefill environment setting\n");
+                return false;
+            }
+            if (std::strcmp(old_policy, "cap128") == 0) {
+                params_base.mixed_prefill_policy = COMMON_MIXED_PREFILL_POLICY_CAP128;
+            }
+        }
+        cap_mixed_prefill = params_base.mixed_prefill_policy != COMMON_MIXED_PREFILL_POLICY_NONE;
+        if (persistent && pool != "on" && pool != "shared" && pool != "roles" && pool != "donor") {
+            SRV_ERR("invalid GGML_NEWA_POOL: %s\n", pool.c_str());
+            return false;
+        }
+        if ((phase_transport.mode == server_newa_transport::state || phase_transport.mode == server_newa_transport::trace ||
+             persistent || cap_mixed_prefill) && (params.n_gpu_layers != 0 || has_mmproj || has_spec || scx_has_spec || params.embedding ||
+                             !params.lora_adapters.empty())) {
+            SRV_ERR("%s", "selected pool/transport requires a single CPU text decoder without adapters or speculation\n");
             return false;
         }
 
@@ -1269,31 +1311,60 @@ private:
             return false;
         }
 
-        const char * pool_mode = std::getenv("GGML_NEWA_POOL");
-        if (pool_mode && std::strcmp(pool_mode, "off") != 0) {
-            if (std::strcmp(pool_mode, "on") != 0) GGML_ABORT("invalid GGML_NEWA_POOL");
-            auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
-            if (!dev) return false;
-            auto * reg = ggml_backend_dev_backend_reg(dev);
-            using create_fn = ggml_threadpool_t (*)(ggml_threadpool_params *);
-            auto create = (create_fn) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_new");
-            newa_pool_free = (void (*)(ggml_threadpool_t)) ggml_backend_reg_get_proc_address(reg, "ggml_threadpool_free");
-            if (!create || !newa_pool_free) return false;
-            const int threads = std::max(params_base.cpuparams.n_threads, params_base.cpuparams_batch.n_threads);
-            auto pool_params = ggml_threadpool_params_default(threads);
-            pool_params.poll = 0;
-            pool_params.paused = true;
-            newa_pool = create(&pool_params);
-            if (!newa_pool) return false;
-            llama_attach_threadpool(ctx_tgt, newa_pool, newa_pool);
-            std::fprintf(stderr, "NEWA_POOL attached=1 threads=%d poll=0\n", threads);
-        } else {
-            std::fprintf(stderr, "NEWA_POOL attached=0\n");
-        }
-
-        if (params.scx_phase_run_id && (llama_model_has_encoder(model_tgt) || !llama_model_has_decoder(model_tgt))) {
-            SRV_ERR("%s", "SCX phase tracing requires a decoder-only model\n");
+        if ((persistent || cap_mixed_prefill || phase_transport.mode == server_newa_transport::state ||
+                phase_transport.mode == server_newa_transport::trace) &&
+                (llama_model_has_encoder(model_tgt) || !llama_model_has_decoder(model_tgt))) {
+            SRV_ERR("%s", "selected pool/transport requires a decoder-only model\n");
             return false;
+        }
+        if (params_base.mixed_prefill_policy == COMMON_MIXED_PREFILL_POLICY_HEAD64 &&
+                (!llama_supports_mixed_prefill_head64(ctx_tgt) ||
+                 params_base.numa != GGML_NUMA_STRATEGY_DISABLED ||
+                 params_base.flash_attn_type != LLAMA_FLASH_ATTN_TYPE_ENABLED)) {
+            SRV_ERR("%s", "head64 requires the supported native CPU model, KV and batch geometry with 6/6 workers\n");
+            return false;
+        }
+        std::fprintf(stderr, "NEWA_MIXED_PREFILL_POLICY effective=%s\n",
+                     params_base.mixed_prefill_policy == COMMON_MIXED_PREFILL_POLICY_HEAD64 ? "head64" :
+                     cap_mixed_prefill ? "cap128" : "off");
+        const bool batch_priority = params_base.cpuparams.priority == GGML_SCHED_PRIO_LOW ||
+                                    params_base.cpuparams_batch.priority == GGML_SCHED_PRIO_LOW;
+        if (batch_priority) {
+#ifdef NEWA_NATIVE_LINUX_ROLE_PRIORITY
+            if (!persistent) {
+                SRV_ERR("%s", "Batch priority requires persistent native CPU pools\n");
+                return false;
+            }
+#else
+            SRV_ERR("%s", "Batch priority requires the native Linux CPU backend\n");
+            return false;
+#endif
+        }
+        if (persistent) {
+            const bool overrides = std::any_of(params_base.tensor_buft_overrides.begin(), params_base.tensor_buft_overrides.end(),
+                [](const llama_model_tensor_buft_override & item) { return item.pattern || item.buft; });
+            if (overrides) {
+                SRV_ERR("%s", "persistent CPU pools do not support tensor buffer overrides\n");
+                return false;
+            }
+            auto cpu = params_base.cpuparams;
+            auto batch_cpu = params_base.cpuparams_batch;
+            if (pool == "on") {
+                cpu.poll = batch_cpu.poll = 0;
+            }
+            auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+            auto * reg = dev ? ggml_backend_dev_backend_reg(dev) : nullptr;
+            if (!newa_pools.init(reg, cpu, batch_cpu, pool == "shared" || pool == "on")) {
+                return false;
+            }
+            llama_attach_threadpool(ctx_tgt, newa_pools.normal, newa_pools.batch);
+        }
+        std::fprintf(stderr, "NEWA_INTEGRATION_V2 pool=%s attached=%d separate=%d transport=%s generation=%d batch=%d\n",
+                     pool.c_str(), int(persistent), int(newa_pools.batch != nullptr), phase_transport.name(),
+                     params_base.cpuparams.n_threads, params_base.cpuparams_batch.n_threads);
+        if (batch_priority) {
+            std::fprintf(stderr, "NEWA_ROLE_PRIORITY generation=%d batch=%d\n",
+                         int(params_base.cpuparams.priority), int(params_base.cpuparams_batch.priority));
         }
 
         vocab = llama_model_get_vocab(model_tgt);
@@ -2876,6 +2947,11 @@ private:
 #endif
 
     void update_slots() {
+        server_scx_reconcile_scope state_scope([this](bool failed) {
+            if (failed || std::none_of(slots.begin(), slots.end(), [](const server_slot & slot) { return slot.is_processing(); })) {
+                clear_phase();
+            }
+        });
 #ifdef DEBUG_TIMINGS
         static int64_t t_prev = 0;
         int64_t t_start = ggml_time_us();
@@ -2902,6 +2978,7 @@ private:
 
             if (all_idle) {
                 newa_resource.reset();
+                clear_phase();
                 SRV_TRC("%s", "all slots are idle\n");
                 return; // skip further processing
 
@@ -3188,13 +3265,38 @@ private:
         auto & alora_scale       = batch.alora_scale;
         auto & alora_disabled_id = batch.alora_disabled_id;
 
+        // Adapted from the donor's cap128 strategy. Leave pure Prefill and Decode alone.
+        const bool limit_prefill = cap_mixed_prefill &&
+            std::any_of(batch.tokens.begin(), batch.tokens.end(), [](const server_batch::token & token) {
+                return token.phase == SERVER_BATCH_PHASE_DECODE;
+            });
+        const int32_t prefill_budget = limit_prefill ? std::min(n_batch, 128) : n_batch;
+        int32_t prefill_added = 0;
+
+        const bool head64_geometry = params_base.mixed_prefill_policy == COMMON_MIXED_PREFILL_POLICY_HEAD64 &&
+                !mctx && !spec && params_base.numa == GGML_NUMA_STRATEGY_DISABLED && params_base.n_gpu_layers == 0 &&
+                params_base.flash_attn_type == LLAMA_FLASH_ATTN_TYPE_ENABLED &&
+                generating.size() == 4 && batch.size() == 4 && n_batch >= 132 &&
+                std::all_of(batch.tokens.begin(), batch.tokens.end(), [](const server_batch::token & tok) {
+                    return tok.phase == SERVER_BATCH_PHASE_DECODE;
+                }) &&
+                std::adjacent_find(batch.tokens.begin(), batch.tokens.end(),
+                    [](const server_batch::token & lhs, const server_batch::token & rhs) {
+                        return rhs.id_slot != lhs.id_slot + 1;
+                    }) == batch.tokens.end() &&
+                std::none_of(generating.begin(), generating.end(), [](const server_slot * slot) { return !slot->lora.empty(); }) &&
+                std::count_if(slots.begin(), slots.end(), [](const server_slot & slot) {
+                    return slot.state == SLOT_STATE_STARTED || slot.state == SLOT_STATE_PROCESSING_PROMPT;
+                }) == 1 &&
+                llama_supports_mixed_prefill_head64(ctx_tgt);
+
         // next, batch any pending prompts without exceeding n_batch
         if (params_base.cont_batching || batch.size() == 0) {
             bool add_ok = true; // false means the batch is full, skip remaining slots
 
             iterate(slots, [&](server_slot & slot) {
-                if (!add_ok || batch.size() >= n_batch) {
-                    return; // batch is full, skip remaining slots
+                if (!add_ok || batch.size() >= n_batch || prefill_added >= prefill_budget) {
+                    return; // batch or mixed prefill budget is full
                 }
 
                 if (!slot.is_processing()) {
@@ -3507,7 +3609,8 @@ private:
 
                     if (!slot.can_split()) {
                         // cannot fit the prompt in the current batch - will try next iter
-                        if (batch.size() + slot.task->n_tokens() > n_batch) {
+                        if (batch.size() + slot.task->n_tokens() > n_batch ||
+                                slot.task->n_tokens() > prefill_budget - prefill_added) {
                             return;
                         }
                     }
@@ -3588,8 +3691,23 @@ private:
                     const auto & spans = slot.task->params.message_spans;
                     const auto last_user_pos = spans.last_user_message_pos();
 
+                    const auto past = slot.prompt.n_tokens();
+                    // A newcomer immediately after the incumbent IDs can join their physical ubatch.
+                    const bool use_head64 = head64_geometry && prefill_added == 0 &&
+                            slot.id != batch.tokens.back().id_slot + 1 &&
+                            slot.task->type == SERVER_TASK_TYPE_COMPLETION &&
+                            !slot.task->is_parent() && !slot.task->is_child() &&
+                            slot.can_split() && !slot.need_embd() && !slot.can_speculate() &&
+                            !slot.task->params.cache_prompt && slot.n_prompt_tokens_cache == 0 &&
+                            !do_checkpoint && !has_mtmd && slot.lora.empty() && alora_scale <= 0 &&
+                            slot.task->n_tokens() == 6144 && past >= 2048 && past <= 6080 && past % 64 == 0 &&
+                            slot.prompt.tokens.pos_next() == past &&
+                            llama_memory_seq_pos_min(llama_get_memory(ctx_tgt), slot.id) == 0 &&
+                            llama_memory_seq_pos_max(llama_get_memory(ctx_tgt), slot.id) == past - 1;
+                    const int32_t slot_budget = use_head64 ? 64 : prefill_budget;
                     // add prompt tokens for processing in the current batch
-                    while (slot.prompt.n_tokens() < slot.task->n_tokens() && batch.size() < n_batch) {
+                    while (slot.prompt.n_tokens() < slot.task->n_tokens() && batch.size() < n_batch &&
+                            prefill_added < slot_budget) {
                         // get next token to process
                         llama_token cur_tok = input_tokens[slot.prompt.n_tokens()];
                         if (cur_tok == LLAMA_TOKEN_NULL) {
@@ -3616,6 +3734,10 @@ private:
                         slot.prompt.tokens.push_back(cur_tok);
 
                         slot.n_prompt_tokens_processed++;
+                        ++prefill_added;
+                        if (limit_prefill && prefill_added == 128) {
+                            ++mixed_prefill_capped_batches;
+                        }
 
                         // break at the last user message, or at user messages at least min step past the last checkpoint
                         if (do_checkpoint && spans.is_user_start(slot.prompt.n_tokens())) {
@@ -3651,6 +3773,9 @@ private:
 
                     // the number of tokens added to the batch for the current slot
                     const auto n_tokens_cur = batch.size() - n_tokens_prev;
+                    if (use_head64 && n_tokens_cur == 64) {
+                        batch.prefill_head64 = true;
+                    }
 
                     const auto n_tokens_start = slot.prompt.n_tokens() - n_tokens_cur;
 
@@ -3741,24 +3866,16 @@ private:
 
         const auto profile_mode = params_base.server_compute_profile_mode;
         const bool trace_profile = params_base.server_compute_profile_trace;
-#ifdef LLAMA_SCX_PHASE_HINT
-        const bool classify_phase = true;
-#else
-        const bool classify_phase = trace_profile || params_base.scx_phase_run_id || profile_mode == COMMON_SERVER_COMPUTE_PROFILE_MODE_PHASE;
-#endif
-
         int32_t n_prefill = 0;
         int32_t n_decode  = 0;
-        int32_t n_unknown = classify_phase ? 0 : batch_view.n_tokens;
-        if (classify_phase) {
-            for (int32_t i = off; i < off + batch_view.n_tokens; ++i) {
-                const auto & token = batch.tokens[i];
-                switch (token.phase) {
-                    case SERVER_BATCH_PHASE_PREFILL: n_prefill++; break;
-                    case SERVER_BATCH_PHASE_DECODE:  n_decode++;  break;
-                    case SERVER_BATCH_PHASE_UNKNOWN: n_unknown++; break;
-                    case SERVER_BATCH_PHASE_MIXED:   GGML_ABORT("MIXED is not a token source");
-                }
+        int32_t n_unknown = 0;
+        for (int32_t i = off; i < off + batch_view.n_tokens; ++i) {
+            const auto & token = batch.tokens[i];
+            switch (token.phase) {
+                case SERVER_BATCH_PHASE_PREFILL: n_prefill++; break;
+                case SERVER_BATCH_PHASE_DECODE:  n_decode++;  break;
+                case SERVER_BATCH_PHASE_UNKNOWN: n_unknown++; break;
+                case SERVER_BATCH_PHASE_MIXED: GGML_ABORT("MIXED is not a token source");
             }
         }
 
@@ -3780,8 +3897,11 @@ private:
             requested_profile = newa_resource.select(phase, batch_view, batch.tokens, off, ctx_tgt, requested_profile);
         }
 
+        const bool head64_call = batch.prefill_head64 && off == 0 && retry == 0 &&
+                n_decode == 4 && n_prefill == 64 && n_unknown == 0;
+
 #ifdef LLAMA_SCX_PHASE_TRACE
-        const uint64_t call_id = trace_profile || params_base.scx_phase_run_id ? ++compute_profile_call_id : 0;
+        const uint64_t call_id = trace_profile || phase_transport.mode == server_newa_transport::trace ? ++compute_profile_call_id : 0;
 #else
         const uint64_t call_id = trace_profile ? ++compute_profile_call_id : 0;
 #endif
@@ -3815,22 +3935,34 @@ private:
                     compute_profile_run_id, call_id, retry, off, batch_view.n_tokens, n_prefill, n_decode, n_unknown,
                     server_batch_phase_name(phase), server_compute_profile_mode_name(profile_mode),
                     use_options ? server_compute_profile_name(requested_profile) : "LEGACY", slots_text.c_str(), tasks_text.c_str(), t_start_us);
+            if (head64_call) {
+                SRV_INF("mixed_prefill_head64: call=%" PRIu64 " slot=%d pos=%d\n",
+                        call_id, batch.tokens.back().id_slot, batch.tokens[4].pos);
+            }
         }
 
 #ifdef LLAMA_SCX_PHASE_TRACE
-        server_scx_scope scx_scope(ctx_tgt, { 1, params_base.scx_phase_run_id, call_id, uint64_t(retry),
-                uint64_t(phase), uint64_t(requested_profile), uint64_t(n_prefill), uint64_t(n_decode), uint64_t(n_unknown), -1 });
+        server_scx_scope scx_scope(ctx_tgt, { 1, phase_transport.mode == server_newa_transport::trace ? phase_transport.run_id : 0,
+                call_id, uint64_t(retry), uint64_t(phase), uint64_t(requested_profile), uint64_t(n_prefill),
+                uint64_t(n_decode), uint64_t(n_unknown), -1 });
 #endif
-#ifdef LLAMA_SCX_PHASE_HINT
-        scx_phase_state.transition(static_cast<server_scx_phase>(phase), llama_scx_phase_v1);
-#endif
+        cpu_phase_state.transition(static_cast<server_scx_phase>(phase), [this](uint32_t value) {
+            server_newa_cpu_phase(value);
+            phase_transport.emit_scalar(value);
+        });
+        const bool state_active = phase_transport.mode == server_newa_transport::state;
+        server_scx_state_sync state_sync(ctx_tgt, state_active);
+        if (state_active) {
+            scx_state.publish(phase_transport, uint32_t(phase), true);
+        }
         int ret;
         newa_resource.begin();
         try {
-            if (use_options) {
+            if (head64_call || use_options) {
                 auto options = llama_decode_default_options();
                 options.compute_profile = requested_profile;
-                ret = llama_decode_with_options(ctx_tgt, batch_view, options);
+                ret = head64_call ? llama_decode_with_mixed_prefill_head64(ctx_tgt, batch_view, options) :
+                                    llama_decode_with_options(ctx_tgt, batch_view, options);
             } else {
                 ret = llama_decode(ctx_tgt, batch_view);
             }
@@ -3839,6 +3971,8 @@ private:
             throw;
         }
         newa_resource.finish(ret);
+        state_sync.finish();
+        if (ret < 0) clear_phase();
 
         const int64_t t_return_us = trace_profile ? ggml_time_us() : 0;
 #ifdef LLAMA_SCX_PHASE_TRACE

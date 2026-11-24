@@ -489,6 +489,10 @@ uint32_t ggml_backend_cpu_newa_phase_current(void) {
 #if !defined(GGML_USE_OPENMP) && defined(__gnu_linux__)
 #include "newa-barrier.h"
 static _Thread_local int newa_worker_index;
+int ggml_backend_cpu_newa_worker_index(void);
+int ggml_backend_cpu_newa_worker_index(void) {
+    return newa_worker_index;
+}
 static _Thread_local uint32_t newa_worker_phase;
 static _Thread_local unsigned int newa_worker_spins;
 
@@ -2702,29 +2706,43 @@ static bool ggml_thread_apply_affinity(const bool * mask) {
     return true;
 }
 
-static bool ggml_thread_apply_priority(int32_t prio) {
-    struct sched_param p;
-    int32_t policy = SCHED_OTHER;
-    switch (prio) {
-        case GGML_SCHED_PRIO_LOW:      policy = SCHED_BATCH; p.sched_priority = 0;  break;
-        case GGML_SCHED_PRIO_NORMAL:   policy = SCHED_OTHER; p.sched_priority = 0;  break;
-        case GGML_SCHED_PRIO_MEDIUM:   policy = SCHED_FIFO;  p.sched_priority = 40; break;
-        case GGML_SCHED_PRIO_HIGH:     policy = SCHED_FIFO;  p.sched_priority = 80; break;
-        case GGML_SCHED_PRIO_REALTIME: policy = SCHED_FIFO;  p.sched_priority = 90; break;
+static bool ggml_thread_set_linux_priority(int policy, int priority) {
+    const struct sched_param param = { .sched_priority = priority };
+    const int error = pthread_setschedparam(pthread_self(), policy, &param);
+    if (error) {
+        fprintf(stderr, "warn: failed to set thread priority policy=%d priority=%d: %s (%d)\n",
+                policy, priority, strerror(error), error);
     }
+    return error == 0;
+}
 
-    if (prio == GGML_SCHED_PRIO_NORMAL) {
-        // Keep inherited policy/priority
+static bool ggml_thread_enter_batch_priority(bool * restore) {
+    const int inherited = sched_getscheduler(0);
+    if (inherited == SCHED_BATCH) {
         return true;
     }
-
-    int32_t err = pthread_setschedparam(pthread_self(), policy, &p);
-    if (err != 0) {
-        fprintf(stderr, "warn: failed to set thread priority %d : %s (%d)\n", prio, strerror(err), err);
+    if (inherited != SCHED_OTHER) {
+        fprintf(stderr, "warn: failed to set thread priority: Batch requires an ordinary Linux caller\n");
         return false;
     }
-
+    if (!ggml_thread_set_linux_priority(SCHED_BATCH, 0)) {
+        return false;
+    }
+    if (restore) {
+        *restore = true;
+    }
     return true;
+}
+
+static bool ggml_thread_apply_priority(int32_t prio) {
+    switch (prio) {
+        case GGML_SCHED_PRIO_LOW:      return ggml_thread_enter_batch_priority(NULL);
+        case GGML_SCHED_PRIO_NORMAL:   return true; // Keep inherited policy/priority.
+        case GGML_SCHED_PRIO_MEDIUM:   return ggml_thread_set_linux_priority(SCHED_FIFO, 40);
+        case GGML_SCHED_PRIO_HIGH:     return ggml_thread_set_linux_priority(SCHED_FIFO, 80);
+        case GGML_SCHED_PRIO_REALTIME: return ggml_thread_set_linux_priority(SCHED_FIFO, 90);
+    }
+    return false;
 }
 
 #else // unsupported platforms
@@ -2770,12 +2788,9 @@ static void ggml_thread_cpumask_next(const bool * global_mask, bool * local_mask
     }
 }
 
-void ggml_threadpool_free(struct ggml_threadpool* threadpool) {
-    if (!threadpool) return;
-
-    const int n_threads = threadpool->n_threads;
-
 #ifndef GGML_USE_OPENMP
+// The last initialized index may be below n_threads after a create failure.
+static void ggml_threadpool_stop_workers(struct ggml_threadpool * threadpool, int initialized) {
     struct ggml_compute_state* workers = threadpool->workers;
 
     ggml_mutex_lock(&threadpool->mutex);
@@ -2786,7 +2801,7 @@ void ggml_threadpool_free(struct ggml_threadpool* threadpool) {
     ggml_cond_broadcast(&threadpool->cond);
     ggml_mutex_unlock(&threadpool->mutex);
 
-    for (int j = 1; j < n_threads; j++) {
+    for (int j = 1; j < initialized; j++) {
         int32_t rc = ggml_thread_join(workers[j].thrd, NULL);
         GGML_ASSERT(rc == GGML_EXIT_SUCCESS || rc == GGML_EXIT_ABORTED);
         UNUSED(rc);
@@ -2794,7 +2809,16 @@ void ggml_threadpool_free(struct ggml_threadpool* threadpool) {
 
     ggml_mutex_destroy(&threadpool->mutex);
     ggml_cond_destroy(&threadpool->cond);
-#endif // GGML_USE_OPENMP
+}
+#endif
+
+void ggml_threadpool_free(struct ggml_threadpool* threadpool) {
+    if (!threadpool) return;
+
+    const int n_threads = threadpool->n_threads;
+#ifndef GGML_USE_OPENMP
+    ggml_threadpool_stop_workers(threadpool, n_threads);
+#endif
 
 #if !defined(GGML_USE_OPENMP) && defined(__gnu_linux__)
     const struct newa_barrier_state * barrier = &threadpool->newa_barrier;
@@ -3348,6 +3372,16 @@ static thread_ret_t ggml_graph_compute_secondary_thread(void* data) {
     return (thread_ret_t) 0;
 }
 
+static void ggml_threadpool_apply_caller_priority(struct ggml_threadpool * threadpool) {
+#ifdef __gnu_linux__
+    // The caller also serves the other role. Scope LOW to graph computation.
+    if (threadpool->prio == GGML_SCHED_PRIO_LOW) {
+        return;
+    }
+#endif
+    ggml_thread_apply_priority(threadpool->prio);
+}
+
 // Start processing new graph
 static void ggml_graph_compute_kickoff(struct ggml_threadpool * threadpool, int n_threads)
 {
@@ -3367,7 +3401,7 @@ static void ggml_graph_compute_kickoff(struct ggml_threadpool * threadpool, int 
 
     if (threadpool->pause) {
        // Update main thread prio and affinity to match the threadpool settings
-       ggml_thread_apply_priority(threadpool->prio);
+       ggml_threadpool_apply_caller_priority(threadpool);
        if (ggml_thread_cpumask_is_valid(threadpool->workers[0].cpumask)) {
            ggml_thread_apply_affinity(threadpool->workers[0].cpumask);
        }
@@ -3388,8 +3422,15 @@ static struct ggml_threadpool * ggml_threadpool_new_impl(
                struct ggml_cgraph * cgraph,
                 struct ggml_cplan * cplan) {
 
+    if (tpp->n_threads < 1 || (uint32_t) tpp->n_threads > GGML_THREADPOOL_N_THREADS_MASK) {
+        GGML_LOG_ERROR("%s: invalid thread count %d\n", __func__, tpp->n_threads);
+        return NULL;
+    }
     struct ggml_threadpool * threadpool =
         ggml_aligned_malloc(sizeof(struct ggml_threadpool));
+    if (!threadpool) {
+        return NULL;
+    }
     {
         threadpool->cgraph           = cgraph;
         threadpool->cplan            = cplan;
@@ -3429,6 +3470,10 @@ static struct ggml_threadpool * ggml_threadpool_new_impl(
     // Allocate and init workers state
     const size_t workers_size = sizeof(struct ggml_compute_state) * tpp->n_threads;
     struct ggml_compute_state * workers = ggml_aligned_malloc(workers_size);
+    if (!workers) {
+        ggml_aligned_free(threadpool, sizeof(struct ggml_threadpool));
+        return NULL;
+    }
 
     memset(workers, 0, workers_size);
     for (int j = 0; j < tpp->n_threads; j++) {
@@ -3446,8 +3491,22 @@ static struct ggml_threadpool * ggml_threadpool_new_impl(
         ggml_thread_cpumask_next(tpp->cpumask, workers[j].cpumask, tpp->strict_cpu, &cpumask_iter);
     }
 #else // GGML_USE_OPENMP
+#ifdef _WIN32
     ggml_mutex_init(&threadpool->mutex);
     ggml_cond_init(&threadpool->cond);
+#else
+    int error = ggml_mutex_init(&threadpool->mutex);
+    if (error) {
+        GGML_LOG_ERROR("%s: mutex initialization failed: %s\n", __func__, strerror(error));
+        goto free_pool;
+    }
+    error = ggml_cond_init(&threadpool->cond);
+    if (error) {
+        GGML_LOG_ERROR("%s: condition initialization failed: %s\n", __func__, strerror(error));
+        ggml_mutex_destroy(&threadpool->mutex);
+        goto free_pool;
+    }
+#endif
 
     // Spin the threads for all workers, and update CPU placements.
     // Place the main thread last (towards the higher numbered CPU cores).
@@ -3458,14 +3517,18 @@ static struct ggml_threadpool * ggml_threadpool_new_impl(
         ggml_thread_cpumask_next(tpp->cpumask, workers[j].cpumask, tpp->strict_cpu, &cpumask_iter);
 
         int32_t rc = ggml_thread_create(&workers[j].thrd, NULL, ggml_graph_compute_secondary_thread, &workers[j]);
-        GGML_ASSERT(rc == 0);
+        if (rc != 0) {
+            GGML_LOG_ERROR("%s: worker %d creation failed: %s\n", __func__, j, strerror(rc));
+            ggml_threadpool_stop_workers(threadpool, j);
+            goto free_pool;
+        }
     }
 
     ggml_thread_cpumask_next(tpp->cpumask, workers[0].cpumask, tpp->strict_cpu, &cpumask_iter);
 
     if (!threadpool->pause) {
         // Update main thread prio and affinity at the start, otherwise we'll do it in resume
-        ggml_thread_apply_priority(threadpool->prio);
+        ggml_threadpool_apply_caller_priority(threadpool);
         if (ggml_thread_cpumask_is_valid(threadpool->workers[0].cpumask)) {
             ggml_thread_apply_affinity(threadpool->workers[0].cpumask);
         }
@@ -3473,6 +3536,13 @@ static struct ggml_threadpool * ggml_threadpool_new_impl(
 #endif // GGML_USE_OPENMP
 
     return threadpool;
+
+#ifndef GGML_USE_OPENMP
+free_pool:
+    ggml_aligned_free(workers, workers_size);
+    ggml_aligned_free(threadpool, sizeof(struct ggml_threadpool));
+    return NULL;
+#endif
 }
 
 struct ggml_threadpool * ggml_threadpool_new(struct ggml_threadpool_params * tpp) {
@@ -3498,6 +3568,9 @@ enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cpl
 
         struct ggml_threadpool_params ttp = ggml_threadpool_params_default(n_threads);
         threadpool = ggml_threadpool_new_impl(&ttp, cgraph, cplan);
+        if (!threadpool) {
+            return GGML_STATUS_ALLOC_FAILED;
+        }
     } else {
         // Reset some of the parameters that need resetting
         // No worker threads should be accessing the parameters below at this stage
@@ -3539,11 +3612,23 @@ enum ggml_status ggml_graph_compute(struct ggml_cgraph * cgraph, struct ggml_cpl
         n_threads = threadpool->n_threads;
     }
 
+#ifdef __gnu_linux__
+    bool restore_caller_priority = false;
+    if (threadpool->prio == GGML_SCHED_PRIO_LOW && !ggml_thread_enter_batch_priority(&restore_caller_priority)) {
+        return GGML_STATUS_FAILED;
+    }
+#endif
+
     // Kick all threads to start the new graph
     ggml_graph_compute_kickoff(threadpool, n_threads);
 
     // This is a work thread too
     ggml_graph_compute_thread(&threadpool->workers[0]);
+#ifdef __gnu_linux__
+    if (restore_caller_priority && !ggml_thread_set_linux_priority(SCHED_OTHER, 0)) {
+        threadpool->ec = GGML_STATUS_FAILED;
+    }
+#endif
 #endif
 
     // don't leave affinity set on the main thread

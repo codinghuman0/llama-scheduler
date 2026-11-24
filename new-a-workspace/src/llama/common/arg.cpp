@@ -1554,9 +1554,9 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
     ));
     add_opt(common_arg(
         {"--prio-batch"}, "N",
-        string_format("set process/thread priority : 0-normal, 1-medium, 2-high, 3-realtime (default: %d)\n", params.cpuparams_batch.priority),
+        string_format("set batch thread priority : low(-1), normal(0), medium(1), high(2), realtime(3) (default: %d)\n", params.cpuparams_batch.priority),
         [](common_params & params, int prio) {
-            if (prio < 0 || prio > 3) {
+            if (prio < GGML_SCHED_PRIO_LOW || prio > GGML_SCHED_PRIO_REALTIME) {
                 throw std::invalid_argument("invalid value");
             }
             params.cpuparams_batch.priority = (enum ggml_sched_priority) prio;
@@ -3489,6 +3489,21 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.server_compute_profile_mode = parse_server_compute_profile_mode(value);
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_SERVER_COMPUTE_PROFILE_MODE"));
+    add_opt(common_arg(
+        {"--mixed-prefill-policy"}, "MODE",
+        "experimental mixed-batch prefill policy: none, cap128, or head64 (default: none; head64 falls back to cap128)",
+        [](common_params & params, const std::string & value) {
+            if (value == "none") {
+                params.mixed_prefill_policy = COMMON_MIXED_PREFILL_POLICY_NONE;
+            } else if (value == "cap128") {
+                params.mixed_prefill_policy = COMMON_MIXED_PREFILL_POLICY_CAP128;
+            } else if (value == "head64") {
+                params.mixed_prefill_policy = COMMON_MIXED_PREFILL_POLICY_HEAD64;
+            } else {
+                throw std::invalid_argument("expected one of: none, cap128, head64");
+            }
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER}));
     add_opt(common_arg(
         {"--server-compute-profile-trace"},
         "log semantic batch phases and synchronize traced decode calls (default: disabled)",

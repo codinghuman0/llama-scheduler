@@ -160,10 +160,12 @@ struct llama_context {
                     llm_graph_type   gtype,
             llama_memory_context_i * mctx,
                        ggml_status & ret,
-             llama_compute_profile   compute_profile);
+             llama_compute_profile   compute_profile,
+                              bool   prefill_head64 = false);
 
+    bool supports_mixed_prefill_head64() const;
     int encode(const llama_batch & batch_inp);
-    int decode(const llama_batch & batch_inp, llama_compute_profile compute_profile);
+    int decode(const llama_batch & batch_inp, llama_compute_profile compute_profile, bool prefill_head64 = false);
 
     //
     // state save/load

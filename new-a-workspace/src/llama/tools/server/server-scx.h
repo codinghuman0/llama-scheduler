@@ -1,14 +1,65 @@
 #pragma once
 
-#ifdef LLAMA_SCX_PHASE_HINT
 #include "server-phase.h"
+#include "newa-state-abi.h"
 #include "ggml-backend.h"
+#include "llama.h"
+#include <exception>
 
-extern "C" {
-void llama_scx_phase_v1(uint32_t phase);
+struct server_newa_transport {
+    enum kind { off, scalar, state, trace };
+    kind mode = off;
+    uint64_t run_id = 0;
+    bool state_log = false;
 
-__attribute__((noinline, used, visibility("default")))
-void llama_scx_phase_v1(uint32_t phase) {
+    bool configure(uint64_t trace_id);
+    const char * name() const;
+    void emit_scalar(uint32_t phase) const;
+    void emit_state(const server_scx_state_v2 & event) const;
+};
+
+class server_scx_state_publisher {
+    uint64_t sequence = 0;
+    uint32_t last_phase = 0;
+    bool last_active = false;
+
+public:
+    void publish(const server_newa_transport & transport, uint32_t phase, bool active) {
+        if (!active) phase = 0;
+        if (last_phase == phase && last_active == active) return;
+        transport.emit_state({2, phase, uint32_t(active), 0, transport.run_id, ++sequence});
+        last_phase = phase;
+        last_active = active;
+    }
+};
+
+template<typename Reconcile>
+class server_scx_reconcile_scope {
+    Reconcile reconcile;
+    int exceptions = std::uncaught_exceptions();
+public:
+    explicit server_scx_reconcile_scope(Reconcile reconcile) : reconcile(reconcile) {}
+    server_scx_reconcile_scope(const server_scx_reconcile_scope &) = delete;
+    ~server_scx_reconcile_scope() { reconcile(std::uncaught_exceptions() > exceptions); }
+};
+
+class server_scx_state_sync {
+    llama_context * ctx;
+public:
+    server_scx_state_sync(llama_context * ctx, bool enabled) : ctx(enabled ? ctx : nullptr) {
+        if (this->ctx) llama_synchronize(this->ctx);
+    }
+    server_scx_state_sync(const server_scx_state_sync &) = delete;
+    void finish() {
+        if (ctx) {
+            llama_synchronize(ctx);
+            ctx = nullptr;
+        }
+    }
+    ~server_scx_state_sync() { finish(); }
+};
+
+inline void server_newa_cpu_phase(uint32_t phase) {
     using phase_fn = void (*)(uint32_t);
     static phase_fn update = [] {
         auto * dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
@@ -17,10 +68,7 @@ void llama_scx_phase_v1(uint32_t phase) {
         return (phase_fn) ggml_backend_reg_get_proc_address(reg, "ggml_backend_cpu_newa_phase");
     }();
     if (update) update(phase);
-    __asm__ __volatile__("nop" : : "r"(phase) : "memory");
 }
-}
-#endif
 
 #ifdef LLAMA_SCX_PHASE_TRACE
 #include "llama.h"
@@ -44,17 +92,6 @@ static_assert(sizeof(server_scx_event) == 80, "SCX phase ABI v1");
 extern "C" {
 void llama_scx_decode_begin_v1(const server_scx_event * event);
 void llama_scx_decode_end_v1(const server_scx_event * event);
-
-__attribute__((noinline, used, visibility("default")))
-void llama_scx_decode_begin_v1(const server_scx_event * event) {
-    __asm__ __volatile__("nop" : : "r"(event) : "memory");
-}
-
-__attribute__((noinline, used, visibility("default")))
-void llama_scx_decode_end_v1(const server_scx_event * event) {
-    __asm__ __volatile__("nop; nop" : : "r"(event) : "memory");
-}
-
 }
 
 class server_scx_scope {

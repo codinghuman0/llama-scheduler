@@ -1,5 +1,23 @@
 # Status
 
+## 2026-11-24: integration-v2 development
+
+The separate integration-v2 worktree builds the R numerical path, semantic
+resource decisions, selectable persistent CPU pools, and optional state-v2
+publication from its own source tree. The canonical run command verifies build
+inputs and mapped project libraries. The first AMD OpenMP and native composition
+checks passed. An awake/resumed token difference in a multi-cohort visit was
+reproduced in unchanged rebuilt B0 and A. Matched-history comparisons across the
+three runtimes are exact, and separate fresh-server heldout visits match the
+preserved output prefixes.
+
+The topology donor contributes CPUID and hybrid configuration. Current-kernel
+FULL/Lite objects, loader, selected-child and receiver tests compiled. A manual
+kernel checkpoint is needed for native verifier and state delivery evidence.
+Intel native execution is pending. Current evidence, failures, and remaining
+steps are recorded in the
+[integration report](../new-a-workspace/experiments/team-integration-v2/professor-integration-report.ko.md).
+
 ## 2026-11-23: preserved NEW_A workspace and Intel handoff
 
 Added `new-a-workspace/` alongside the existing base project, preserving its
@@ -322,3 +340,17 @@ validation logs, request/response, environment and isolation records, and the
 final instrumentation report. Targeted cleanup runs on success, failure,
 SIGINT, and SIGTERM and verifies sched_ext returns to disabled. No scheduling
 policy dimension is changed in M11R.
+
+## Integration v2 CPU runtime and selected-child strategies
+
+AMD OpenMP and native clean builds used the same canonical source and verified
+exact model fixtures, lifecycle, pool recovery and manual BPF preparation.
+Adaptive and fixed thread roles, persistent pool, native Batch priority/park,
+SSE, mixed cap128 and scoped head64 are summarized in the integration report.
+
+The current kernel admits preparation of FULL and Lite configurations with
+observe, Decode handoff and two previous-CPU strategies. These are compiled,
+with kernel verifier, attachment, real dispatch and detach pending operator
+execution. Intel uses the same source recipe and still needs native validation.
+
+See [the Intel handoff and kernel procedure](../new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md).

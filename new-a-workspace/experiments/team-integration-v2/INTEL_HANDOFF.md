@@ -4,19 +4,31 @@ GitHub 저장소의 `integration-v2` 브랜치에서 실행합니다. 원본 모
 
 Ubuntu 일반 계정에서 GCC/G++, CMake, Make, Python 3.10+, Git, util-linux와 OpenSSL 개발 패키지가 필요합니다. Intel 하드웨어별 설정에는 CPU별 CPUID와 sysfs topology를 함께 사용합니다. 현재 허용 CPU의 P/E, SMT, cpuset과 보이는 cgroup 제한을 기록합니다. 전원이나 BIOS 설정이 달라지면 동일한 i5 모델이어도 결과가 달라질 수 있습니다.
 
-## 같은 소스에서 재빌드
+## 기존 클론 업데이트
 
-`~/projects`에 `model.gguf`가 있는 Intel PC에서 아래 블록을 실행합니다. GitHub 인증은 팀원의 저장소 접근 권한을 사용합니다.
+`~/projects/llama-scheduler`에 `main`을 클론해 둔 Intel PC에서는 기존 디렉터리에서 `integration-v2`를 가져옵니다. `main`만 가져온 클론에도 적용됩니다. 브랜치 전환에서 충돌하는 로컬 파일이 있거나 기존 `integration-v2`의 이력이 갈라졌다면 Git이 해당 단계에서 중단합니다.
 
 ```bash
 (
   set -euo pipefail
-  cd "$HOME/projects"
-  test -r model.gguf
-  git clone --branch integration-v2 --single-branch https://github.com/codinghuman0/llama-scheduler.git
-  cd llama-scheduler/new-a-workspace
-  bash scripts/intel-integration-v2-smoke.sh "$HOME/projects/model.gguf" intel-validation-01
+  cd "$HOME/projects/llama-scheduler"
+  git fetch --no-tags origin refs/heads/integration-v2
+  if git show-ref --verify --quiet refs/heads/integration-v2; then
+    git switch --no-overwrite-ignore integration-v2
+    git merge --ff-only --no-overwrite-ignore FETCH_HEAD
+  else
+    git switch --no-overwrite-ignore -c integration-v2 FETCH_HEAD
+  fi
 )
+```
+
+처음 설치하는 PC에서는 `~/projects`에서 `git clone --branch integration-v2 --single-branch https://github.com/codinghuman0/llama-scheduler.git`을 사용합니다. 두 경우 모두 `$HOME/projects/model.gguf`를 그대로 읽습니다. 실행 시 해당 PC에서 새 바이너리를 빌드하고 `new-a-workspace/state/integration-v2/`에 저장합니다.
+
+## 같은 소스에서 재빌드
+
+```bash
+cd "$HOME/projects/llama-scheduler/new-a-workspace"
+bash scripts/intel-integration-v2-smoke.sh "$HOME/projects/model.gguf" intel-validation-01
 ```
 
 스크립트는 build 입력과 doctor 결과 ZIP 하나, fixture별 실행 결과 ZIP 세 개와 SHA256 sidecar를 만듭니다. 직접 단계별로 실행할 경우 아래 명령을 사용합니다.

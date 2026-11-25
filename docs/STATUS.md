@@ -2,6 +2,8 @@
 
 ## Intel and AMD release entry point
 
+The public `placement` entry point completed 36 new Ryzen 5 5500U visits on AC, including 24 successful selected-child kernel visits. Eight-request throughput changes against Linux were −0.58% in ambient and −0.63% under cpu25. The separate native m4 `head64` smoke increased throughput by 6.99% in one pair with identical output tokens. [Portable AMD results](../new-a-workspace/experiments/amd-prefill-placement-ac-v1/portable-amd-recheck.md)
+
 The published launcher prepared both kernel policies from a new shallow clone and from an existing single-branch `main` checkout. Updating kept the original `.git` directory, local `main` branch and untracked team file. A second invocation found the checkout up to date and reused the verified build. The historical AMD comparison's option parser resolves `integrated-runtime-research` and `amd-5-6`, and both saved B0 campaigns reproduce from their raw responses.
 
 `scripts/run-cpu-experiment.sh` clones the shallow `integration-v2` branch or fast-forwards an existing checkout and runs the requested experiment. The CPU smoke, native m4 comparison, FULL kernel smoke and Lite placement comparison discover the local CPU envelope. The public modes use Korean diagnostics and have no temperature sensor, free-disk, free-RAM or AC admission threshold. An available external power reading is recorded in portable placement results. The fixed original AMD protocol still requires AC when invoked explicitly for historical reproduction.

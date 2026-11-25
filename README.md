@@ -25,6 +25,8 @@ bash "$runner" smoke
 
 온도 센서와 고정 디스크·RAM 여유량을 검사하지 않습니다. 데스크톱에 AC 정보가 없어도 공용 실험은 진행합니다. 파일 쓰기·할당·권한 오류는 실제로 발생한 단계에서 한국어로 안내하며 외부 도구의 원문은 로그에 보관합니다. [팀원 실행 안내](new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md) · [AMD 런타임 측정](new-a-workspace/experiments/amd-published-direct-v1/result-summary.md) · [AMD 커널 배치 측정](new-a-workspace/experiments/amd-prefill-placement-ac-v1/result-summary.md)
 
+Ryzen 5 5500U에서 이 스크립트로 반복한 36회 스케줄러 비교와 별도 `m4` 지연시간 측정을 확인할 수 있습니다. [AMD 실측 보고서](new-a-workspace/experiments/amd-prefill-placement-ac-v1/portable-amd-recheck.md)
+
 ## Historical Base Project
 
 CPU-only llama.cpp semantic phase-aware `sched_ext` Base Project

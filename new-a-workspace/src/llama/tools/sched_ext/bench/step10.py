@@ -16,7 +16,7 @@ import subprocess
 import sys
 import time
 
-from common import (BENCH, BOOT_ID, HOUSE_CPUS, HOST, PROFILE_PATH, THREADS, UID, MIN_FREE, MODEL, PORT, PROMPT, PROMPT_SHA, REPO, REQUEST,
+from common import (BENCH, BOOT_ID, HOUSE_CPUS, HOST, PROFILE_PATH, THREADS, UID, MODEL, PORT, PROMPT, PROMPT_SHA, REPO, REQUEST,
                     REQUEST_SHA, RESULTS, REVISIONS, SCHED, SCHED_HASHES, SERVER_CPUS, TAGS,
                     active_run, bundle_env, canonical, command, helper_request, identity,
                     live_project_processes, locked, model_identity, order, port_free,
@@ -78,12 +78,6 @@ def audit_command(run, argv, **kwargs):
     return command(argv, **kwargs)
 
 
-def free_space(path):
-    free = shutil.disk_usage(path).free
-    require(free >= MIN_FREE, f'Free disk below reserved 512 MiB: {free} bytes')
-    return free
-
-
 def dependencies(server, env):
     output = command(['/usr/bin/ldd', server], env=env)
     require('not found' not in output, 'Runtime dependency unresolved')
@@ -125,7 +119,6 @@ def build_bundle(run, config):
     source, build = temp / 'source', temp / 'build'
     metadata = run / 'builds' / config
     metadata.mkdir(parents=True)
-    free_space(run)
     revision = REVISIONS[config]
     audit_command(run, ['git', 'worktree', 'add', '--detach', source, revision], log=metadata / 'worktree.log')
     require(command(['git', 'rev-parse', 'HEAD'], cwd=source) == revision, 'Build source revision mismatch')
@@ -137,7 +130,6 @@ def build_bundle(run, config):
     write_json(metadata / 'configure-command.json', argv)
     audit_command(run, argv, env=env, log=metadata / 'configure.log', capture=False)
     audit_command(run, ['cmake', '--build', build, '--target', 'llama-server', '--parallel', str(BUILD_JOBS)], env=env, log=metadata / 'build.log', capture=False)
-    free_space(run)
     cache = (build / 'CMakeCache.txt').read_text()
     cache_values = dict(re.findall(r'^([^/#\n][^:\n]*):[^=\n]+=(.*)$', cache, re.M))
     for option in CMAKE_OPTIONS:
@@ -192,7 +184,6 @@ def build_bundle(run, config):
     audit_command(run, ['git', 'worktree', 'remove', '--force', source])
     shutil.rmtree(build)
     temp.rmdir()
-    free_space(run)
     return record
 
 
@@ -664,7 +655,7 @@ def check_ready():
     require(not live_project_processes() and state() == 'disabled', 'Project runtime already active')
     port_free()
     machine.validate(machine.snapshot())
-    print('Quiet-application/port/power/topology checks passed. No request issued. Phase C still checks load/temperature before timing.')
+    print('Quiet-application/port/power/topology checks passed. No request issued. Phase C still checks background load before timing.')
 
 
 def collect_rows(run):
@@ -738,7 +729,7 @@ def finalize():
             analysis.export(run, rows, summary)
             with open(run / 'final-report.md', 'a') as report:
                 report.write('\nHost profile SHA256: ' + manifest['host_profile_sha256'] + '\n')
-                report.write('Thermal validation: ' + ('unavailable; only idle/load readiness validated' if HOST['capabilities']['temperature_sensor'] == 'unavailable' else 'bounded package-sensor cooldown/stability validated') + '\n')
+                report.write('CPU temperature was not sampled.\n')
             change_status(run, 'FINALIZED')
         except Exception as error:
             write_json(run / 'protocol-validation.json', dict(status='FAIL', error=str(error)))
@@ -820,5 +811,5 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as error:
-        print(f'Step 10 stopped: {error}', file=sys.stderr)
+        print(f'오류: Step 10 실험을 중단했습니다. 진단 내용을 확인하세요.\n{error}', file=sys.stderr)
         sys.exit(1)

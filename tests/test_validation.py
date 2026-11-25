@@ -130,7 +130,7 @@ class ValidationTests(unittest.TestCase):
     def test_different_root_ops_name_is_rejected_in_dry_run(self) -> None:
         completed, _, _ = self.invoke_ops_preflight("another_scheduler")
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("expected scheduler name llama_simple", completed.stderr)
+        self.assertIn("검증에는 llama_simple이 필요합니다", completed.stderr)
 
     def test_missing_ops_path_has_clear_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -148,7 +148,7 @@ class ValidationTests(unittest.TestCase):
                 "--sleep-wake", str(self.sleep_wake),
             ], text=True, capture_output=True, check=False)
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("--ops-path is test-only and requires --dry-run", completed.stderr)
+            self.assertIn("--ops-path 옵션은 --dry-run에서만 사용할 수 있습니다", completed.stderr)
 
     def test_finite_cpu_progress_and_affinity_in_dry_run(self) -> None:
         completed, records, _ = self.invoke_dry_run("single_cpu_bound")
@@ -186,7 +186,7 @@ class ValidationTests(unittest.TestCase):
                 "--sleep-wake", str(self.sleep_wake), "--scenario", "single_cpu_bound",
             ], text=True, capture_output=True, check=False)
             self.assertEqual(completed.returncode, 1)
-            self.assertIn("scheduler is not active", completed.stderr)
+            self.assertIn("sched_ext가 활성 상태가 아닙니다", completed.stderr)
 
     def test_inactive_check_refuses_while_scheduler_is_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as directory, \
@@ -209,7 +209,7 @@ class ValidationTests(unittest.TestCase):
                 "--sleep-wake", str(self.sleep_wake),
             ], text=True, capture_output=True, check=False)
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("requires --dry-run", completed.stderr)
+            self.assertIn("--dry-run에서만 사용할 수 있습니다", completed.stderr)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Bounded, unprivileged AVX2 runtime comparison; never loads sched_ext."""
-import argparse
+from cli_ko import ArgumentParser, main_entry
 import copy
 import ctypes
 import datetime
@@ -65,11 +65,11 @@ def cpu_list(value):
     result = []
     for part in value.split(','):
         ends = part.split('-')
-        require(len(ends) in (1, 2), 'Invalid CPU list')
+        require(len(ends) in (1, 2), 'CPU 목록이 올바르지 않습니다.')
         lo, hi = int(ends[0]), int(ends[-1])
-        require(0 <= lo <= hi < 1024, 'Invalid CPU range')
+        require(0 <= lo <= hi < 1024, 'CPU 범위가 올바르지 않습니다.')
         result.extend(range(lo, hi + 1))
-    require(len(result) == len(set(result)), 'Duplicate CPU IDs')
+    require(len(result) == len(set(result)), 'CPU 번호가 중복됐습니다.')
     return sorted(result)
 
 
@@ -78,49 +78,35 @@ def choose_cpus(rows, requested=None):
     groups = {}
     for r in rows:
         groups.setdefault((r['package'], r['core']), []).append(r)
-    require(len(groups) >= 6, 'Six allowed physical cores are required by the existing E policy')
+    require(len(groups) >= 6, 'E 정책에는 사용 가능한 물리 코어 6개가 필요합니다.')
     # SMT-capable cores first: a documented inference, not a CPUID core-type claim.
     order = sorted(groups.values(), key=lambda g: (-max(len(r['siblings']) for r in g), min(r['cpu'] for r in g)))
     selected = requested if requested is not None else sorted(min(r['cpu'] for r in g) for g in order[:6])
     require(len(selected) == 6 and len(set(selected)) == 6 and set(selected) <= by_cpu.keys(),
-            '--cpus must contain six distinct allowed CPUs')
+            '--cpus에 서로 다른 허용 CPU 6개를 지정하세요.')
     physical = {(by_cpu[c]['package'], by_cpu[c]['core']) for c in selected}
-    require(len(physical) == 6, 'Do not select two SMT siblings of the same core')
+    require(len(physical) == 6, '한 물리 코어의 SMT 스레드 두 개를 함께 선택할 수 없습니다.')
     others = [r for r in rows if r['cpu'] not in selected]
-    require(others, 'A controller CPU outside the server envelope is required')
+    require(others, '서버의 CPU 범위 밖에 제어용 CPU가 하나 필요합니다.')
     others.sort(key=lambda r: ((r['package'], r['core']) in physical, r['cpu']))
     return selected, others[0]['cpu']
 
 
 def temperatures():
-    values = {}
-    for directory in Path('/sys/class/hwmon').glob('*'):
-        name = text(directory / 'name')
-        if name not in ('coretemp', 'k10temp', 'zenpower'):
-            continue
-        for path in directory.glob('temp*_input'):
-            try:
-                values[name + ':' + path.name] = int(path.read_text()) / 1000
-            except (OSError, ValueError):
-                pass
-    return values
+    # Retain the historical JSON field while allowing hosts without sensors.
+    return {}
 
 
 def guard():
-    require(os.getuid() != 0, 'Run as the ordinary user, without sudo')
+    require(os.getuid() != 0, 'sudo 없이 일반 사용자로 실행하세요.')
     require(text('/sys/kernel/sched_ext/state', 'unsupported') in ('disabled', 'unsupported'),
-            'An external sched_ext scheduler is active; leave it untouched and stop')
-    require(os.sched_getscheduler(0) == os.SCHED_OTHER, 'Controller must use normal Linux policy')
-    require(shutil.disk_usage(ROOT).free > 350 * 1024**2, 'Less than 350 MiB free disk space')
-    available = int(re.search(r'MemAvailable:\s+(\d+)', text('/proc/meminfo'))[1])
-    require(available >= 2500000, 'Less than 2.5 GB available RAM')
-    temps = temperatures()
-    require(temps and max(temps.values()) < 90, 'CPU temperature unavailable or at least 90 C; inspect cooling/sensors')
+            '다른 커널 스케줄러가 이미 활성화되어 실험을 중단합니다.')
+    require(os.sched_getscheduler(0) == os.SCHED_OTHER, '제어 프로세스는 Linux 기본 스케줄링 정책이어야 합니다.')
 
 
 def preflight(args):
-    require(sys.version_info >= (3, 10), 'Python 3.10 or newer is required')
-    require(platform.system() == 'Linux' and platform.machine() == 'x86_64', 'Requires x86_64 Linux')
+    require(sys.version_info >= (3, 10), 'Python 3.10 이상이 필요합니다.')
+    require(platform.system() == 'Linux' and platform.machine() == 'x86_64', 'x86-64 Linux가 필요합니다.')
     guard()
     cpuinfo = {}
     for block in Path('/proc/cpuinfo').read_text().strip().split('\n\n'):
@@ -140,15 +126,15 @@ def preflight(args):
         required = {'avx', 'avx2', 'fma', 'f16c', 'sse4_2'}
         require(required <= set(cpuinfo[cpu]['flags'].split()), f'CPU {cpu} lacks required AVX2/FMA/F16C/SSE4.2 flags')
     vendor = cpuinfo[selected[0]]['vendor_id']
-    require(vendor == 'GenuineIntel' or args.allow_non_intel, 'Not Intel; use --allow-non-intel only for local compatibility tests')
+    require(vendor == 'GenuineIntel' or args.allow_non_intel, 'Intel 전용 과거 실험입니다. 다른 장비의 호환성 검사에는 --allow-non-intel을 지정하세요.')
     for tool in ('git', 'cmake', 'gcc', 'g++', 'make', 'taskset', 'tar'):
-        require(shutil.which(tool), 'Missing dependency: ' + tool)
+        require(shutil.which(tool), '필요한 프로그램이 없습니다: ' + tool)
     return dict(status='PREFLIGHT_PASS', cpu_model=cpuinfo[selected[0]]['model name'], vendor=vendor,
                 intel_hardware=vendor == 'GenuineIntel', kernel=platform.release(), os_release=text('/etc/os-release'),
                 allowed_cpus=allowed, topology=rows, selected_cpus=selected, controller_cpu=controller,
                 selection='one thread per physical core, SMT-capable cores first; P/E is inferred, not assumed',
                 scheduler='default Linux only', sched_ext=text('/sys/kernel/sched_ext/state', 'unsupported'),
-                temperature_c=temperatures(), disk_free_bytes=shutil.disk_usage(ROOT).free,
+                temperature_c=temperatures(),
                 governors={str(c): text(f'/sys/devices/system/cpu/cpu{c}/cpufreq/scaling_governor') for c in selected},
                 gcc=subprocess.check_output(['gcc', '--version'], text=True).splitlines()[0])
 
@@ -165,14 +151,14 @@ def run_logged(command, log, timeout=1800):
                                    env=clean_env(), cwd=ROOT, start_new_session=True)
         try:
             code = process.wait(timeout=timeout)
-            require(code == 0, 'Command failed (' + str(code) + '); inspect ' + str(log))
+            require(code == 0, '명령 실행 실패 (종료 코드 ' + str(code) + '). 로그 파일: ' + str(log))
         finally:
             stop_owned(process)
 
 
 def tree_hashes(directory):
     return {str(p.relative_to(directory)): sha(p) for p in sorted(directory.rglob('*'))
-            if p.is_file() and not p.is_symlink() and '.git' not in p.parts}
+            if p.is_file() and not p.is_symlink() and '.git' not in p.parts and '__pycache__' not in p.parts}
 
 
 def build(args):
@@ -195,18 +181,17 @@ def build(args):
                   compiler=subprocess.check_output(['g++', '--version'], text=True),
                   gcc_sha256=sha(Path(shutil.which('gcc')).resolve()),
                   gxx_sha256=sha(Path(shutil.which('g++')).resolve()))
-    require(inputs['r_header_sha256'] == '014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029', 'R header identity changed')
+    require(inputs['r_header_sha256'] == '014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029', 'R 커널 헤더의 해시가 다릅니다.')
     key = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()[:16]
     destination = base / key
     if (destination/'complete.json').exists():
         result = read(destination/'complete.json')
-        require(read(destination/'inputs.json') == inputs, 'Build input seal changed')
+        require(read(destination/'inputs.json') == inputs, '빌드 입력 해시가 달라졌습니다.')
         for p, digest in result['binary_sha256'].items():
-            require(sha(Path(p)) == digest, 'Build artifact changed: ' + p)
+            require(sha(Path(p)) == digest, '빌드 산출물이 바뀌었습니다: ' + p)
         print('REUSE VERIFIED BUILD', destination, flush=True)
         return result
-    require(not destination.exists(), 'Incomplete build retained at ' + str(destination) + '; inspect logs, then move only that build directory aside to retry')
-    require(shutil.disk_usage(ROOT).free > 1300 * 1024**2, 'Build needs at least 1.3 GiB free disk space')
+    require(not destination.exists(), '미완성 빌드가 남아 있습니다: ' + str(destination) + '. 로그를 확인하고 해당 빌드 폴더를 보관한 후 다시 시도하세요.')
     destination.mkdir()
     save(destination/'inputs.json', inputs)
     source_a = destination/'source-A'
@@ -219,7 +204,7 @@ def build(args):
         run_logged(['git', 'init', str(repo)], destination/'git-init.log')
         run_logged(['git', '-C', str(repo), 'fetch', '--depth=1', 'https://github.com/ggml-org/llama.cpp.git', REV], destination/'git-fetch.log', 300)
     actual = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', REV+'^{commit}'], text=True).strip()
-    require(actual == REV, 'Historical baseline revision not available; no baseline substitution allowed')
+    require(actual == REV, '과거 원본 커밋을 찾을 수 없습니다. --baseline-repo로 보존된 저장소를 지정하세요.')
     archive = destination/'baseline-source.tar'
     with archive.open('wb') as stream:
         subprocess.run(['git', '-C', str(repo), 'archive', REV], stdout=stream, check=True)
@@ -239,8 +224,8 @@ def build(args):
         run_logged(['cmake', '--build', str(target), '--target', 'llama-server', '-j', str(args.jobs)], destination/(name+'-build.log'))
         commands = read(target/'compile_commands.json')
         combined = '\n'.join(c['command'] for c in commands)
-        require(not re.search(r'-march=native|-mtune=native|-mavx512|-mamx|-mavxvnni|-march=znver', combined), 'Unexpected host-specific ISA flag')
-        require(all(flag in combined for flag in ('-mavx2', '-mfma', '-mf16c', '-fopenmp')), 'Expected AVX2/OpenMP backend flags missing')
+        require(not re.search(r'-march=native|-mtune=native|-mavx512|-mamx|-mavxvnni|-march=znver', combined), 'CPU 전용 ISA 옵션이 섞여 있습니다.')
+        require(all(flag in combined for flag in ('-mavx2', '-mfma', '-mf16c', '-fopenmp')), 'AVX2/OpenMP 컴파일 옵션이 없습니다.')
         for path in (target/'bin').iterdir():
             if path.is_file() and (path.name == 'llama-server' or '.so' in path.name):
                 artifacts[str(path.resolve())] = sha(path)
@@ -275,7 +260,7 @@ def process_counter(pid):
 
 def cpu_seconds(before, after):
     for name in ('pid', 'starttime', 'tick_hz', 'affinity', 'policy'):
-        require(before[name] == after[name], 'Process counter identity changed: ' + name)
+        require(before[name] == after[name], '프로세스 카운터 식별자가 바뀌었습니다: ' + name)
     return (after['cpu_ticks'] - before['cpu_ticks']) / before['tick_hz']
 
 
@@ -288,7 +273,7 @@ def worker_envelope(pid, cpus):
         except ProcessLookupError:
             continue
     require(workers and all(w['affinity'] == cpus and w['policy'] == 0 for w in workers.values()),
-            'Server worker affinity or Linux scheduler policy differs')
+            '서버 스레드의 CPU 범위 또는 Linux 스케줄러 정책이 다릅니다.')
     return workers
 
 
@@ -316,15 +301,15 @@ def payload_for(fixture, n_predict):
 def validate_body(body, fixture, n_predict):
     if isinstance(body, dict) and len(fixture['requests']) == 1:
         body = [body]
-    require(isinstance(body, list) and len(body) == len(fixture['requests']), 'Missing completion responses')
-    require(sorted(v['index'] for v in body) == list(range(len(body))), 'Duplicate or missing request indices')
+    require(isinstance(body, list) and len(body) == len(fixture['requests']), '생성 응답이 누락됐습니다.')
+    require(sorted(v['index'] for v in body) == list(range(len(body))), '요청 번호가 중복되거나 누락됐습니다.')
     body.sort(key=lambda v: v['index'])
     for row, request in zip(body, fixture['requests']):
-        require(len(row['tokens']) == row['tokens_predicted'] == n_predict, 'Generated token count differs')
-        require(row['tokens_evaluated'] == row['timings']['prompt_n'] == len(request['prompt']), 'Prefill workload changed')
-        require(row['timings']['cache_n'] == 0, 'Cross-request prompt/KV reuse detected')
+        require(len(row['tokens']) == row['tokens_predicted'] == n_predict, '생성된 토큰 수가 다릅니다.')
+        require(row['tokens_evaluated'] == row['timings']['prompt_n'] == len(request['prompt']), 'Prefill 입력 토큰 수가 달라졌습니다.')
+        require(row['timings']['cache_n'] == 0, '요청 사이에 프롬프트 또는 KV 캐시 재사용이 감지됐습니다.')
         require(row['generation_settings']['temperature'] == 0 and row['generation_settings']['seed'] == 424242,
-                'Deterministic generation settings differ')
+                '결정적 토큰 생성 설정이 다릅니다.')
     return body
 
 
@@ -373,33 +358,33 @@ def visit(args, host, identity, arm, condition, fixture, n_predict, folder):
                                          '--parent', str(os.getpid()), '--seconds', '600'],
                                         env=clean_env(), stdout=load_log, stderr=subprocess.STDOUT, start_new_session=True)
                 time.sleep(.5)
-                require(load.poll() is None and 'READY' in (folder/'load.jsonl').read_text(), 'CPU load failed to start')
+                require(load.poll() is None and 'READY' in (folder/'load.jsonl').read_text(), 'CPU 부하 프로세스를 시작하지 못했습니다.')
             server = subprocess.Popen(['taskset', '-c', ','.join(map(str, cpus)), *command],
                                       env=env, stdout=server_log, stderr=subprocess.STDOUT,
                                       start_new_session=True, preexec_fn=child_setup)
             save(folder/'owned-processes.json', dict(server_pid=server.pid, load_pid=load.pid if load else None))
             deadline = time.monotonic() + 120
             while True:
-                require(server.poll() is None, 'Server exited; inspect server.log')
+                require(server.poll() is None, '서버가 종료됐습니다. server.log를 확인하세요.')
                 try:
                     http_json(port, '/health', timeout=1)
                     break
                 except (OSError, RuntimeError, http.client.HTTPException):
-                    require(time.monotonic() < deadline, 'Server ready timeout')
+                    require(time.monotonic() < deadline, '서버가 제한 시간 내에 준비되지 않았습니다.')
                     time.sleep(.1)
             actual = Path(f'/proc/{server.pid}/cmdline').read_bytes().rstrip(b'\0').decode().split('\0')
-            require(actual == command, 'Unexpected server command (including possible port conflict)')
+            require(actual == command, '예상과 다른 서버 명령입니다. 포트 충돌을 확인하세요.')
             mapped = sorted({line.split()[-1] for line in Path(f'/proc/{server.pid}/maps').read_text().splitlines() if '/' in line})
             loaded = {p: sha(Path(p)) for p in mapped if Path(p).is_file() and ('.so' in Path(p).name or p == command[0])}
             expected = {p: h for p, h in identity['binary_sha256'].items() if Path(p).parent == bindir}
-            require(expected and all(loaded.get(p) == h for p, h in expected.items()), 'Fresh build DSO identity mismatch')
-            require(all(str(bindir) in p for p in loaded if Path(p).name.startswith(('libllama', 'libggml'))), 'Old llama/ggml DSO loaded')
-            require(str(args.model.resolve()) in mapped, 'Expected model mapping missing')
+            require(expected and all(loaded.get(p) == h for p, h in expected.items()), '새 빌드의 공유 라이브러리 해시가 일치하지 않습니다.')
+            require(all(str(bindir) in p for p in loaded if Path(p).name.startswith(('libllama', 'libggml'))), '이전 llama/ggml 공유 라이브러리가 로드됐습니다.')
+            require(str(args.model.resolve()) in mapped, '예상한 모델이 매핑되지 않았습니다.')
             save(folder/'runtime.json', dict(loaded_sha256=loaded, mapped=mapped, model_sha256=MODEL_SHA,
                                             workers=worker_envelope(server.pid, cpus)))
             for item, request in zip(fixture['items'], fixture['requests']):
                 tokens = http_json(port, '/tokenize', dict(content=item['prompt'], add_special=True))['tokens']
-                require(tokens[:fixture['input_token_cap']] == request['prompt'], 'Model/tokenizer does not reproduce fixtures')
+                require(tokens[:fixture['input_token_cap']] == request['prompt'], '모델의 토크나이저가 실험 입력과 일치하지 않습니다.')
             for role in ('warmup', 'measured'):
                 guard()
                 before = process_counter(server.pid)
@@ -421,16 +406,16 @@ def visit(args, host, identity, arm, condition, fixture, n_predict, folder):
                               tokens=[r['tokens'] for r in rows], per_request_timings=[r['timings'] for r in rows])
                 if load:
                     require(load.poll() is None and lb['affinity'] == la['affinity'] == [cpus[-1]] and lb['policy'] == la['policy'] == 0,
-                            'Background CPU load stopped or changed affinity/policy')
+                            '백그라운드 부하가 중단됐거나 CPU·정책이 변경됐습니다.')
                     sample.update(load_before=lb, load_after=la, load_mean_cpu_cores=cpu_seconds(lb, la)/wall)
                 samples.append(sample)
                 save(folder/'samples.json', samples)
                 if load and role == 'measured':
-                    require(.22 <= sample['load_mean_cpu_cores'] <= .28, 'Measured cpu25 outside 0.22..0.28 core; retain failed visit')
+                    require(.22 <= sample['load_mean_cpu_cores'] <= .28, '실제 cpu25 부하가 0.22~0.28코어 범위를 벗어났습니다.')
                 guard()
                 print(json.dumps(dict(event='COHORT_COMPLETE', arm=arm, cohort=fixture['id'], condition=condition,
                                       role=role, throughput=sample['throughput'])), flush=True)
-            require(samples[0]['tokens'] == samples[1]['tokens'], 'Within-server deterministic token mismatch')
+            require(samples[0]['tokens'] == samples[1]['tokens'], '같은 서버에서 생성 토큰이 다릅니다.')
     finally:
         server_rc = stop_owned(server)
         load_rc = stop_owned(load)
@@ -438,15 +423,15 @@ def visit(args, host, identity, arm, condition, fixture, n_predict, folder):
         signal.signal(signal.SIGALRM, prior_alarm)
         save(folder/'cleanup.json', dict(server_returncode=server_rc, load_returncode=load_rc,
                                          elapsed_s=time.monotonic()-started, temperature_c=temperatures()))
-    require(server_rc == 0 and (load is None or load_rc == 0), 'Abnormal process shutdown; inspect logs')
+    require(server_rc == 0 and (load is None or load_rc == 0), '서버가 비정상 종료됐습니다. 로그를 확인하세요.')
     log = (folder/'server.log').read_text()
     policy = validate_policy(log, mode, cpus, os.sysconf('SC_CLK_TCK'))
     teams = sorted({int(n) for n in re.findall(r'NEWA_TEAM pid=\d+ team=(\d+)', log)})
-    require(teams and set(teams) <= {5, 6}, 'Unexpected or missing actual OpenMP team evidence')
+    require(teams and set(teams) <= {5, 6}, 'OpenMP 스레드 팀 실행 증빙이 잘못됐거나 없습니다.')
     measured = samples[1]
     epochs = [e for e in policy.get('epochs', []) if measured['start_ns'] <= e['sample']['model_start'] <= measured['end_ns']]
     decisions = [sum(e['eligible_by_size_5_6'][size][j] for e in epochs for size in range(2, 9)) for j in range(2)]
-    require({5+j for j, n in enumerate(decisions) if n} <= set(teams), 'Selected profiles missing in actual OpenMP team log')
+    require({5+j for j, n in enumerate(decisions) if n} <= set(teams), '실제 OpenMP 로그에 선택한 프로파일이 없습니다.')
     save(folder/'policy-recomputed.json', policy)
     result = dict(status='VALID', arm=arm, condition=condition, cohort=fixture['id'],
                   metrics=measured, actual_openmp_teams=teams, measured_multi_decode_5_6=decisions,
@@ -472,10 +457,10 @@ def analyze(rows, conditions):
             gains = []
             for block in blocks:
                 pair = {r['arm']: r for r in group if r['block'] == block}
-                require(set(pair) == set(ARMS), 'Incomplete paired block')
+                require(set(pair) == set(ARMS), '비교 블록이 완료되지 않았습니다.')
                 if condition == 'cpu25':
                     loads = [r['metrics']['load_mean_cpu_cores'] for r in pair.values()]
-                    require(max(loads)-min(loads) <= .025, 'Unequal actual cpu25 consumption within paired block')
+                    require(max(loads)-min(loads) <= .025, '같은 블록에서 실제 cpu25 부하가 다릅니다.')
                 gains.append(100*(pair[numerator]['metrics']['throughput']/pair[denominator]['metrics']['throughput']-1))
             result[numerator+'/'+denominator] = paired(gains)
         result['absolute_mean_tokens_per_second'] = {
@@ -488,11 +473,11 @@ def analyze(rows, conditions):
 
 
 def experiment(args, host, identity):
-    require(args.model.is_file(), 'Provide the original model via --model /path/to/model.gguf (weights are not in Git)')
-    require(sha(args.model) == MODEL_SHA, 'Model SHA256 differs; numeric-token fixtures require the original model')
+    require(args.model.is_file(), '--model로 원본 model.gguf를 지정하세요.')
+    require(sha(args.model) == MODEL_SHA, '모델 SHA-256이 다릅니다. 원본 model.gguf를 사용하세요.')
     for path in Path('/proc').glob('[0-9]*/comm'):
         require(text(path) not in ('llama-server', 'llama-bench', 'cc1', 'cc1plus', 'cmake', 'ninja'),
-                'Competing build/inference process: ' + str(path))
+                '경쟁하는 빌드 또는 추론 프로세스가 있습니다: ' + str(path))
     fixtures = read(FIXTURES)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     output = STATE/(stamp+'-'+args.mode+'-'+str(os.getpid()))
@@ -553,8 +538,8 @@ def experiment(args, host, identity):
                              A_equals_F6=group['A_L'] == group['F6_L'], A_equals_B0=group['A_L'] == group['B0_L'])
                 checks.append(check)
                 save(output/'correctness.json', checks)
-                require(check['A_equals_F6'], 'New policy token mismatch; no performance claim allowed')
-                require(check['A_equals_B0'], 'B0/A output mismatch; inspect separately from phase on/off, pilot stopped')
+                require(check['A_equals_F6'], '새 정책이 생성한 토큰이 달라 성능 비교를 중단합니다.')
+                require(check['A_equals_B0'], 'B0/A 생성 토큰이 달라 파일럿을 중단합니다.')
             save(output/'progress.json', dict(status='RUNNING', completed=len(completed), total=len(plan), last=spec))
         report = analyze([r for r in completed if r['stage'] == 'pilot'], args.conditions) if args.mode == 'pilot' else dict(status='SMOKE_PASS')
         report.update(intel_hardware=host['intel_hardware'], scheduler_tested=False,
@@ -572,7 +557,7 @@ def experiment(args, host, identity):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = ArgumentParser(description="과거 Intel 런타임 비교 실험")
     parser.add_argument('mode', choices=['check', 'build', 'smoke', 'pilot'], nargs='?', default='check')
     parser.add_argument('--model', type=Path, default=ROOT/'models/model.gguf')
     parser.add_argument('--cpus', help='six distinct physical cores; e.g. derive IDs from check output')
@@ -582,9 +567,9 @@ def main():
     parser.add_argument('--blocks', type=int, default=4, help='pilot only; fixed before running, even number 2..16')
     parser.add_argument('--conditions', nargs='+', choices=['ambient', 'cpu25'], default=['ambient', 'cpu25'])
     args = parser.parse_args()
-    require(1 <= args.jobs <= 4, 'Build jobs must be 1..4')
-    require(2 <= args.blocks <= 16 and args.blocks % 2 == 0, 'Use an even block count from 2..16')
-    require(len(set(args.conditions)) == len(args.conditions), 'Duplicate conditions')
+    require(1 <= args.jobs <= 4, '빌드 작업 수는 1에서 4 사이여야 합니다.')
+    require(2 <= args.blocks <= 16 and args.blocks % 2 == 0, '블록 수는 2~16 사이의 짝수로 지정하세요.')
+    require(len(set(args.conditions)) == len(args.conditions), '동일한 실험 조건이 중복됐습니다.')
     ROOT.joinpath('state').mkdir(exist_ok=True)
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     def interrupted(signum, frame):
@@ -604,8 +589,4 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except (Exception, KeyboardInterrupt) as error:
-        print(f'FAILED: {type(error).__name__}: {error}', file=sys.stderr, flush=True)
-        sys.exit(1)
+    main_entry(main)

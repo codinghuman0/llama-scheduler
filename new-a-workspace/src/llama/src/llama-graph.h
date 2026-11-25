@@ -711,6 +711,8 @@ struct llm_graph_params {
 
     llm_graph_result * res;
 
+    bool prefill_head64 = false;
+
     // return true if the "other" params would result in a graph with the same topology as with the current params
     //   having the same topology allows us to reuse the graph in some cases
     bool allow_reuse(const llm_graph_params & other) const {
@@ -745,7 +747,7 @@ struct llm_graph_params {
             return false;
         }
 
-        if (n_outputs != other.n_outputs) {
+        if (n_outputs != other.n_outputs || prefill_head64 != other.prefill_head64) {
             return false;
         }
 
@@ -888,6 +890,7 @@ struct llm_graph_context {
     const llama_hparams & hparams;
     const llama_cparams & cparams;
     const llama_ubatch  & ubatch;
+    const bool prefill_head64;
 
     const int64_t n_embd;
     const int64_t n_layer;

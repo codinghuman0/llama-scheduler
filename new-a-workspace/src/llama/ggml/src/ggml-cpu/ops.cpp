@@ -9,6 +9,9 @@
 #include "vec.h"
 
 #include <algorithm>
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <cfloat>
 #include <cmath>
 
@@ -8703,10 +8706,71 @@ static void ggml_compute_forward_flash_attn_ext_f16_one_chunk(
     }
 }
 
+#if defined(__AVX2__) && defined(__F16C__) && !defined(GGML_USE_OPENMP)
+static inline void ggml_flash_attn_pack_k_8x8(const char * src, size_t stride, float * dst, size_t dst_stride) {
+    const auto exp_mask = _mm_set1_epi16(0x7c00);
+    __m256 x[8];
+    for (int i = 0; i < 8; ++i) {
+        const auto * row = reinterpret_cast<const ggml_fp16_t *>(src + i*stride);
+        const auto half = _mm_loadu_si128(reinterpret_cast<const __m128i *>(row));
+        const auto exp = _mm_and_si128(half, exp_mask);
+        if (_mm_movemask_epi8(_mm_cmpeq_epi16(exp, exp_mask))) {
+            // Match K's scalar lookup, including its handling of signaling NaNs.
+            float scalar[8];
+            for (int j = 0; j < 8; ++j) {
+                scalar[j] = GGML_CPU_FP16_TO_FP32(row[j]);
+            }
+            x[i] = _mm256_loadu_ps(scalar);
+        } else {
+            x[i] = _mm256_cvtph_ps(half);
+        }
+    }
+    const __m256 t0 = _mm256_unpacklo_ps(x[0], x[1]);
+    const __m256 t1 = _mm256_unpackhi_ps(x[0], x[1]);
+    const __m256 t2 = _mm256_unpacklo_ps(x[2], x[3]);
+    const __m256 t3 = _mm256_unpackhi_ps(x[2], x[3]);
+    const __m256 t4 = _mm256_unpacklo_ps(x[4], x[5]);
+    const __m256 t5 = _mm256_unpackhi_ps(x[4], x[5]);
+    const __m256 t6 = _mm256_unpacklo_ps(x[6], x[7]);
+    const __m256 t7 = _mm256_unpackhi_ps(x[6], x[7]);
+    const __m256 s0 = _mm256_shuffle_ps(t0, t2, 0x44);
+    const __m256 s1 = _mm256_shuffle_ps(t0, t2, 0xee);
+    const __m256 s2 = _mm256_shuffle_ps(t1, t3, 0x44);
+    const __m256 s3 = _mm256_shuffle_ps(t1, t3, 0xee);
+    const __m256 s4 = _mm256_shuffle_ps(t4, t6, 0x44);
+    const __m256 s5 = _mm256_shuffle_ps(t4, t6, 0xee);
+    const __m256 s6 = _mm256_shuffle_ps(t5, t7, 0x44);
+    const __m256 s7 = _mm256_shuffle_ps(t5, t7, 0xee);
+    _mm256_storeu_ps(dst + 0 * dst_stride, _mm256_permute2f128_ps(s0, s4, 0x20));
+    _mm256_storeu_ps(dst + 1 * dst_stride, _mm256_permute2f128_ps(s1, s5, 0x20));
+    _mm256_storeu_ps(dst + 2 * dst_stride, _mm256_permute2f128_ps(s2, s6, 0x20));
+    _mm256_storeu_ps(dst + 3 * dst_stride, _mm256_permute2f128_ps(s3, s7, 0x20));
+    _mm256_storeu_ps(dst + 4 * dst_stride, _mm256_permute2f128_ps(s0, s4, 0x31));
+    _mm256_storeu_ps(dst + 5 * dst_stride, _mm256_permute2f128_ps(s1, s5, 0x31));
+    _mm256_storeu_ps(dst + 6 * dst_stride, _mm256_permute2f128_ps(s2, s6, 0x31));
+    _mm256_storeu_ps(dst + 7 * dst_stride, _mm256_permute2f128_ps(s3, s7, 0x31));
+}
+
+static inline void ggml_flash_attn_pack_v_row128(const ggml_fp16_t * src, float * dst) {
+    const auto exp_mask = _mm_set1_epi16(0x7c00);
+    for (int i = 0; i < 128; i += 8) {
+        const __m128i x = _mm_loadu_si128(reinterpret_cast<const __m128i *>(src + i));
+        const __m128i exp = _mm_and_si128(x, exp_mask);
+        // Preserve the scalar conversion for blocks with infinity or NaN, including exception flags.
+        if (_mm_movemask_epi8(_mm_cmpeq_epi16(exp, exp_mask))) {
+            ggml_fp16_to_fp32_row(src + i, dst + i, 8);
+        } else {
+            _mm256_storeu_ps(dst + i, _mm256_cvtph_ps(x));
+        }
+    }
+}
+#endif
+
 static void ggml_compute_forward_flash_attn_ext_tiled(
         const ggml_compute_params * params,
         ggml_tensor * dst,
-        int ir0, int ir1) {
+        int ir0, int ir1,
+        bool head64 = false) {
     const ggml_tensor * q     = dst->src[0];
     const ggml_tensor * k     = dst->src[1];
     const ggml_tensor * v     = dst->src[2];
@@ -8748,7 +8812,11 @@ static void ggml_compute_forward_flash_attn_ext_tiled(
 
     GGML_ASSERT(k->type == v->type);
     const ggml_type kv_type = k->type;
-
+#if defined(__AVX2__) && defined(__F16C__) && !defined(GGML_USE_OPENMP)
+    const bool pack_simd = head64 && (_mm_getcsr() & _MM_ROUND_MASK) == _MM_ROUND_NEAREST;
+#else
+    GGML_UNUSED(head64);
+#endif
 
     // broadcast factors
     const int64_t rk2 = neq2/nek2;
@@ -8873,7 +8941,19 @@ static void ggml_compute_forward_flash_attn_ext_tiled(
 
             // Pack K tile transposed: K_f32[dk][kv] so KV_TILE is contiguous (SIMD dim)
             // Zero-pad the last tile so the GEMM always operates on KV_TILE_SZ columns
-            for (int tk = 0; tk < kv_tile; tk++) {
+            int packed = 0;
+#if defined(__AVX2__) && defined(__F16C__) && !defined(GGML_USE_OPENMP)
+            if (pack_simd) {
+                const char * k_tile = (const char *) k->data + ic*nbk1 + ik2*nbk2 + ik3*nbk3;
+                for (; packed + 8 <= kv_tile; packed += 8) {
+                    for (int64_t dk = 0; dk < DK; dk += 8) {
+                        ggml_flash_attn_pack_k_8x8(k_tile + packed*nbk1 + dk*sizeof(ggml_fp16_t),
+                                                 nbk1, K_f32 + dk*KV_TILE_SZ + packed, KV_TILE_SZ);
+                    }
+                }
+            }
+#endif
+            for (int tk = packed; tk < kv_tile; tk++) {
                 const char * k_data = (const char *)k->data + (ic + tk)*nbk1 + ik2*nbk2 + ik3*nbk3;
                 if (kv_type == GGML_TYPE_F16) {
                     const ggml_fp16_t * k_f16 = (const ggml_fp16_t *)k_data;
@@ -8941,6 +9021,12 @@ static void ggml_compute_forward_flash_attn_ext_tiled(
             for (int tk = 0; tk < kv_tile; tk++) {
                 const char * v_data = (const char *)v->data + (ic + tk)*nbv1 + iv2*nbv2 + iv3*nbv3;
                 if (kv_type == GGML_TYPE_F16) {
+#if defined(__AVX2__) && defined(__F16C__) && !defined(GGML_USE_OPENMP)
+                    if (pack_simd) {
+                        ggml_flash_attn_pack_v_row128((const ggml_fp16_t *) v_data, V32 + tk*DV);
+                        continue;
+                    }
+#endif
                     ggml_fp16_to_fp32_row((const ggml_fp16_t *)v_data, V32 + tk * DV, DV);
                 } else {
                     memcpy(V32 + tk * DV, v_data, DV * sizeof(float));
@@ -9182,6 +9268,30 @@ static void ggml_compute_forward_flash_attn_ext_f16(
 #endif
         use_tiled &= (DV % f32_epr == 0);
 #endif
+#if defined(__AVX2__) && defined(__F16C__) && !defined(GGML_USE_OPENMP)
+        if (use_tiled && !disable_chunking && Q_TILE_SZ == 64 && neq1 == 64 && neq2 == 12 && neq3 == 1 &&
+                nth == 6 && nek1 >= 2048 && k->type == GGML_TYPE_F16 && v->type == GGML_TYPE_F16 &&
+                k->ne[2] == 2 && v->ne[2] == 2 && k->ne[3] == 1 && v->ne[3] == 1 && DK == 128 && DV == 128 &&
+                k->nb[0] == sizeof(ggml_fp16_t) && v->nb[0] == sizeof(ggml_fp16_t) &&
+                ggml_get_op_params_i32(dst, GGML_FLASH_ATTN_EXT_HEAD64) == 1) {
+            if (ith == 0) {
+                static std::atomic<unsigned long long> tiles{0};
+                if (tiles.fetch_add(1, std::memory_order_relaxed) == 0) {
+                    std::atexit([] {
+                        std::fprintf(stderr, "NEWA_HEAD64_KERNEL layer_calls=%llu\n",
+                                     tiles.load(std::memory_order_relaxed));
+                    });
+                }
+            }
+            // Keep all 64 queries for a head in the same tile.
+            for (int head = ith; head < neq2; head = ggml_threadpool_chunk_add(params->threadpool, 1)) {
+                const int64_t pos = head * neq1;
+                ggml_compute_forward_flash_attn_ext_tiled(params, dst, pos, pos + neq1, true);
+            }
+            return;
+        }
+#endif
+
         int current_chunk = ith;
 
         while (current_chunk < nchunk) {

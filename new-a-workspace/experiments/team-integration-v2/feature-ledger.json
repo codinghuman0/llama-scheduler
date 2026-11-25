@@ -1,0 +1,517 @@
+{
+  "schema": 1,
+  "date": "2026-11-24",
+  "status": "DEVELOPMENT_CHECKPOINT",
+  "features": [
+    {
+      "id": "R-prefill",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4",
+      "donor_path_and_function": "R overlay newa-q4-policy.h:newa_q4_try",
+      "final_path": "src/llama/ggml/src/ggml-cpu/newa-q4-policy.h",
+      "final_function": "newa_q4_try",
+      "source_sha256": "9dd9bdccbfba783b5f04bbedf473b65fe0bd36b6bdb64e72d6f3440455052d20",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_ACTIVE",
+      "execution": "MODEL_TESTED",
+      "default": "SAFE_DEFAULT",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/",
+      "scope_or_limit": "Canonical R activation; native worker-index adapter. Q4 phase counters and exact token comparisons."
+    },
+    {
+      "id": "Q6-by-phase",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4",
+      "donor_path_and_function": "GGML CPU policy newa_q6_phase_allowed",
+      "final_path": "src/llama/ggml/src/ggml-cpu/newa-q6-policy.h",
+      "final_function": "newa_q6_phase_allowed",
+      "source_sha256": "a9afec4d8290cd82c88f20b2eaaaa10b13392a97379680327f4262f8c07f6657",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_ACTIVE",
+      "execution": "MODEL_TESTED",
+      "default": "SAFE_DEFAULT",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/native-state-only-v2/",
+      "scope_or_limit": "Native extension reuses kernel body and graph worker index. Phase chunk counters demonstrate path use."
+    },
+    {
+      "id": "explicit-profile",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "a9432639",
+      "donor_path_and_function": "llama_decode_with_options",
+      "final_path": "src/llama/src/llama-context.cpp",
+      "final_function": "llama_decode_with_options",
+      "source_sha256": "b22a316e341b0272ba014adc729915ee30cb594eafdb1835f848f051306c3380",
+      "source": "SHARED_ANCESTRY",
+      "integration": "EXISTING_REUSED",
+      "execution": "MODEL_TESTED",
+      "default": "SAFE_DEFAULT",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/",
+      "scope_or_limit": "Two resource profile API, null ctx guard adapted from later donor."
+    },
+    {
+      "id": "semantic-batch",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "5219055a",
+      "donor_path_and_function": "server context classify submitted view",
+      "final_path": "src/llama/tools/server/server-context.cpp",
+      "final_function": "decode_batch",
+      "source_sha256": "f99f0976495e834967624bd828c87a99b5d8717291bb1093d5a7279d15e973d8",
+      "source": "SHARED_ANCESTRY",
+      "integration": "EXISTING_REUSED",
+      "execution": "MODEL_TESTED",
+      "default": "SAFE_DEFAULT",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/",
+      "scope_or_limit": "Selection reads actual view incl offset, retry and split."
+    },
+    {
+      "id": "CPU-bridge",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4",
+      "donor_path_and_function": "ggml_backend_cpu_newa_phase",
+      "final_path": "src/llama/tools/server/server-scx.h",
+      "final_function": "server_newa_cpu_phase",
+      "source_sha256": "8a4aa9cf9241edd007c223b2b8c2b6b27d7383be914f43e5ed25a8e512806e00",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_ACTIVE",
+      "execution": "MODEL_TESTED",
+      "default": "SAFE_DEFAULT",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/openmp-v1-shared-off",
+      "scope_or_limit": "Off transport preserves CPU phase and R/Q6 dispatch."
+    },
+    {
+      "id": "E-legacy",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4",
+      "donor_path_and_function": "Prefill sensor select",
+      "final_path": "src/llama/tools/server/newa-prefill-pressure.h",
+      "final_function": "newa_decode_policy::select",
+      "source_sha256": "ef9095a89b404d8ba94145b4ac1ff556851a543fdc27a928f05814d114a05443",
+      "source": "LOCAL",
+      "integration": "EXISTING_REUSED",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/",
+      "scope_or_limit": "Legacy six CPU, 5/6, fixed5/fixed6/pressure and old behavior. Fresh model tests keep fixed envelope."
+    },
+    {
+      "id": "adaptive-config",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4",
+      "donor_path_and_function": "E select -> configurable roles",
+      "final_path": "src/llama/tools/server/newa-prefill-pressure.h",
+      "final_function": "newa_decode_policy::select",
+      "source_sha256": "ef9095a89b404d8ba94145b4ac1ff556851a543fdc27a928f05814d114a05443",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/openmp-v1-adaptive",
+      "scope_or_limit": "Explicit workers, 2..8 members, age/threshold, max 32 CPU. Tested on 5/6 AMD only; Intel4/8 native pending."
+    },
+    {
+      "id": "pool",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "21537a5",
+      "donor_path_and_function": "tools/server/server-threadpool.h:init",
+      "final_path": "src/llama/tools/server/server-threadpool.h",
+      "final_function": "server_threadpools::init",
+      "source_sha256": "a5f32ee8dd4651b5524dd03781832d0b6610cd23dbaca3fe02816c272cf2c81d",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": [
+        "evidence/native-state-only-v2/native-v2-composition",
+        "evidence/pool-failure-v1/"
+      ],
+      "scope_or_limit": "Common owner composes disposable/shared/role pools. New alloc failure and second-worker ENOMEM/EAGAIN injection verifies cleanup and fresh reuse."
+    },
+    {
+      "id": "role-masks",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "21537a5",
+      "donor_path_and_function": "pool init + common_cpu_params",
+      "final_path": "tools/integration_v2/runtime.py",
+      "final_function": "role_arguments",
+      "source_sha256": "1f377abcda79b7407b9abe3ff71aa215815e78c26d752cf2d7e10fc2d9169c5a",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/native-unified-v1/native-unified-v1-masks",
+      "scope_or_limit": "Actual native 5/6 teams with singleton worker masks; explicit generation/batch poll strategy. SCX/strict role-mask combination rejected."
+    },
+    {
+      "id": "role-priority",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "21537a5",
+      "donor_path_and_function": "ggml_thread_apply_priority",
+      "final_path": "src/llama/ggml/src/ggml-cpu/ggml-cpu.c",
+      "final_function": "ggml_thread_apply_priority",
+      "source_sha256": "5548359da1446a9bbf3fc43afb083cd2e23983ced19041ba0fc4e9bd64e1a09b",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/role-priority-native-v1/priority-and-park-expanded.json",
+      "scope_or_limit": "Native Linux only. Generation/Batch priority modes select actual SCHED_BATCH workers; caller restored on success/abort. OpenMP and SCX combination rejected; RT is outside the common launcher."
+    },
+    {
+      "id": "state-publisher",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "44c95d5",
+      "donor_path_and_function": "server_scx_state_publisher",
+      "final_path": "src/llama/tools/server/server-scx.h",
+      "final_function": "server_scx_state_publisher::publish",
+      "source_sha256": "8a4aa9cf9241edd007c223b2b8c2b6b27d7383be914f43e5ed25a8e512806e00",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/native-state-only-v2/native-v2-composition/state-v2.json",
+      "scope_or_limit": "RUN and monotonically increasing sequence, active/idle, sleep and shutdown. Single CPU decoder scope."
+    },
+    {
+      "id": "marker-tu",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "db33191",
+      "donor_path_and_function": "tools/server/server-scx.cpp",
+      "final_path": "src/llama/tools/server/server-scx.cpp",
+      "final_function": "llama_scx_phase_set_v2",
+      "source_sha256": "bc27181b90425452b3474f149e6416a66e5f328b8022f951e1e2ca5b66cf8b9f",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": [
+        "evidence/openmp-unified-v1/openmp-v1-scalar-smoke",
+        "evidence/openmp-unified-v1/openmp-v1-trace-smoke",
+        "evidence/same-source-build-comparison.json"
+      ],
+      "scope_or_limit": "All four transport modes tested as run selections; only state has publisher event log. Kernel attach NOT_RUN."
+    },
+    {
+      "id": "v2-receiver",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4",
+      "donor_path_and_function": "Scalar uprobe lifecycle extended by integration",
+      "final_path": "tools/integration_v2/scheduler/state-receiver.h",
+      "final_function": "newa_state_accept",
+      "source_sha256": "cfaa724f8041f0988909b649c104eed3157ca90d1a444969159ba369d8e5fdc6",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_FREE_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/kernel-static/scheduler-manifest.json",
+      "scope_or_limit": "C contract and both BTF objects built. Actual attach and raw event delivery KERNEL_NOT_RUN."
+    },
+    {
+      "id": "CPUID-topology",
+      "donor_repo": "euichan0418/new-a-llm-scheduler",
+      "donor_revision": "cc8c3ee",
+      "donor_path_and_function": "tools/sched_ext/new_a_hybrid/collect.py:inspect",
+      "final_path": "tools/integration_v2/topology/new_a_hybrid/collect.py",
+      "final_function": "inspect",
+      "source_sha256": "cfeb5985c2cf893eacccecec488abb3d5ba297b2b9b76fcba9f38507bebbfb92",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_ACTIVE",
+      "execution": "MODEL_TESTED",
+      "default": "SAFE_DEFAULT",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/model-free/host-detection.json",
+      "scope_or_limit": "AMD real; Intel hybrid/SMT/cpuset synthetic. Unknown is rejected."
+    },
+    {
+      "id": "FULL-Lite",
+      "donor_repo": "euichan0418/new-a-llm-scheduler",
+      "donor_revision": "269e878",
+      "donor_path_and_function": "Runtime Lite candidate.diff:observe_runtime",
+      "final_path": "tools/integration_v2/scheduler/handoff.bpf.c",
+      "final_function": "observe_runtime",
+      "source_sha256": "fd15f4b38424756b4efdadc5c7fc0589a7998b4c3332f431b287463c7f7c51f3",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "COMPILED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/kernel-placement-v4/scheduler-manifest.json",
+      "scope_or_limit": "Same dispatch and safety counters within each sealed policy. Compiled for current host BTF; native verifier and kernel data pending."
+    },
+    {
+      "id": "selected-child",
+      "donor_repo": "euichan0418/new-a-llm-scheduler",
+      "donor_revision": "45e704d",
+      "donor_path_and_function": "universal guard_domain.h and identity.h",
+      "final_path": "tools/integration_v2/scheduler/loader.c",
+      "final_function": "new_a_object_load",
+      "source_sha256": "1b8d61a1d6fe4ada8773f3421972bd2839e68a1f99a9c4283b3eaa876a8d0a2d",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_FREE_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/kernel-placement-v4",
+      "scope_or_limit": "Eight current-BTF builds/owner-bound plans across FULL/Lite and placement policies. Manual root loader remains a separate checkpoint."
+    },
+    {
+      "id": "idle-handoff",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4",
+      "donor_path_and_function": "scheduler/handoff.bpf.c:NEW_A_IDLE_HANDOFF",
+      "final_path": "tools/integration_v2/scheduler/handoff.bpf.c",
+      "final_function": "handoff_idle",
+      "source_sha256": "fd15f4b38424756b4efdadc5c7fc0589a7998b4c3332f431b287463c7f7c51f3",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_FREE_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/kernel-placement-v4/scheduler-manifest.json",
+      "scope_or_limit": "FULL/Lite sealed Decode candidate. Actual valid v2 state controls eligible first-tier idle enqueue/kick. Capabilities, real moves, isolation and detach require manual kernel admission."
+    },
+    {
+      "id": "serving",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "2d51f37",
+      "donor_path_and_function": "tools/server/bench/cpu/runner.py:workload",
+      "final_path": "tools/integration_v2/serving.py",
+      "final_function": "run",
+      "source_sha256": "02718e5a8f1087ddc810c210494275891150197c29d235e7aad0e98268a855b6",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "INCONCLUSIVE",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/openmp-v1-serving-calibrated",
+      "scope_or_limit": "All six donor workloads times two profiles; overlap observed only in m1/m3. One pair per workload provides observations."
+    },
+    {
+      "id": "mixed-cap128",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "65e2275",
+      "donor_path_and_function": "server-context.cpp:prefill_budget",
+      "final_path": "src/llama/tools/server/server-context.cpp",
+      "final_function": "update_slots",
+      "source_sha256": "f99f0976495e834967624bd828c87a99b5d8717291bb1093d5a7279d15e973d8",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/openmp-v1-serving-calibrated",
+      "scope_or_limit": "Positive cap counts in m1/m3, zero in pure pp/d1/d2/d4. Paired config held cap constant."
+    },
+    {
+      "id": "flash-attn-head64",
+      "donor_repo": "hsju2021/llama.cpp-fork",
+      "donor_revision": "65e2275",
+      "donor_path_and_function": "llama_decode_with_mixed_prefill_head64 and ops.cpp",
+      "final_path": "src/llama/ggml/src/ggml-cpu/ops.cpp",
+      "final_function": "ggml_compute_forward_flash_attn_ext_f16",
+      "source_sha256": "ee533342918ba1d014b71079d307a0bbd231c4e0365fa4eca2e4f05e9ddc9307",
+      "source": "DONOR_ADAPTED",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "DIAGNOSTIC_ONLY",
+      "performance": {
+        "AMD": "INCONCLUSIVE",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": [
+        "evidence/head64-native-v1/token-equality.json",
+        "evidence/head64-native-roles-v1/token-equality.json"
+      ],
+      "scope_or_limit": "Native 6/6, scoped m4 geometry, original Qwen2 and AVX2/FP16 KV. 3584 actual custom CPU layer calls per candidate visit; five stream arrays match in warmup/measurement."
+    },
+    {
+      "id": "manifest-launch",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4",
+      "donor_path_and_function": "old build and Intel DSO gate",
+      "final_path": "tools/integration_v2/runtime.py",
+      "final_function": "verify_build / verify_loaded",
+      "source_sha256": "1f377abcda79b7407b9abe3ff71aa215815e78c26d752cf2d7e10fc2d9169c5a",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_ACTIVE",
+      "execution": "MODEL_TESTED",
+      "default": "SAFE_DEFAULT",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "build_config": "integration-v2 portable AVX2; per-evidence effective/config records",
+      "evidence": "evidence/openmp-unified-v1/manifest.json",
+      "scope_or_limit": "Source+compiler+DSO seal, stale library/pre-R/invalid ELF rejection tests."
+    },
+    {
+      "id": "previous-idle-locality",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4948a899557d2adf896bf29d6a1577d3a5",
+      "donor_path_and_function": "new-a-lab/locality-build-v2/decode/locality.bpf.c:pick_previous_idle",
+      "final_path": "tools/integration_v2/scheduler/handoff.bpf.c",
+      "final_function": "llama_select_cpu / pick_previous_idle",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_FREE_TESTED",
+      "default": "RESEARCH_PRESET",
+      "build_config": "Common AVX2 recipe or scheduler bound to running BTF",
+      "evidence": "evidence/kernel-placement-v4",
+      "scope_or_limit": "Sealed locality-decode and locality-active choices; selected TGID, first tier, allowed/online/idle checks. No native kernel admission yet.",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "source_sha256": "fd15f4b38424756b4efdadc5c7fc0589a7998b4c3332f431b287463c7f7c51f3"
+    },
+    {
+      "id": "native-park",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4948a899557d2adf896bf29d6a1577d3a5",
+      "donor_path_and_function": "GGML_NEWA_BARRIER / newa_phase_spins",
+      "final_path": "src/llama/ggml/src/ggml-cpu/newa-barrier.h",
+      "final_function": "newa_barrier_wait_budget",
+      "source": "LOCAL",
+      "integration": "INTEGRATED_SELECTABLE",
+      "execution": "MODEL_TESTED",
+      "default": "RESEARCH_PRESET",
+      "build_config": "Common AVX2 recipe or scheduler bound to running BTF",
+      "evidence": "evidence/role-priority-native-v1/priority-and-park-expanded.json",
+      "scope_or_limit": "Native futex mode with common all/prefill/budget options. Budget test observed 3402 Prefill waits and exact tokens. OpenMP and kernel combination rejected.",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "source_sha256": "f0d208c6530034b639b9de219a5bef3c70e790b8b856738a51d6f2371537239b"
+    },
+    {
+      "id": "native-barrier-hint",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4948a899557d2adf896bf29d6a1577d3a5",
+      "donor_path_and_function": "ggml_newa_barrier_wait_v1",
+      "final_path": "src/llama/ggml/src/ggml-cpu/ggml-cpu.c",
+      "final_function": "ggml_newa_barrier_wait_v1",
+      "source": "LOCAL",
+      "integration": "OUT_OF_SCOPE_WITH_REASON",
+      "execution": "NOT_RUN",
+      "default": "DIAGNOSTIC_ONLY",
+      "build_config": "Common AVX2 recipe or scheduler bound to running BTF",
+      "evidence": "three-repository-analysis.ko.md",
+      "scope_or_limit": "Inherited diagnostic symbol has no matching barrier-hint consumer in pinned scheduler. The public state-v2 provider is a different ABI.",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "source_sha256": "5548359da1446a9bbf3fc43afb083cd2e23983ced19041ba0fc4e9bd64e1a09b"
+    },
+    {
+      "id": "repack-huge-advice",
+      "donor_repo": "codinghuman0/llama-scheduler",
+      "donor_revision": "441b3b4948a899557d2adf896bf29d6a1577d3a5",
+      "donor_path_and_function": "repack.cpp -> newa_repack_pages",
+      "final_path": "src/llama/ggml/src/ggml-cpu/newa-repack-pages.h",
+      "final_function": "newa_repack_pages",
+      "source": "LOCAL",
+      "integration": "EXISTING_REUSED",
+      "execution": "MODEL_TESTED",
+      "default": "SAFE_DEFAULT",
+      "build_config": "Common AVX2 recipe or scheduler bound to running BTF",
+      "evidence": "evidence/openmp-roles-v1/heldout2/server.log",
+      "scope_or_limit": "Eligible CPU repack buffers receive MADV_HUGEPAGE. AMD startup recorded return 0; actual THP use and effect not measured.",
+      "performance": {
+        "AMD": "NOT_MEASURED",
+        "Intel": "NOT_MEASURED"
+      },
+      "source_sha256": "69da9db393e937a15535b86255570e30290a116fb294a4c5d62f8ab9007a95c8"
+    }
+  ]
+}

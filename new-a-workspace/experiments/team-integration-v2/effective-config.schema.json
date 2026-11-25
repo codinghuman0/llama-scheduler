@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Integration v2 effective host configuration",
+  "type": "object",
+  "required": ["profile", "resources", "policy", "pool", "transport", "cpus", "threads", "batch_threads", "backend", "r_route", "topology", "scheduler", "run_id"],
+  "properties": {
+    "profile": {"enum": ["unified-conservative", "integrated-runtime-research"]},
+    "resources": {"enum": ["amd-5-6", "intel-fixed6", "intel-4-8", "physical"]},
+    "policy": {"enum": ["phase-fixed", "pressure", "fixed5", "fixed6", "adaptive"]},
+    "pool": {"enum": ["off", "shared", "roles"]},
+    "transport": {"enum": ["off", "scalar", "state", "trace"]},
+    "cpus": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "integer", "minimum": 0, "maximum": 1023}},
+    "threads": {"type": "integer", "minimum": 1},
+    "batch_threads": {"type": "integer", "minimum": 1},
+    "threads_http": {"type": "integer", "minimum": 1},
+    "backend": {"enum": ["openmp", "native"]},
+    "r_route": {"const": "semantic-prefill-reference"},
+    "scheduler": {"enum": ["SCHED_OTHER", "SCHED_EXT"]},
+    "mixed_prefill": {"enum": ["off", "cap128", "head64"]},
+    "relaxed_host_checks": {"type": "boolean"},
+    "native_barrier": {"enum": ["not-applicable", "spin", "park"]},
+    "barrier_phase": {"enum": ["all", "prefill", "budget"]},
+    "adaptive": {
+      "type": ["object", "null"],
+      "properties": {
+        "threshold": {"type": "number", "minimum": 0, "maximum": 4},
+        "cohort": {"type": "integer", "minimum": 2, "maximum": 8},
+        "min_prefill_ms": {"type": "integer", "minimum": 100, "maximum": 10000}
+      },
+      "required": ["threshold", "cohort", "min_prefill_ms"]
+    },
+    "role_affinity": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "array", "items": {"type": "integer"}}},
+    "role_polls": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": ["integer", "null"]}},
+    "role_priorities": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"enum": ["normal", "batch"]}},
+    "role_options": {"type": "boolean"},
+    "role_strict": {"type": "boolean"},
+    "run_id": {"type": "integer", "minimum": 1},
+    "topology": {"type": "object"}
+  }
+}

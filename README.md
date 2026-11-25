@@ -1,15 +1,33 @@
 # llama-scheduler
 
-## NEW_A workspace and Intel experiments
+## Intel·AMD CPU 실험
 
-The preserved NEW_A runtime sources and research evidence are in
-[`new-a-workspace/`](new-a-workspace/). For Intel i5-1240P / Ubuntu, start with
-the [experiment guide](new-a-workspace/docs/INTEL_EXPERIMENT.ko.md),
-[local compatibility check](new-a-workspace/docs/INTEL_COMPATIBILITY_CHECK.ko.md),
-and [Codex troubleshooting handoff](new-a-workspace/docs/INTEL_CODEX_HANDOFF.ko.md).
-Model weights and compiled runtimes are excluded; the script rebuilds the pinned
-baseline and A for AVX2. This path uses the default Linux scheduler and does not
-load the archived BPF scheduler. The original base project documentation follows.
+Ubuntu x86-64 일반 계정에서 원본 모델을 `~/projects/model.gguf`에 둡니다. 아래 명령은 `integration-v2`를 처음에는 얕게 클론하고 기존 `~/projects/llama-scheduler` 또는 `~/projects/llama-scheduler-integration-v2`가 있으면 그 폴더에서 업데이트합니다. 변경이 있거나 커밋 이력이 갈라진 체크아웃은 경로와 함께 알려줍니다.
+
+```bash
+runner=$(mktemp) &&
+curl -fsSL https://raw.githubusercontent.com/codinghuman0/llama-scheduler/integration-v2/scripts/run-cpu-experiment.sh -o "$runner" &&
+bash "$runner" smoke
+```
+
+| 모드 | 측정 또는 검증 |
+|---|---|
+| `smoke` (기본) | 서로 다른 8개 요청을 두 세트로 실행하고 단일 요청도 검사합니다. 입력마다 새 서버를 시작해 측정 tok/s와 결과 경로를 출력합니다. |
+| `m4` | native 백엔드로 Decode 4개와 긴 Prefill 1개를 겹쳐 cap128/head64 처리와 출력 토큰을 비교합니다. 허용된 물리 코어 6개가 필요합니다. |
+| `prefill-linux` | 기본 Linux 정책에서 짧은 단일·다중 요청과 phase 전송을 확인합니다. |
+| `prepare` | 호스트 커널용 BPF를 일반 계정으로 빌드하고 두 정책의 체크포인트를 생성합니다. |
+| `scx` | FULL 계측으로 선택된 서버의 neutral/prefill-pcore 배치와 생성 토큰을 비교합니다. 화면에 출력된 각 loader 명령을 다른 터미널에서 실행합니다. |
+| `placement` | 평상시·cpu25 각각 6블록, 세 정책 총 36회 실행 후 블록별 생성 처리율과 95% 구간을 계산합니다. sudo 인증이 가능한 일반 터미널에서 실행합니다. |
+
+다시 실행할 때는 클론 안에서 `bash scripts/run-cpu-experiment.sh 모드`를 사용합니다. 모델 경로는 두 번째 인자, 기존 다른 경로의 저장소는 `NEWA_CHECKOUT`으로 지정할 수 있습니다. 결과·빌드·로그는 `new-a-workspace/state/integration-v2/`에 보관합니다. `smoke`, `prefill-linux`, `prepare`, `scx`, `placement`는 같은 OpenMP 런타임을 검증해 재사용하고 `m4`에는 별도의 native 빌드를 사용합니다.
+
+기본 실험에는 Git, Python 3.10 이상, CMake, GCC/G++, Make, util-linux 및 OpenSSL 개발 헤더가 필요합니다. CPU의 AVX2/FMA/F16C/SSE4.2, cpuset과 할당량에서 실제 사용 가능한 코어를 확인합니다. i5-1240P 형상의 P/E와 동종 Ryzen을 지원합니다. `prepare`, `scx`, `placement`에는 sched_ext/BTF 지원 커널과 clang BPF, bpftool, libbpf·libelf·zlib 개발 파일도 필요합니다. 커널 모드에서 제어용 CPU는 서버 범위 밖에 둡니다.
+
+온도 센서와 고정 디스크·RAM 여유량을 검사하지 않습니다. 데스크톱에 AC 정보가 없어도 공용 실험은 진행합니다. 파일 쓰기·할당·권한 오류는 실제로 발생한 단계에서 한국어로 안내하며 외부 도구의 원문은 로그에 보관합니다. [팀원 실행 안내](new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md) · [AMD 런타임 측정](new-a-workspace/experiments/amd-published-direct-v1/result-summary.md) · [AMD 커널 배치 측정](new-a-workspace/experiments/amd-prefill-placement-ac-v1/result-summary.md)
+
+Ryzen 5 5500U에서 이 스크립트로 반복한 36회 스케줄러 비교와 별도 `m4` 지연시간 측정을 확인할 수 있습니다. [AMD 실측 보고서](new-a-workspace/experiments/amd-prefill-placement-ac-v1/portable-amd-recheck.md)
+
+## Historical Base Project
 
 CPU-only llama.cpp semantic phase-aware `sched_ext` Base Project
 

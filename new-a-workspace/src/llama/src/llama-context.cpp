@@ -6,6 +6,7 @@
 #include "llama-impl.h"
 #include "llama-batch.h"
 #include "llama-io.h"
+#include "llama-kv-cache.h"
 #include "llama-memory.h"
 #include "llama-mmap.h"
 #include "llama-model.h"
@@ -1322,7 +1323,8 @@ llm_graph_result * llama_context::process_ubatch(
                 llm_graph_type   gtype,
         llama_memory_context_i * mctx,
                    ggml_status & ret,
-         llama_compute_profile   compute_profile) {
+         llama_compute_profile   compute_profile,
+                          bool   prefill_head64) {
     if (mctx && !mctx->apply()) {
         LLAMA_LOG_ERROR("%s: failed to apply memory context\n", __func__);
         ret = GGML_STATUS_FAILED;
@@ -1334,7 +1336,8 @@ llm_graph_result * llama_context::process_ubatch(
 
     // the new graph parameters
     // in order to correctly reuse a graph, it's full topology has to be uniquely determined by these parameters
-    const auto gparams = graph_params(res, ubatch, mctx, gtype);
+    auto gparams = graph_params(res, ubatch, mctx, gtype);
+    gparams.prefill_head64 = prefill_head64;
 
     if (!graph_reuse_disable && res->can_reuse(gparams)) {
         //LLAMA_LOG_DEBUG("%s: reusing previous graph\n", __func__);
@@ -1702,7 +1705,29 @@ static bool needs_raw_logits(const llama_ubatch & ubatch, const std::map<llama_s
     return false; // all sequences use backend sampling
 }
 
-int llama_context::decode(const llama_batch & batch_inp, llama_compute_profile compute_profile) {
+bool llama_context::supports_mixed_prefill_head64() const {
+    if (model.arch != LLM_ARCH_QWEN2 || !model.devices.empty() || !backend_cpu || backends.size() != 1 ||
+            cparams.ctx_type != LLAMA_CONTEXT_TYPE_DEFAULT || !cparams.flash_attn || !cparams.causal_attn ||
+            cparams.kv_unified || cparams.embeddings || cparams.n_ubatch != 128 || cparams.n_batch < 132 ||
+            cparams.n_threads != 6 || cparams.n_threads_batch != 6 ||
+            model.hparams.n_head() != 12 || model.hparams.n_head_kv() != 2 ||
+            model.hparams.n_embd_head_k() != 128 || model.hparams.n_embd_head_v() != 128) {
+        return false;
+    }
+
+    const auto * kv = dynamic_cast<const llama_kv_cache *>(memory.get());
+    if (!kv || kv->type_k() != GGML_TYPE_F16 || kv->type_v() != GGML_TYPE_F16) {
+        return false;
+    }
+
+    const auto reg = ggml_backend_dev_backend_reg(ggml_backend_get_device(backend_cpu));
+    const auto supports = reinterpret_cast<bool (*)()>(
+            ggml_backend_reg_get_proc_address(reg, "ggml_backend_cpu_supports_flash_attn_head64"));
+    return supports && supports();
+}
+
+int llama_context::decode(const llama_batch & batch_inp, llama_compute_profile compute_profile, bool prefill_head64) {
+    prefill_head64 = prefill_head64 && batch_inp.token && batch_inp.n_tokens == 68 && supports_mixed_prefill_head64();
     // MTP hook batches carry both token (next-token id) and embd (h_nextn row),
     // so accept either present rather than requiring exactly one.
     GGML_ASSERT(batch_inp.token || batch_inp.embd);
@@ -1870,7 +1895,13 @@ int llama_context::decode(const llama_batch & batch_inp, llama_compute_profile c
 
         ggml_status status;
 
-        const auto * res = process_ubatch(ubatch, ctx_type_to_graph_type(cparams.ctx_type), mctx.get(), status, compute_profile);
+        const bool head64_ubatch = prefill_head64 && ubatch.n_tokens == 64 && ubatch.n_seqs_unq == 1 &&
+                ubatch.pos[0] >= 2048 && ubatch.pos[0] <= 6080 && ubatch.pos[0] % 64 == 0;
+        if (head64_ubatch) {
+            LLAMA_LOG_DEBUG("%s: mixed prefill head64, physical ubatch=%u, pos=%d, seq=%d\n",
+                    __func__, ubatch.n_tokens, ubatch.pos[0], ubatch.seq_id_unq[0]);
+        }
+        const auto * res = process_ubatch(ubatch, ctx_type_to_graph_type(cparams.ctx_type), mctx.get(), status, compute_profile, head64_ubatch);
 
         if (!res) {
             // the last ubatch failed or was aborted -> remove all positions of that ubatch from the memory module
@@ -4119,21 +4150,38 @@ int32_t llama_decode(
     return llama_decode_with_options(ctx, batch, options);
 }
 
-int32_t llama_decode_with_options(
+static int32_t llama_decode_impl(
         llama_context * ctx,
           llama_batch   batch,
- llama_decode_options   options) {
+ llama_decode_options   options,
+                 bool   prefill_head64) {
+    if (ctx == nullptr) {
+        LLAMA_LOG_ERROR("%s: null context\n", __func__);
+        return -1;
+    }
     if (!llama_compute_profile_is_valid(options.compute_profile)) {
         LLAMA_LOG_ERROR("%s: invalid compute profile: %d\n", __func__, (int) options.compute_profile);
         return -1;
     }
 
-    const int ret = ctx->decode(batch, options.compute_profile);
+    const int ret = ctx->decode(batch, options.compute_profile, prefill_head64);
     if (ret != 0 && ret != 1) {
         LLAMA_LOG_ERROR("%s: failed to decode, ret = %d\n", __func__, ret);
     }
 
     return ret;
+}
+
+int32_t llama_decode_with_options(llama_context * ctx, llama_batch batch, llama_decode_options options) {
+    return llama_decode_impl(ctx, batch, options, false);
+}
+
+bool llama_supports_mixed_prefill_head64(const llama_context * ctx) {
+    return ctx && ctx->supports_mixed_prefill_head64();
+}
+
+int32_t llama_decode_with_mixed_prefill_head64(llama_context * ctx, llama_batch batch, llama_decode_options options) {
+    return llama_decode_impl(ctx, batch, options, true);
 }
 
 //

@@ -38,7 +38,7 @@ LOADER_PID=""
 
 say()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32mPASS\033[0m  %s\n' "$*"; }
-die()  { printf '\033[1;31mERROR\033[0m  %s\n' "$*" >&2; exit 1; }
+die()  { printf '\033[1;31m오류\033[0m  %s\n' "$*" >&2; exit 1; }
 
 kill_group_user() {
     local pgid="${1:-}"
@@ -68,23 +68,23 @@ trap cleanup EXIT INT TERM
 
 cd "$REPO_ROOT"
 
-[[ -f "$MODEL" ]] || die "model not found: $MODEL"
-[[ -f "$TOPOLOGY_ENV" ]] || die "topology env not found: $TOPOLOGY_ENV"
-[[ -x "$SERVER" ]] || die "llama-server missing: $SERVER"
-[[ -f "$MARKER" ]] || die "marker ELF missing: $MARKER"
-[[ -x "$SCHED" ]] || die "scheduler missing: $SCHED"
-[[ -x "$CHILD" ]] || die "child launcher missing: $CHILD"
-command -v curl >/dev/null 2>&1 || die "curl missing"
-command -v taskset >/dev/null 2>&1 || die "taskset missing"
-command -v setsid >/dev/null 2>&1 || die "setsid missing"
-command -v bpftool >/dev/null 2>&1 || die "bpftool missing"
+[[ -f "$MODEL" ]] || die "모델을 찾을 수 없습니다: $MODEL"
+[[ -f "$TOPOLOGY_ENV" ]] || die "토폴로지 환경 파일이 없습니다: $TOPOLOGY_ENV"
+[[ -x "$SERVER" ]] || die "llama-server가 없습니다: $SERVER"
+[[ -f "$MARKER" ]] || die "마커 ELF가 없습니다: $MARKER"
+[[ -x "$SCHED" ]] || die "스케줄러가 없습니다: $SCHED"
+[[ -x "$CHILD" ]] || die "자식 실행기가 없습니다: $CHILD"
+command -v curl >/dev/null 2>&1 || die "curl 항목이 없습니다"
+command -v taskset >/dev/null 2>&1 || die "taskset 항목이 없습니다"
+command -v setsid >/dev/null 2>&1 || die "setsid 항목이 없습니다"
+command -v bpftool >/dev/null 2>&1 || die "bpftool 항목이 없습니다"
 
 # shellcheck disable=SC1090
 source "$TOPOLOGY_ENV"
-[[ "${TOPOLOGY_RESULT:-}" == "PASS" ]] || die "topology env does not contain TOPOLOGY_RESULT=PASS"
-[[ -n "${CPU_SELECTED_LIST:-}" ]] || die "CPU_SELECTED_LIST missing"
-[[ -n "${CPU_THREADS:-}" ]] || die "CPU_THREADS missing"
-[[ -n "${CPU_THREADS_BATCH:-}" ]] || die "CPU_THREADS_BATCH missing"
+[[ "${TOPOLOGY_RESULT:-}" == "PASS" ]] || die "토폴로지 검증 기록이 PASS가 아닙니다"
+[[ -n "${CPU_SELECTED_LIST:-}" ]] || die "CPU_SELECTED_LIST 항목이 없습니다"
+[[ -n "${CPU_THREADS:-}" ]] || die "CPU_THREADS 항목이 없습니다"
+[[ -n "${CPU_THREADS_BATCH:-}" ]] || die "CPU_THREADS_BATCH 항목이 없습니다"
 
 say "Smoke configuration"
 printf 'repo:          %s\n' "$REPO_ROOT"
@@ -95,11 +95,11 @@ printf 'threads-batch: %s\n' "$CPU_THREADS_BATCH"
 
 ACTUAL_SHA="$(sha256sum "$MODEL" | awk '{print $1}')"
 [[ "$ACTUAL_SHA" == "$EXPECTED_MODEL_SHA256" ]] || \
-    die "model SHA256 mismatch: got $ACTUAL_SHA"
+    die "모델 SHA-256이 일치하지 않습니다: got $ACTUAL_SHA"
 ok "model SHA256"
 
 if [[ "$(cat /sys/kernel/sched_ext/state 2>/dev/null || echo unavailable)" != "disabled" ]]; then
-    die "sched_ext must be disabled before smoke"
+    die "smoke를 시작하려면 sched_ext가 비활성 상태여야 합니다"
 fi
 ok "sched_ext initially disabled"
 
@@ -159,10 +159,10 @@ DEFAULT_PGID=$!
 
 wait_health 120 || {
     tail -100 "$RUN_DIR/default-server.log" >&2 || true
-    die "default llama-server did not become healthy"
+    die "기본 llama-server가 준비되지 않았습니다"
 }
 
-request_once "$RUN_DIR/default-response.json" || die "default completion request failed"
+request_once "$RUN_DIR/default-response.json" || die "기본 서버의 생성 요청에 실패했습니다"
 ok "default Linux inference returned HTTP 2xx"
 
 kill_group_user "$DEFAULT_PGID"
@@ -171,7 +171,7 @@ DEFAULT_PGID=""
 
 sleep 0.3
 if pgrep -f "$SERVER" >/dev/null 2>&1; then
-    die "llama-server remained after default smoke cleanup"
+    die "기본 smoke 종료 후 서버가 남아 있습니다"
 fi
 ok "default server cleanup"
 
@@ -198,14 +198,14 @@ for _ in $(seq 1 100); do
     [[ "$state" == "enabled" ]] && break
     if ! kill -0 "$LOADER_PID" 2>/dev/null; then
         cat "$RUN_DIR/sched-loader.log" >&2 || true
-        die "scheduler loader exited before sched_ext became enabled"
+        die "sched_ext가 활성화되기 전에 loader가 종료됐습니다"
     fi
     sleep 0.1
 done
 
 [[ "$(cat /sys/kernel/sched_ext/state 2>/dev/null || true)" == "enabled" ]] || {
     cat "$RUN_DIR/sched-loader.log" >&2 || true
-    die "sched_ext did not become enabled"
+    die "sched_ext가 활성화되지 않았습니다"
 }
 ok "sched_ext enabled"
 
@@ -228,7 +228,7 @@ CHILD_PGID=$!
 wait_health 120 || {
     tail -100 "$RUN_DIR/sched-server.log" >&2 || true
     tail -100 "$RUN_DIR/sched-loader.log" >&2 || true
-    die "sched_ext llama-server did not become healthy"
+    die "sched_ext 서버가 준비되지 않았습니다"
 }
 
 # Embedded observer + request. It reads only the tiny 12-byte control state.
@@ -273,7 +273,7 @@ if len(candidates) != 1:
     print("12-byte map candidates:")
     for m in candidates:
         print(json.dumps(m, sort_keys=True))
-    raise RuntimeError(f"expected exactly one control map, found {len(candidates)}")
+    raise RuntimeError(f"제어 map 개수가 1이어야 합니다. 발견한 수: {len(candidates)}")
 
 map_id = candidates[0]["id"]
 print(f"CONTROL_MAP_ID={map_id}")
@@ -291,10 +291,10 @@ def as_byte(x):
 def read_state():
     dump = run_json("map", "dump", "id", str(map_id))
     if not dump:
-        raise RuntimeError("empty control map dump")
+        raise RuntimeError("제어 map 내용이 비었습니다")
     raw = bytes(as_byte(x) for x in dump[0]["value"])
     if len(raw) < 12:
-        raise RuntimeError(f"short control state: {len(raw)} bytes")
+        raise RuntimeError(f"제어 상태 데이터가 너무 짧습니다: {len(raw)} bytes")
     return struct.unpack_from("<III", raw, 0)
 
 phase_names = {0: "UNKNOWN", 1: "PREFILL", 2: "DECODE", 3: "MIXED"}
@@ -305,7 +305,7 @@ print(
     f"phase={phase}({phase_names.get(phase, 'INVALID')}) exit_kind={exit_kind}"
 )
 if selected == 0:
-    raise RuntimeError("selected_tgid is zero after child registration")
+    raise RuntimeError("자식 등록 후 selected_tgid가 0입니다")
 
 result = {"status": None, "error": None}
 
@@ -385,16 +385,16 @@ print(f"OBSERVED_PHASE_NAMES={[phase_names.get(v, 'INVALID') for v in observed]}
 if result["error"] is not None:
     raise RuntimeError(result["error"])
 if result["status"] is None or not (200 <= result["status"] < 300):
-    raise RuntimeError(f"HTTP failure: {result['status']}")
+    raise RuntimeError(f"HTTP 요청에 실패했습니다: {result['status']}")
 
 try:
     prefill_i = observed.index(1)
     decode_i = observed.index(2)
 except ValueError as e:
-    raise RuntimeError(f"missing PREFILL or DECODE: {observed}") from e
+    raise RuntimeError(f"PREFILL 또는 DECODE 상태가 없습니다: {observed}") from e
 
 if prefill_i >= decode_i:
-    raise RuntimeError(f"wrong phase order: {observed}")
+    raise RuntimeError(f"phase 순서가 잘못됐습니다: {observed}")
 
 print()
 print("PHASE_TRANSPORT_SMOKE_RESULT=PASS")
@@ -427,22 +427,22 @@ for _ in $(seq 1 50); do
 done
 
 [[ "$(cat /sys/kernel/sched_ext/state 2>/dev/null || true)" == "disabled" ]] || \
-    die "sched_ext remained enabled after cleanup"
+    die "정리 후 sched_ext가 활성화된 상태입니다"
 ok "sched_ext disabled after cleanup"
 
 if pgrep -f "$SERVER" >/dev/null 2>&1; then
-    die "llama-server remained after sched_ext cleanup"
+    die "정리 후 llama-server가 남아 있습니다"
 fi
 ok "no llama-server remains"
 
 if pgrep -f "$SCHED" >/dev/null 2>&1; then
-    die "llama_scx loader remained after cleanup"
+    die "정리 후 llama_scx loader가 남아 있습니다"
 fi
 ok "no llama_scx loader remains"
 
 if [[ -n "$(git status --short)" ]]; then
     git status --short >&2
-    die "Git worktree changed during portability smoke"
+    die "이식성 검증 중 Git 작업 트리가 변경됐습니다"
 fi
 ok "Git worktree clean"
 

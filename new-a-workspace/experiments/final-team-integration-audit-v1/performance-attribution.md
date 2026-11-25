@@ -83,7 +83,7 @@ A_S/A_L는 FULL 관측 비용까지 포함한 scheduler 구성의 순효과다. 
 | replication | cpu25 | A_L | 1032 | [1016, 0] | [1016, 0] | 8 / 8 |
 | replication | cpu25 | A_S | 1032 | [1016, 0] | [1016, 0] | 8 / 8 |
 
-각 measured arm/조건의1,016 eligible multi calls는8cohorts×127calls이며 tokens가 아니다. 이 raw에서는 각 cohort가8-token eligible126calls와4-token tail1call로 끝난다. warmup, functional-check, measured는 [observed-usage.json](observed-usage.json)의48개 group에 따로 기록돼 있다. 총144visits는 timed128 + Linux smoke12 + scheduler admission4이며, 각 visit의 warmup을 성능 반복수로 더하지 않았다. libgomp affinity-format `NEWA_TEAM`은 변화 시점의 team 보고로 전체 graph 계수가 아니다.
+각 measured arm/조건의1,016 eligible multi calls는8cohorts×127calls이며 tokens가 아니다. 이 raw에서는 각 cohort가8-token eligible126calls와4-token tail1call로 끝난다. warmup, functional-check, measured는 [observed-usage.json](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/observed-usage.json)의48개 group에 따로 기록돼 있다. 총144visits는 timed128 + Linux smoke12 + scheduler admission4이며, 각 visit의 warmup을 성능 반복수로 더하지 않았다. libgomp affinity-format `NEWA_TEAM`은 변화 시점의 team 보고로 전체 graph 계수가 아니다.
 
 ## Scheduler 사용량: whole-visit 통계
 

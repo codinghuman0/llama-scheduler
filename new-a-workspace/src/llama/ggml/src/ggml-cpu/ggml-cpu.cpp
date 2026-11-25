@@ -7,6 +7,7 @@ extern "C" void ggml_backend_cpu_newa_phase(uint32_t phase);
 #include "repack.h"
 #include "traits.h"
 #include "ggml-impl.h"
+#include "common.h"
 #include "amx/amx.h"
 
 #include <cctype>
@@ -648,6 +649,14 @@ static ggml_backend_feature * ggml_backend_cpu_get_features(ggml_backend_reg_t r
     GGML_UNUSED(reg);
 }
 
+static bool ggml_backend_cpu_supports_flash_attn_head64() {
+#if defined(__AVX2__) && defined(__F16C__) && !defined(GGML_USE_OPENMP)
+    return ggml_fa_tile_config::Q == 64 && !ggml_is_numa();
+#else
+    return false;
+#endif
+}
+
 static void * ggml_backend_cpu_get_proc_address(ggml_backend_reg_t reg, const char * name) {
 #if defined(__gnu_linux__)
     if (strcmp(name, "ggml_backend_cpu_newa_phase") == 0) return (void *) ggml_backend_cpu_newa_phase;
@@ -659,6 +668,9 @@ static void * ggml_backend_cpu_get_proc_address(ggml_backend_reg_t reg, const ch
     if (strcmp(name, "ggml_backend_dev_get_extra_bufts") == 0) {
         ggml_backend_dev_get_extra_bufts_t fct = ggml_backend_cpu_device_get_extra_buffers_type;
         return (void *)fct;
+    }
+    if (strcmp(name, "ggml_backend_cpu_supports_flash_attn_head64") == 0) {
+        return (void *)ggml_backend_cpu_supports_flash_attn_head64;
     }
     if (strcmp(name, "ggml_backend_get_features") == 0) {
         return (void *)ggml_backend_cpu_get_features;

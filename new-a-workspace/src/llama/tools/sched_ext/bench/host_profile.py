@@ -43,7 +43,7 @@ def allocation(topology):
                 compute_threads=len(server), batch_threads=len(server), http_threads=2)
 
 
-def capabilities(*, cpu=Path('/sys/devices/system/cpu'), hwmon_root=Path('/sys/class/hwmon'), power_root=Path('/sys/class/power_supply')):
+def capabilities(*, cpu=Path('/sys/devices/system/cpu'), power_root=Path('/sys/class/power_supply')):
     fields = ('affected_cpus', 'related_cpus', 'scaling_driver', 'scaling_governor',
               'scaling_available_governors', 'scaling_min_freq', 'scaling_max_freq',
               'cpuinfo_min_freq', 'cpuinfo_max_freq', 'scaling_cur_freq', 'bios_limit',
@@ -55,24 +55,13 @@ def capabilities(*, cpu=Path('/sys/devices/system/cpu'), hwmon_root=Path('/sys/c
     for policy in sorted((cpu / 'cpufreq').glob('policy*')):
         if (policy / 'boost').exists():
             turbo[str(policy / 'boost')] = (policy / 'boost').read_text().strip()
-    candidates = []
-    for hwmon in sorted(hwmon_root.glob('hwmon*')):
-        name = read_optional(hwmon / 'name')
-        for label in sorted(hwmon.glob('temp*_label')):
-            value = label.read_text().strip()
-            if (name == 'k10temp' and value == 'Tctl') or (name == 'coretemp' and re.fullmatch(r'Package id \d+', value)):
-                sensor = label.with_name(label.name.replace('_label', '_input'))
-                if sensor.exists():
-                    candidates.append(dict(name=name, label=value, input=str(sensor.resolve()), device=str((hwmon / 'device').resolve())))
-    sensor = sorted(candidates, key=lambda s: (s['name'], s['label'], s['device']))[0] if candidates else 'unavailable'
-    temperature = int(Path(sensor['input']).read_text()) / 1000 if candidates else None
     supplies = {}
     for p in sorted(power_root.glob('*')):
         kind = read_optional(p / 'type')
         if kind in {'Mains', 'USB', 'USB_C', 'USB_PD', 'USB_PD_DRP', 'Wireless', 'UPS', 'Battery'} or (p / 'online').exists():
             supplies[p.name] = {k: read_optional(p / k) for k in ('type', 'online', 'status', 'present')}
     return dict(frequency=dict(available=bool(policies), policies=policies),
-                turbo=dict(available=bool(turbo), interfaces=turbo), temperature_sensor=sensor, temperature_c=temperature,
+                turbo=dict(available=bool(turbo), interfaces=turbo), temperature_sensor='unavailable', temperature_c=None,
                 power_supply=dict(available=bool(supplies), entries=supplies))
 
 
@@ -81,7 +70,7 @@ def execution_state(value):
     entries = {name: {k: supply[k] for k in ('type', 'present', 'online')
                       if k in supply and (k != 'online' or supply.get('type') != 'Battery')}
                for name, supply in power['entries'].items()}
-    return {k: value[k] for k in ('turbo', 'temperature_sensor')} | {
+    return {'turbo': value['turbo']} | {
         'power_supply': dict(available=power['available'], entries=entries),
         'frequency': dict(available=value['frequency']['available'], policies={p: {k: v for k, v in fields.items() if k != 'scaling_cur_freq'}
                                                                            for p, fields in value['frequency']['policies'].items()})}

@@ -14,6 +14,7 @@ add_library(${TARGET} STATIC
     server-common.cpp
     server-common.h
     server-context.cpp
+    server-scx.cpp
     server-context.h
     server-stream.cpp
     server-stream.h
@@ -33,8 +34,12 @@ target_include_directories(${TARGET} PRIVATE ../mtmd)
 target_include_directories(${TARGET} PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(${TARGET} PUBLIC llama-common mtmd ${CMAKE_THREAD_LIBS_INIT})
 
-if (LLAMA_SCX_PHASE_HINT OR LLAMA_SCX_PHASE_TRACE)
+if (LLAMA_SCX_PHASE_HINT)
     target_compile_definitions(${TARGET} PRIVATE LLAMA_SCX_PHASE_HINT)
+endif()
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT GGML_OPENMP_ENABLED)
+    target_compile_definitions(${TARGET} PRIVATE NEWA_NATIVE_LINUX_ROLE_PRIORITY)
 endif()
 
 # llama-server-impl: server logic, reusable by app

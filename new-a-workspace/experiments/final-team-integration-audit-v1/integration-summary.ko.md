@@ -18,7 +18,7 @@
 | A_S | 동일 pressure A + selected-child observe/FULL/partial/fixed-affinity scheduler, 평가 역할. |
 | P | donor pool을 선택 이식한 별도 server. padding guard 수정 후 실제 모델/lifecycle 검증, 제한 pilot 후 채택 보류. |
 
-**실행 진입점 주의:** 현재 `new-a-workspace/run.sh`는 기본적으로 pre-R `runtime/NEW_A`를 선택한다. A_L 역할 지정 때 기본 경로/tag를 바꾸지 않았다는 원래 release map과 일치한다. 이 명령을 최종 A_L 실행이라고 소개하면 안 된다. 이번 감사도 경로를 변경하지 않았다. [실제 대응과 hash](evidence/entrypoint-scope.json), [동결 cases/release map](evidence/preserved/a-component-scheduler-replication-v1/frozen-release-map.json).
+**실행 진입점 주의:** 현재 `new-a-workspace/run.sh`는 기본적으로 pre-R `runtime/NEW_A`를 선택한다. A_L 역할 지정 때 기본 경로/tag를 바꾸지 않았다는 원래 release map과 일치한다. 이 명령을 최종 A_L 실행이라고 소개하면 안 된다. 이번 감사도 경로를 변경하지 않았다. [실제 대응과 hash](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/evidence/entrypoint-scope.json), [동결 cases/release map](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/evidence/preserved/a-component-scheduler-replication-v1/frozen-release-map.json).
 
 ## 어디까지 통합됐는가
 
@@ -28,7 +28,7 @@
 4. **커널 실행 통합:** A_S의 대상 server/worker에 SCHED_EXT, 정확한 BPF/marker ELF, live monitor, 정상 정리 증거가 있다. 총 32 timed visits와 4 admission visits를 구분했다. FULL의 `phase_seen`은 비트맵이고 observe의 handoff moved는 전부 0이다. phase 수신이 phase-dependent 배치를 뜻하지 않는다.
 5. **선택 이식 후 미채택:** donor pool header는 P overlay와 byte-identical이며 P ELF에는 owner가 있다. A ELF/source에는 그 owner가 없다. pool off 때문에 compute-profile API가 꺼진 것은 아니다. v2 active/idle, Lite, Intel4/8, donor serving harness는 최종 활성 기능으로 인정하지 않는다.
 
-세부 34개 기능은 [통합 표](integration-matrix.md), [JSON](integration-matrix.json), [CSV](integration-matrix.csv)에 출처·채택·실행·성능의 네 축으로 기록했다. 파일/LOC 비율을 통합률이나 개인 점수로 환산하지 않았다.
+세부 34개 기능은 [통합 표](integration-matrix.md), [JSON](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/integration-matrix.json), [CSV](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/integration-matrix.csv)에 출처·채택·실행·성능의 네 축으로 기록했다. 파일/LOC 비율을 통합률이나 개인 점수로 환산하지 않았다.
 
 ## 성능과 기여는 별도 판정
 

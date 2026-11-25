@@ -9,6 +9,11 @@
 #include <cstdint>
 #include <map>
 
+// Experimental server path for an already-admitted 4-decode + 64-prefill call.
+LLAMA_API bool llama_supports_mixed_prefill_head64(const llama_context * ctx);
+LLAMA_API int32_t llama_decode_with_mixed_prefill_head64(
+        llama_context * ctx, llama_batch batch, llama_decode_options options);
+
 // Reserve a new compute graph. It is valid until the next call to llama_graph_reserve.
 LLAMA_API struct ggml_cgraph * llama_graph_reserve(
         struct llama_context * ctx,

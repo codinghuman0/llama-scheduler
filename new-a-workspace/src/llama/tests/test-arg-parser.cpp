@@ -226,6 +226,24 @@ static void test(void) {
         assert(false == common_params_parse(argv.size(), list_str_to_char(argv).data(), server_params, LLAMA_EXAMPLE_SERVER));
     }
 
+    for (const auto & policy : {
+            std::make_pair("none",   COMMON_MIXED_PREFILL_POLICY_NONE),
+            std::make_pair("cap128", COMMON_MIXED_PREFILL_POLICY_CAP128),
+            std::make_pair("head64", COMMON_MIXED_PREFILL_POLICY_HEAD64),
+        }) {
+        common_params server_params;
+        assert(server_params.mixed_prefill_policy == COMMON_MIXED_PREFILL_POLICY_NONE);
+        argv = {"binary_name", "-m", "model.gguf", "--mixed-prefill-policy", policy.first};
+        assert(common_params_parse(argv.size(), list_str_to_char(argv).data(), server_params, LLAMA_EXAMPLE_SERVER));
+        assert(server_params.mixed_prefill_policy == policy.second);
+        assert(!common_params_parse(argv.size(), list_str_to_char(argv).data(), server_params, LLAMA_EXAMPLE_CLI));
+    }
+    {
+        common_params server_params;
+        argv = {"binary_name", "-m", "model.gguf", "--mixed-prefill-policy", "invalid"};
+        assert(!common_params_parse(argv.size(), list_str_to_char(argv).data(), server_params, LLAMA_EXAMPLE_SERVER));
+    }
+
     for (const std::string value : {"0", "-1", "+1", "1x", "18446744073709551616"}) {
         common_params server_params;
         argv = {"binary_name", "-m", "model.gguf", "--scx-phase-run-id", value};

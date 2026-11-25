@@ -1,5 +1,92 @@
 # Status
 
+## Intel and AMD release entry point
+
+The public `placement` entry point completed 36 new Ryzen 5 5500U visits on AC, including 24 successful selected-child kernel visits. Eight-request throughput changes against Linux were −0.58% in ambient and −0.63% under cpu25. The separate native m4 `head64` smoke increased throughput by 6.99% in one pair with identical output tokens. [Portable AMD results](../new-a-workspace/experiments/amd-prefill-placement-ac-v1/portable-amd-recheck.md)
+
+The published launcher prepared both kernel policies from a new shallow clone and from an existing single-branch `main` checkout. Updating kept the original `.git` directory, local `main` branch and untracked team file. A second invocation found the checkout up to date and reused the verified build. The historical AMD comparison's option parser resolves `integrated-runtime-research` and `amd-5-6`, and both saved B0 campaigns reproduce from their raw responses.
+
+`scripts/run-cpu-experiment.sh` clones the shallow `integration-v2` branch or fast-forwards an existing checkout and runs the requested experiment. The CPU smoke, native m4 comparison, FULL kernel smoke and Lite placement comparison discover the local CPU envelope. The public modes use Korean diagnostics and have no temperature sensor, free-disk, free-RAM or AC admission threshold. An available external power reading is recorded in portable placement results. The fixed original AMD protocol still requires AC when invoked explicitly for historical reproduction.
+
+The original 5500U placement study and historical baseline campaigns are published with their compact aggregate results. The release removes 8,986 historical entries (161,989,120 uncompressed bytes) from the checkout. The release also excludes 44 workspace-migration files (5,371,688 bytes). The files are preserved at `25ab433140eafc6cbb3b259b017c2a9252b37900`. [Launch instructions](../README.md#intelamd-cpu-실험) · [Archive and current inputs](../new-a-workspace/experiments/README.md)
+
+Ryzen 5 5500U completed all three Linux smoke fixtures with the shared state-only OpenMP build. File syscall tracing during the test, verified build reuse, doctor, inference and ZIP collection observed zero thermal sysfs opens and zero workspace statfs calls. The host BPF build prepared both FULL checkpoints without a kernel load. The 4P+8E Intel fixture, 8-core AMD fixture, no-SMT AMD and CPU-quota tests passed. Physical Intel and a second AMD desktop are pending.
+
+## Optional Prefill P-core selection
+
+The integration-v2 scheduler includes `prefill-pcore` and a matched `neutral` control. Both use state-v2, selected-child registration and the existing guarded weighted-vtime dispatch. Only a registered task waking during active Prefill can claim an allowed, online, idle P-core representative. FULL records actual running starts per CPU and phase. Both variants export selection attempts and hits. [Intel/AMD smoke procedure](../new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md#prefill-p-core-옵션을-확인하는-짧은-실험)
+
+On AMD Ryzen 5 5500U, kernel `7.0.0-43-generic`, the six policies built in both FULL and Lite. The host tests exercised the production selector with controlled idle masks. Both new checkpoints produced zero P representatives on this six-core AMD. A real-model Linux smoke completed eight concurrent requests and one single request, four output tokens per request, with identical warmup/measurement tokens, zero cross-request cache, per-request timings, and 14 state-v2 transitions including idle. The server exited with code zero and no live process-group members. The ordinary Linux smoke is recorded in `new-a-workspace/state/integration-v2/prefill-pcore-linux-smoke-01`. Intel hardware measurement is pending.
+
+`bash scripts/integration_v2.sh test` passed 48 topology, 22 serving and 16 integration tests. The scheduler build ran the C receiver test and both production-selector host tests. `bpftool gen skeleton` opened all four new objects, and their 11 external function names were present in the running kernel BTF. The `neutral` objects have no idle-claim kfunc reference. The Intel 4P+8E fixture passed the normal resource resolver and checkpoint encoder with four preferred P representatives inside a six-CPU envelope. The AMD target encoded a zero-length preference inside its six-CPU envelope.
+
+The shipped `bash scripts/prefill-pcore-smoke.sh linux` run is in `state/integration-v2/prefill-smoke-linux.PJG86j8c/linux`. Both cohorts' throughput and request timings were checked against the raw responses. A userspace replay fed its 14 published transitions through the C receiver and production selector, with one synthetic wakeup per transition. The simulated Intel candidate chose an idle P representative on the four Prefill transitions. The AMD configuration and both neutral controls used default selection throughout. See `state/integration-v2/prefill-pcore-host-replay.json`. Both final offline checkpoints are in `state/integration-v2/prefill-smoke-prepare.juPdlTDx`. The online controller in `prefill-smoke-scx.T3wPvix4` expired waiting for its first manual loader. The host remained in `sched_ext=disabled`. A new `bash scripts/prefill-pcore-smoke.sh scx` visit generates fresh operator commands.
+
+With AC and direct loader access, both FULL objects passed the AMD selected-child smoke. Each receiver accepted 14 state transitions including four idle events. Both guards passed and both loaders detached cleanly. The two arms produced identical tokens, and `prefill-pcore` recorded zero P-core attempts and hits. The raw visit and deployment evidence are in `state/integration-v2/prefill-smoke-scx.I2XsWiIz`.
+
+The Lite campaign completed 36 visits, with six paired blocks per load condition. For eight concurrent requests, `prefill-pcore` changed throughput relative to the same runtime on default Linux by −1.12% under ambient load (95% paired interval −3.56% to +0.23%) and +0.20% under `cpu25` (−0.99% to +1.34%). Under `cpu25`, mean server CPU time fell from 81.94 to 76.42 CPU seconds. All measured arms produced identical output tokens within each block. [AMD measurement report](../new-a-workspace/experiments/amd-prefill-placement-ac-v1/result-summary.md) · [Protocol](../new-a-workspace/experiments/amd-prefill-placement-ac-v1/protocol.json)
+
+## Mixed workload overlap validation
+
+Integrated the donor [cc68058](https://github.com/hsju2021/llama.cpp-fork/commit/cc6805881aac81d48f605ca285cce9778c0aea3f)
+`/slots` parser hardening, fixture shape, regression test and API examples.
+The overlap check accepts an object or a one-element array for `next_token`
+and skips malformed snapshots. `bash scripts/integration_v2.sh test` passed
+all 77 model-free tests, including 22 serving benchmark tests. Real-model
+performance measurement is pending.
+
+## Standalone integration workspace
+
+The integration checkout now has an independent Git directory. Its branch,
+upstream and working changes were compared before removing the old worktrees
+and experiment folders. The workspace keeps the checkout, the original
+`llama.cpp` directory and `model.gguf`. The model SHA-256 still matches.
+
+After removal, a fresh OpenMP build, `doctor`, a real-model cohort smoke,
+76 model-free tests and recalculation of the saved AMD confirmation passed.
+The retained AMD results are self-contained for recalculation. Repeating the
+historical B0/A experiment requires the original benchmark runtimes.
+
+## Intel smoke host checks
+
+Intel `smoke` and `m4` use relaxed host checks. Only a fresh build checks its
+128 MiB free-space floor. Doctor and inference have no fixed disk gate.
+Temperature sensors are skipped throughout the standard smoke path. Seventy-six
+model-free tests passed. On AMD, the same OpenMP fixed6 launch and all three
+smoke fixtures passed, and syscall traces of the test, doctor, inference and
+collection stages showed no thermal sysfs reads or workspace disk checks.
+A synthetic Intel 4P+8E topology selected four P-cores and two E-cores.
+See the [Intel handoff](../new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md)
+for the Intel hardware run procedure.
+
+## 2026-11-25: published integration-v2 AMD performance
+
+The published `fcb2e08` OpenMP research profile completed two B0/A/integration
+confirmation campaigns on Ryzen 5 5500U, using the default Linux scheduler.
+All 32 primary pairs were technically valid with equal warmup and measured
+output tokens. Relative to the historical source rebuild, the integrated build
+improved cohort throughput by 17.92–18.11% in ambient and 32.88–37.43% in cpu25.
+The [AMD result and raw audit](../new-a-workspace/experiments/amd-published-direct-v1/result-summary.md)
+record the frozen workload, exact gains, and scope.
+
+## 2026-11-24: integration-v2 development
+
+The separate integration-v2 worktree builds the R numerical path, semantic
+resource decisions, selectable persistent CPU pools, and optional state-v2
+publication from its own source tree. The canonical run command verifies build
+inputs and mapped project libraries. The first AMD OpenMP and native composition
+checks passed. An awake/resumed token difference in a multi-cohort visit was
+reproduced in unchanged rebuilt B0 and A. Matched-history comparisons across the
+three runtimes are exact, and separate fresh-server heldout visits match the
+preserved output prefixes.
+
+The topology donor contributes CPUID and hybrid configuration. Current-kernel
+FULL/Lite objects, loader, selected-child and receiver tests compiled. A manual
+kernel checkpoint is needed for native verifier and state delivery evidence.
+Intel native execution is pending. Current evidence, failures, and remaining
+steps are recorded in the
+[integration report](../new-a-workspace/experiments/team-integration-v2/professor-integration-report.ko.md).
+
 ## 2026-11-23: preserved NEW_A workspace and Intel handoff
 
 Added `new-a-workspace/` alongside the existing base project, preserving its
@@ -322,3 +409,21 @@ validation logs, request/response, environment and isolation records, and the
 final instrumentation report. Targeted cleanup runs on success, failure,
 SIGINT, and SIGTERM and verifies sched_ext returns to disabled. No scheduling
 policy dimension is changed in M11R.
+
+## Integration v2 CPU runtime and selected-child strategies
+
+AMD OpenMP and native clean builds used the same canonical source and verified
+exact model fixtures, lifecycle, pool recovery and manual BPF preparation.
+Adaptive and fixed thread roles, persistent pool, native Batch priority/park,
+SSE, mixed cap128 and scoped head64 are summarized in the integration report.
+
+The current kernel admits preparation of FULL and Lite configurations with
+observe, Decode handoff and two previous-CPU strategies. These are compiled,
+with kernel verifier, attachment, real dispatch and detach pending operator
+execution. Intel uses the same source recipe and still needs native validation.
+
+See [the Intel handoff and kernel procedure](../new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md).
+
+The Intel Linux wrapper skips CPU temperature checks in build, doctor and
+inference. Disk requirements are greater than 128 MiB for the build and 32 MiB
+for validation and inference.

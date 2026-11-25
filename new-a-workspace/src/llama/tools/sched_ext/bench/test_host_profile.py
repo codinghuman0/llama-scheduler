@@ -26,7 +26,7 @@ class HostProfileTests(unittest.TestCase):
     def test_missing_optional_interfaces_and_present_state_changes(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            kwargs = dict(cpu=root / 'cpu', hwmon_root=root / 'hwmon', power_root=root / 'power')
+            kwargs = dict(cpu=root / 'cpu', power_root=root / 'power')
             empty = host_profile.capabilities(**kwargs)
             self.assertFalse(empty['frequency']['available'])
             self.assertFalse(empty['turbo']['available'])
@@ -81,27 +81,9 @@ class HostProfileTests(unittest.TestCase):
                             dict(available=True, entries={'adapter': dict(online='1')}))
         self.assertEqual(value['power_supply']['entries']['BAT0']['status'], 'Charging')
 
-    def test_sensor_discovery_has_no_hwmon_index_or_vendor_requirement(self):
-        for name, label in (('k10temp', 'Tctl'), ('coretemp', 'Package id 2')):
-            with tempfile.TemporaryDirectory() as temp:
-                root = Path(temp)
-                hwmon = root / 'hwmon/hwmon57'
-                hwmon.mkdir(parents=True)
-                (hwmon / 'name').write_text(name)
-                (hwmon / 'temp8_label').write_text(label)
-                (hwmon / 'temp8_input').write_text('42000')
-                result = host_profile.capabilities(cpu=root / 'cpu', hwmon_root=root / 'hwmon', power_root=root / 'power')
-                self.assertEqual(result['temperature_c'], 42)
-                self.assertEqual(result['temperature_sensor']['label'], label)
-
-    def test_bounded_readiness_with_and_without_temperature(self):
-        absent = dict(temperature_sensor='unavailable', temperature_c=None, loadavg=[0, 0, 0])
-        self.assertTrue(machine.thermal_ready([absent] * 3))
-        self.assertFalse(machine.thermal_ready([absent | dict(loadavg=[2, 0, 0])] * 3))
-        present = absent | dict(temperature_sensor=dict(name='fixture'), temperature_c=40)
-        self.assertTrue(machine.thermal_ready([present, present | dict(temperature_c=42), present]))
-        self.assertFalse(machine.thermal_ready([present, present | dict(temperature_c=43), present]))
-        self.assertFalse(machine.thermal_ready([present | dict(temperature_c=56)] * 3))
+    def test_readiness_uses_only_background_load(self):
+        self.assertTrue(machine.load_ready([dict(loadavg=[0, 0, 0])]))
+        self.assertFalse(machine.load_ready([dict(loadavg=[2, 0, 0])]))
 
     def test_scheduler_path_and_artifact_tampering(self):
         with tempfile.TemporaryDirectory() as temp, patch.object(host_profile, 'SCHED', Path(temp)):

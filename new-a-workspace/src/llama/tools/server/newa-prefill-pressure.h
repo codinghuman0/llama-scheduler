@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <time.h>
 #include <unistd.h>
+#include <vector>
 
 // CPU-only research overlay. The public interface matches the retained server hook.
 // No token values, request answers, condition names, or previous-cohort learning are used.
@@ -18,17 +19,22 @@ class newa_decode_policy {
 #ifdef NEWA_PREFILL_PRESSURE_TEST
     friend struct newa_prefill_pressure_test;
 #endif
-    enum class mode { off, pressure, fixed6, fixed5 } policy = mode::off;
-    static constexpr long long min_call_ns = 1000000000LL;
+    enum class mode { off, pressure, fixed6, fixed5, adaptive } policy = mode::off;
+    static constexpr unsigned max_adaptive_cpus = 32;
+    long long min_call_ns = 1000000000LL;
     static constexpr long long max_read_ns = 20000000LL;
     static constexpr long long max_start_age_ns = 10000000000LL;
     static constexpr unsigned max_decode_calls = 256;
-    static constexpr double threshold = .125, accounting_margin = .02;
+
+    static constexpr double accounting_margin = .02;
+    double threshold = .125;
+    unsigned epoch_size = 8;
+    int generation_workers = 5, batch_workers = 6;
     struct snapshot {
         long long wall_first = 0, wall_last = 0, cpu_first = 0, cpu_last = 0;
         unsigned long long task_ticks = 0;
         bool ok = false;
-        unsigned long long fields[6][3] = {};
+        unsigned long long fields[max_adaptive_cpus][3] = {};
     };
     struct observation {
         snapshot before, after;
@@ -52,7 +58,7 @@ class newa_decode_policy {
         observation sample;
     } current, proposed;
     std::array<epoch, 16> reports{};
-    std::array<int, 6> cpus{};
+    std::vector<int> cpus;
     unsigned report_count = 0, reports_dropped = 0, failures = 0, read_errors = 0;
     long ticks_per_second = 0;
     bool selected = false, begun = false, capture = false;
@@ -98,7 +104,7 @@ class newa_decode_policy {
         }
         ok = cpu_ns(result.cpu_last) && ok;
         result.wall_last = wall_ns();
-        result.ok = ok && seen == 63 && result.wall_last >= result.wall_first &&
+        result.ok = ok && seen == (uint32_t)((UINT64_C(1) << cpus.size()) - 1) && result.wall_last >= result.wall_first &&
                     result.wall_last - result.wall_first <= max_read_ns && result.cpu_last >= result.cpu_first;
         return result;
     }
@@ -128,30 +134,39 @@ class newa_decode_policy {
         if (!value.counters_valid) return;
         value.score = (value.task_cpu_s - value.own_cpu_upper_s - value.rounding_cpu_s) / value.wall_s - accounting_margin;
         value.usable = value.model_end - value.model_start >= min_call_ns;
-        value.shadow_choice = value.usable && value.score > threshold ? 5 : 6;
+        value.shadow_choice = value.usable && value.score > threshold ? generation_workers : batch_workers;
     }
     static void invalidate(epoch & value, int reason) {
         if (!value.invalidated) value.reason = reason;
         value.invalidated = true;
     }
-    static int find_member(epoch & value, int slot, int task, bool add) {
+    int find_member(epoch & value, int slot, int task, bool add) {
         for (unsigned i = 0; i < value.member_count; ++i) {
             const auto & existing = value.members[i];
             if (existing.slot == slot) return existing.task == task ? (int)i : -1;
             if (existing.task == task) return -1;
         }
-        if (!add || value.member_count == 8 || task < 0 || slot < 0) return -1;
+        if (!add || value.member_count == epoch_size || task < 0 || slot < 0) return -1;
         const unsigned index = value.member_count++;
         value.members[index].task = task;
         value.members[index].slot = slot;
         return (int)index;
     }
-    static void print_snapshot(const snapshot & value) {
+    void print_snapshot(const snapshot & value) const {
         std::fprintf(stderr, "{\"wall_first\":%lld,\"wall_last\":%lld,\"cpu_first\":%lld,\"cpu_last\":%lld,\"task_ticks\":%llu,\"ok\":%s,\"fields\":[",
                      value.wall_first, value.wall_last, value.cpu_first, value.cpu_last, value.task_ticks, value.ok ? "true" : "false");
-        for (unsigned i = 0; i < 6; ++i)
+        for (unsigned i = 0; i < cpus.size(); ++i)
             std::fprintf(stderr, "%s[%llu,%llu,%llu]", i ? "," : "", value.fields[i][0], value.fields[i][1], value.fields[i][2]);
         std::fprintf(stderr, "]}");
+    }
+
+    static double setting_value(const char * name, double low, double high) {
+        const char * raw = std::getenv(name);
+        char * end = nullptr;
+        const double value = raw ? std::strtod(raw, &end) : 0;
+        if (!raw || end == raw || *end || !std::isfinite(value) || value < low || value > high)
+            throw std::invalid_argument(name);
+        return value;
     }
 
 public:
@@ -161,13 +176,23 @@ public:
         if (!std::strcmp(setting, "pressure")) policy = mode::pressure;
         else if (!std::strcmp(setting, "fixed6")) policy = mode::fixed6;
         else if (!std::strcmp(setting, "fixed5")) policy = mode::fixed5;
-        else throw std::invalid_argument("unknown Prefill pressure mode");
+        else if (!std::strcmp(setting, "adaptive")) {
+            policy = mode::adaptive;
+            threshold = setting_value("NEWA_ADAPTIVE_THRESHOLD", 0, 4);
+            const double members = setting_value("NEWA_ADAPTIVE_COHORT", 2, 8);
+            if (members != std::floor(members))
+                throw std::invalid_argument("NEWA_ADAPTIVE_COHORT requires an integer");
+            epoch_size = (unsigned) members;
+            min_call_ns = (long long)(setting_value("NEWA_ADAPTIVE_PREFILL_MS", 100, 10000) * 1000000);
+        } else throw std::invalid_argument("unknown Prefill pressure mode");
         cpu_set_t mask;
         CPU_ZERO(&mask);
-        if (sched_getaffinity(0, sizeof(mask), &mask) || CPU_COUNT(&mask) != 6)
-            throw std::invalid_argument("Prefill pressure experiment requires fixed six-CPU affinity");
-        unsigned index = 0;
-        for (int cpu = 0; cpu < CPU_SETSIZE; ++cpu) if (CPU_ISSET(cpu, &mask)) cpus[index++] = cpu;
+        if (sched_getaffinity(0, sizeof(mask), &mask))
+            throw std::invalid_argument("Cannot read fixed CPU affinity for Prefill sampling");
+        const int count = CPU_COUNT(&mask);
+        if (policy == mode::adaptive ? count < 2 || count > (int)max_adaptive_cpus : count != 6)
+            throw std::invalid_argument("Adaptive pressure requires 2..32 CPUs; legacy modes require six");
+        for (int cpu = 0; cpu < CPU_SETSIZE; ++cpu) if (CPU_ISSET(cpu, &mask)) cpus.push_back(cpu);
         ticks_per_second = sysconf(_SC_CLK_TCK);
         if (ticks_per_second <= 0) throw std::invalid_argument("invalid USER_HZ");
     }
@@ -187,12 +212,21 @@ public:
             const Tokens & tokens, int off, llama_context * ctx, llama_compute_profile original) {
         if (!enabled()) return original;
         if (selected) reset();
-        if (llama_n_threads(ctx) != 5 || llama_n_threads_batch(ctx) != 6)
-            throw std::invalid_argument("Prefill pressure experiment requires threads5/batch6");
+        const int generation = llama_n_threads(ctx);
+        const int batch = llama_n_threads_batch(ctx);
+        if (policy == mode::adaptive) {
+            if (generation < 1 || generation >= batch || batch > (int)cpus.size())
+                throw std::invalid_argument("Adaptive pressure requires two distinct worker counts within the fixed envelope");
+            generation_workers = generation;
+            batch_workers = batch;
+        } else if (generation != 5 || batch != 6) {
+            throw std::invalid_argument("Legacy pressure experiment requires threads5/batch6");
+        }
         proposed = current;
         proposed.active = true;
         capture = false;
-        int actual = phase == SERVER_BATCH_PHASE_DECODE && view.n_tokens == 1 ? 5 : 6;
+        if (!proposed.sample.captured) proposed.sample.shadow_choice = batch_workers;
+        int actual = phase == SERVER_BATCH_PHASE_DECODE && view.n_tokens == 1 ? generation_workers : batch_workers;
         const bool shape = view.n_tokens > 0 && off >= 0 && (size_t)off + view.n_tokens <= tokens.size() &&
             view.token && !view.embd && view.pos && view.seq_id && view.n_seq_id && view.logits;
         if (!shape || (unsigned)phase >= 4 || phase == SERVER_BATCH_PHASE_UNKNOWN) invalidate(proposed, 1);
@@ -223,7 +257,7 @@ public:
                 proposed.sample.n_tokens = view.n_tokens;
             }
         } else if (!proposed.invalidated && phase == SERVER_BATCH_PHASE_DECODE) {
-            bool eligible = view.n_tokens <= 8 && proposed.member_count == 8 && proposed.sample.captured &&
+            bool eligible = view.n_tokens <= (int)epoch_size && proposed.member_count == epoch_size && proposed.sample.captured &&
                 proposed.sample.counters_valid && proposed.sample.usable;
             unsigned active_mask = 0;
             for (int i = 0; i < view.n_tokens && eligible; ++i) {
@@ -243,7 +277,7 @@ public:
                 member.last_position = token.pos;
             }
             if (!proposed.locked) {
-                eligible &= active_mask == 255;
+                eligible &= active_mask == (1U << epoch_size) - 1;
                 if (eligible) {
                     proposed.first_decode_ns = wall_ns();
                     proposed.sample_age_ns = proposed.first_decode_ns - proposed.sample.after.wall_last;
@@ -256,14 +290,15 @@ public:
                 proposed.locked = true;
                 proposed.active_mask = active_mask;
                 ++proposed.eligible_calls;
-                actual = view.n_tokens == 1 ? 5 : policy == mode::fixed6 ? 6 : policy == mode::fixed5 ? 5 : proposed.sample.shadow_choice;
-                ++proposed.eligible_by_size[view.n_tokens][actual == 5 ? 0 : 1];
+                actual = view.n_tokens == 1 || policy == mode::fixed5 ? generation_workers :
+                    policy == mode::fixed6 ? batch_workers : proposed.sample.shadow_choice;
+                ++proposed.eligible_by_size[view.n_tokens][actual == generation_workers ? 0 : 1];
             }
         }
         ++proposed.calls;
-        if ((unsigned)phase < 4) ++proposed.decisions[(unsigned)phase][actual == 5 ? 0 : 1];
+        if ((unsigned)phase < 4) ++proposed.decisions[(unsigned)phase][actual == generation_workers ? 0 : 1];
         selected = true;
-        return actual == 5 ? LLAMA_COMPUTE_PROFILE_GENERATION : LLAMA_COMPUTE_PROFILE_BATCH;
+        return actual == generation_workers ? LLAMA_COMPUTE_PROFILE_GENERATION : LLAMA_COMPUTE_PROFILE_BATCH;
     }
     void begin() {
         if (!enabled()) return;
@@ -299,11 +334,15 @@ public:
     ~newa_decode_policy() {
         if (!enabled()) return;
         reset();
-        const char * name = policy == mode::pressure ? "pressure" : policy == mode::fixed6 ? "fixed6" : "fixed5";
+        const char * name = policy == mode::adaptive ? "adaptive" : policy == mode::pressure ? "pressure" : policy == mode::fixed6 ? "fixed6" : "fixed5";
         std::fprintf(stderr, "NEWA_PREFILL_POLICY {\"mode\":\"%s\",\"failures\":%u,\"read_errors\":%u,\"reports_dropped\":%u,\"ticks_per_second\":%ld,\"cpus\":[",
                      name, failures, read_errors, reports_dropped, ticks_per_second);
         for (unsigned i = 0; i < cpus.size(); ++i) std::fprintf(stderr, "%s%d", i ? "," : "", cpus[i]);
-        std::fprintf(stderr, "],\"threshold\":%.17g,\"accounting_margin_cores\":%.17g,\"epochs\":[", threshold, accounting_margin);
+        std::fprintf(stderr, "],\"threshold\":%.17g,\"accounting_margin_cores\":%.17g", threshold, accounting_margin);
+        if (policy == mode::adaptive)
+            std::fprintf(stderr, ",\"workers\":[%d,%d],\"epoch_size\":%u,\"min_prefill_ns\":%lld",
+                         generation_workers, batch_workers, epoch_size, min_call_ns);
+        std::fprintf(stderr, ",\"epochs\":[");
         for (unsigned i = 0; i < report_count; ++i) {
             const auto & e = reports[i];
             const auto & s = e.sample;
@@ -315,9 +354,9 @@ public:
                 std::fprintf(stderr, "%s{\"task\":%d,\"slot\":%d,\"first_position\":%d,\"last_position\":%d,\"prefill_seen\":%s}",
                     j ? "," : "", v.task, v.slot, v.first_position, v.last_position, v.prefill_seen ? "true" : "false");
             }
-            std::fprintf(stderr, "],\"decisions_5_6\":[");
+            std::fprintf(stderr, "],\"%s\":[", policy == mode::adaptive ? "decisions_generation_batch" : "decisions_5_6");
             for (unsigned j = 0; j < 4; ++j) std::fprintf(stderr, "%s[%llu,%llu]", j ? "," : "", e.decisions[j][0], e.decisions[j][1]);
-            std::fprintf(stderr, "],\"eligible_by_size_5_6\":[");
+            std::fprintf(stderr, "],\"%s\":[", policy == mode::adaptive ? "eligible_by_size_generation_batch" : "eligible_by_size_5_6");
             for (unsigned j = 0; j < 9; ++j) std::fprintf(stderr, "%s[%llu,%llu]", j ? "," : "", e.eligible_by_size[j][0], e.eligible_by_size[j][1]);
             std::fprintf(stderr, "],\"sample\":{\"captured\":%s,\"counters_valid\":%s,\"usable\":%s,\"n_tokens\":%d,\"model_start\":%lld,\"model_end\":%lld,\"wall_s\":%.17g,\"task_cpu_s\":%.17g,\"own_cpu_upper_s\":%.17g,\"rounding_cpu_s\":%.17g,\"score\":%.17g,\"shadow_choice\":%d,\"before\":",
                 s.captured ? "true" : "false", s.counters_valid ? "true" : "false", s.usable ? "true" : "false", s.n_tokens,

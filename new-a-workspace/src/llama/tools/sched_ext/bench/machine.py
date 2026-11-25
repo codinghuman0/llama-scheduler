@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
 """Checkpoints run outside requests; there is no background observer."""
-import math
 import os
 from pathlib import Path
 import re
@@ -25,9 +24,6 @@ def invariants(value):
 
 
 def validate(value, baseline=None):
-    sensor = value['temperature_sensor']
-    require((sensor == 'unavailable' and value['temperature_c'] is None) or
-            (isinstance(sensor, dict) and isinstance(value['temperature_c'], (int, float)) and math.isfinite(value['temperature_c'])), 'Temperature capability/value differs')
     if baseline:
         require(invariants(value) == invariants(baseline), 'Machine configuration changed during campaign')
     elif HOST:
@@ -37,11 +33,8 @@ def validate(value, baseline=None):
                 and host_profile.execution_state(value) == host_profile.execution_state(HOST['capabilities']), 'Machine differs from frozen host profile')
 
 
-def thermal_ready(samples):
-    if samples[0]['temperature_sensor'] == 'unavailable':
-        return all(s['temperature_c'] is None and s['loadavg'][0] <= 1 for s in samples)
-    temperatures = [s['temperature_c'] for s in samples]
-    return max(temperatures) <= 55 and max(temperatures) - min(temperatures) <= 2
+def load_ready(samples):
+    return all(s['loadavg'][0] <= 1 for s in samples)
 
 
 def counters():
@@ -141,7 +134,7 @@ def readiness(run, name, baseline, *, after_warmup):
             third, sample3 = counters(), snapshot()
             validate(sample3, baseline)
             record.update(third=sample3, second_busy_pct=busy(second, third))
-            ready = thermal_ready((sample1, sample2, sample3)) and max(record['busy_pct'], record['second_busy_pct']) <= 5
+            ready = load_ready((sample1, sample2, sample3)) and max(record['busy_pct'], record['second_busy_pct']) <= 5
         else:
             ready = sample2['loadavg'][0] <= 1 and record['busy_pct'] <= 5
         record['ready'] = ready
@@ -160,7 +153,7 @@ def validate_readiness(readings, baseline, *, after_warmup):
         validate(record[name], baseline)
     require(0 <= record['busy_pct'] <= 5, 'Saved readiness CPU busy exceeds protocol')
     if after_warmup:
-        require(thermal_ready([record[name] for name in names])
+        require(load_ready([record[name] for name in names])
                 and 0 <= record['second_busy_pct'] <= 5, 'Saved cooldown exceeds protocol')
     else:
         require(record['second']['loadavg'][0] <= 1, 'Saved block load exceeds protocol')

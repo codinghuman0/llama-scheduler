@@ -28,10 +28,10 @@
 - 원래 P는 null-padding guard에서 실패했다. 수정 P는 별도 overlay/identity다. observer-v1의 미지원 getter 실패도 observer-v2 결과로 덮어쓰지 않았다.
 - HINT OFF 전체 context의 기존 `newa_resource` 미선언 오류는 남아 있다. HINT ON final을 확인한 것이 모든 build mode PASS는 아니다.
 - 두 캠페인 `heldout-1/2`는 historical fixture label이다. 이번 재현·감사에서 unseen dataset이라는 뜻이 아니다.
-- final A_L은 연구 역할이다. 기본 `run.sh`의 pre-R NEW_A 경로와 동일하지 않다. [진입점 증거](evidence/entrypoint-scope.json).
+- final A_L은 연구 역할이다. 기본 `run.sh`의 pre-R NEW_A 경로와 동일하지 않다. [진입점 증거](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/evidence/entrypoint-scope.json).
 
 ## 조회 실패를 숨기지 않음
 
-public donor에서 local59→head 비교는 조회되지 않았다. 보존 Git object를 읽어 local59→공유5219→B0를 확인하고, 정확한 donor pin에 대해5219 ancestry를 별도로 확인했다. donor HEAD에 `server-phase.h` 파일을 가정한 조회도404였다. 실제 shared server/scx classifier와 local header 분리를 기준으로 조사했다. 감사용 raw 파일명 첫 시도 오류도 수정 이력을 남겼다. [조회·감사 시도 기록](evidence/audit-attempts.json).
+public donor에서 local59→head 비교는 조회되지 않았다. 보존 Git object를 읽어 local59→공유5219→B0를 확인하고, 정확한 donor pin에 대해5219 ancestry를 별도로 확인했다. donor HEAD에 `server-phase.h` 파일을 가정한 조회도404였다. 실제 shared server/scx classifier와 local header 분리를 기준으로 조사했다. 감사용 raw 파일명 첫 시도 오류도 수정 이력을 남겼다. [조회·감사 시도 기록](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/evidence/audit-attempts.json).
 
 이 목록은 새 실험을 자동으로 실행하라는 명령이 아니다. 이번 작업은 감사 패키지 완료 후 종료한다.

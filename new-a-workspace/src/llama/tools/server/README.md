@@ -770,11 +770,7 @@ By default, it is read-only. To make POST request to change global properties, y
 ```json
 {
   "default_generation_settings": {
-    "id": 0,
-    "id_task": -1,
     "n_ctx": 1024,
-    "speculative": false,
-    "is_processing": false,
     "params": {
       "n_predict": -1,
       "seed": 4294967295,
@@ -795,24 +791,16 @@ By default, it is read-only. To make POST request to change global properties, y
       "dry_base": 1.75,
       "dry_allowed_length": 2,
       "dry_penalty_last_n": -1,
-      "dry_sequence_breakers": [
-        "\n",
-        ":",
-        "\"",
-        "*"
-      ],
       "mirostat": 0,
       "mirostat_tau": 5.0,
       "mirostat_eta": 0.10000000149011612,
-      "stop": [],
       "max_tokens": -1,
       "n_keep": 0,
       "n_discard": 0,
       "ignore_eos": false,
-      "stream": true,
+      "stream": false,
       "n_probs": 0,
       "min_keep": 0,
-      "grammar": "",
       "samplers": [
         "dry",
         "top_k",
@@ -822,18 +810,8 @@ By default, it is read-only. To make POST request to change global properties, y
         "xtc",
         "temperature"
       ],
-      "speculative.n_max": 16,
-      "speculative.n_min": 5,
-      "speculative.p_min": 0.8999999761581421,
+      "speculative.types": "none",
       "timings_per_token": false
-    },
-    "prompt": "",
-    "next_token": {
-      "has_next_token": true,
-      "has_new_line": false,
-      "n_remain": -1,
-      "n_decoded": 0,
-      "stopping_word": ""
     }
   },
   "total_slots": 1,
@@ -849,7 +827,7 @@ By default, it is read-only. To make POST request to change global properties, y
 }
 ```
 
-- `default_generation_settings` - the default generation settings for the `/completion` endpoint, which has the same fields as the `generation_settings` response object from the `/completion` endpoint.
+- `default_generation_settings` contains the slot context size (`n_ctx`) and the default generation parameters for `/completion` (`params`).
 - `total_slots` - the total number of slots for process requests (defined by `--parallel` option)
 - `model_path` - the path to model file (same with `-m` argument)
 - `chat_template` - the model's original Jinja2 prompt template
@@ -909,6 +887,8 @@ Same as the `/v1/embeddings` endpoint.
 
 This endpoint is enabled by default and can be disabled with `--no-slots`. It can be used to query various per-slot metrics, such as speed, processed tokens, sampling parameters, etc.
 
+For a slot with a current or previous task, `next_token` is an array containing one object. `n_prompt_tokens_processed` counts newly processed prompt tokens for that task. `n_prompt_tokens` is the number of tokens currently stored in the slot and can include generated tokens.
+
 If query param `?fail_on_no_slot=1` is set, this endpoint will respond with status code 503 if there is no available slots.
 
 **Response format**
@@ -924,6 +904,9 @@ If query param `?fail_on_no_slot=1` is set, this endpoint will respond with stat
     "n_ctx": 65536,
     "speculative": false,
     "is_processing": true,
+    "n_prompt_tokens": 128,
+    "n_prompt_tokens_processed": 128,
+    "n_prompt_tokens_cache": 0,
     "params": {
       "n_predict": -1,
       "seed": 4294967295,
@@ -969,19 +952,19 @@ If query param `?fail_on_no_slot=1` is set, this endpoint will respond with stat
         "xtc",
         "temperature"
       ],
-      "speculative.n_max": 16,
-      "speculative.n_min": 0,
-      "speculative.p_min": 0.75,
+      "speculative.types": "none",
       "timings_per_token": false,
       "post_sampling_probs": false,
       "lora": []
     },
-    "next_token": {
-      "has_next_token": true,
-      "has_new_line": false,
-      "n_remain": -1,
-      "n_decoded": 0
-    }
+    "next_token": [
+      {
+        "has_next_token": true,
+        "has_new_line": false,
+        "n_remain": -1,
+        "n_decoded": 0
+      }
+    ]
   },
   {
     "id": 1,
@@ -989,6 +972,9 @@ If query param `?fail_on_no_slot=1` is set, this endpoint will respond with stat
     "n_ctx": 65536,
     "speculative": false,
     "is_processing": true,
+    "n_prompt_tokens": 151,
+    "n_prompt_tokens_processed": 16,
+    "n_prompt_tokens_cache": 0,
     "params": {
       "n_predict": -1,
       "seed": 4294967295,
@@ -1034,19 +1020,19 @@ If query param `?fail_on_no_slot=1` is set, this endpoint will respond with stat
         "xtc",
         "temperature"
       ],
-      "speculative.n_max": 16,
-      "speculative.n_min": 0,
-      "speculative.p_min": 0.75,
+      "speculative.types": "none",
       "timings_per_token": false,
       "post_sampling_probs": false,
       "lora": []
     },
-    "next_token": {
-      "has_next_token": true,
-      "has_new_line": true,
-      "n_remain": -1,
-      "n_decoded": 136
-    }
+    "next_token": [
+      {
+        "has_next_token": true,
+        "has_new_line": true,
+        "n_remain": -1,
+        "n_decoded": 136
+      }
+    ]
   }
 ]
 ```

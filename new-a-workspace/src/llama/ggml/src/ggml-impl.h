@@ -150,6 +150,9 @@ static void ggml_set_op_params(struct ggml_tensor * tensor, const void * params,
     memcpy(tensor->op_params, params, params_size);
 }
 
+// Private FLASH_ATTN_EXT parameter for the CPU mixed-prefill query tile.
+enum { GGML_FLASH_ATTN_EXT_HEAD64 = 4 };
+
 static int32_t ggml_get_op_params_i32(const struct ggml_tensor * tensor, uint32_t i) {
     assert(i < GGML_MAX_OP_PARAMS / sizeof(int32_t));
     return ((const int32_t *)(tensor->op_params))[i];

@@ -71,11 +71,11 @@ check-scx-api:
 
 validate-kernel-sched-uapi:
 	@test -f "$(KERNEL_SCHED_UAPI)" || { \
-		printf 'error: selected kernel UAPI header not found: %s\n' "$(KERNEL_SCHED_UAPI)" >&2; \
+		printf '오류: 선택한 커널의 UAPI 헤더가 없습니다 (%s).\n' "$(KERNEL_SCHED_UAPI)" >&2; \
 		exit 1; \
 	}
 	@awk '$$1 == "#define" && $$2 == "SCHED_EXT" && $$3 == "7" { found = 1 } \
-		END { if (!found) { printf "error: %s does not define SCHED_EXT as policy 7\n", ARGV[1] > "/dev/stderr"; exit 1 } }' \
+		END { if (!found) { printf "오류: %s에 SCHED_EXT 정책 번호 7이 정의되어 있지 않습니다.\n", ARGV[1] > "/dev/stderr"; exit 1 } }' \
 		"$(KERNEL_SCHED_UAPI)"
 
 check-sched-uapi: validate-kernel-sched-uapi

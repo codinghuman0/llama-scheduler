@@ -1,0 +1,31 @@
+{
+  "device": "AMD Ryzen 5 5500U",
+  "model_sha256": "f3bdf9cf31dee4b57ae4e455a1cb0d01b5c2c1b50d72d3112141c195506c2840",
+  "server_cpus": [0, 2, 4, 6, 8, 10],
+  "profile": "unified-conservative",
+  "resources": "amd-5-6",
+  "policy": "fixed6",
+  "pool": "roles",
+  "transport": "state",
+  "kernel_instrumentation": "lite",
+  "primary": "actual generated tokens divided by the wall seconds of the 8-request HTTP cohort",
+  "contrasts": [["prefill-pcore", "neutral"], ["prefill-pcore", "linux"], ["neutral", "linux"]],
+  "tokens_per_request": 64,
+  "cohorts": ["heldout-1", "heldout-2"],
+  "secondary_fixture": "single-short",
+  "conditions": ["ambient", "cpu25"],
+  "blocks_per_condition": 6,
+  "arm_orders": [
+    ["linux", "neutral", "prefill-pcore"], ["prefill-pcore", "neutral", "linux"],
+    ["neutral", "prefill-pcore", "linux"], ["linux", "prefill-pcore", "neutral"],
+    ["prefill-pcore", "linux", "neutral"], ["neutral", "linux", "prefill-pcore"]
+  ],
+  "order_rule": "Alternate cohorts by block. Reverse arm order for cpu25. Alternate which condition goes first by block.",
+  "visit_rule": "Fresh server for each arm. Each cohort has one warmup, one measured request; model loading and warmup are excluded. Eight-prompt fixture precedes single-short.",
+  "power": "AC online at visit endpoints and each warmup and measured HTTP boundary",
+  "cpu25": {"cpu": 10, "min_cores": 0.22, "max_cores": 0.28, "max_within_block_spread": 0.025},
+  "audit": "Same model, binaries, runtime settings, payloads and token IDs for all arms in each block. Require actual kernel registration, selected-task masks, receiver and detach for each SCX visit. Save and report all failures. No replacing slow observations.",
+  "phase_metrics": "Per visit, sum of per-request phase tokens divided by sum of per-request phase seconds. Simultaneous requests can overlap.",
+  "uncertainty": {"method": "percentile bootstrap of paired block gains, stratified by cohort", "draws": 20000, "seed": 20261125},
+  "scope": "One AMD measurement campaign, no promotion or independent-confirmation claim"
+}

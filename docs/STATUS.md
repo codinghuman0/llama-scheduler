@@ -2,6 +2,8 @@
 
 ## Intel and AMD release entry point
 
+The published launcher prepared both kernel policies from a new shallow clone and from an existing single-branch `main` checkout. Updating kept the original `.git` directory, local `main` branch and untracked team file. A second invocation found the checkout up to date and reused the verified build. The historical AMD comparison's option parser resolves `integrated-runtime-research` and `amd-5-6`, and both saved B0 campaigns reproduce from their raw responses.
+
 `scripts/run-cpu-experiment.sh` clones the shallow `integration-v2` branch or fast-forwards an existing checkout and runs the requested experiment. The CPU smoke, native m4 comparison, FULL kernel smoke and Lite placement comparison discover the local CPU envelope. The public modes use Korean diagnostics and have no temperature sensor, free-disk, free-RAM or AC admission threshold. An available external power reading is recorded in portable placement results. The fixed original AMD protocol still requires AC when invoked explicitly for historical reproduction.
 
 The original 5500U placement study and historical baseline campaigns are published with their compact aggregate results. The release removes 8,986 historical entries (161,989,120 uncompressed bytes) from the checkout. The release also excludes 44 workspace-migration files (5,371,688 bytes). The files are preserved at `25ab433140eafc6cbb3b259b017c2a9252b37900`. [Launch instructions](../README.md#intelamd-cpu-실험) · [Archive and current inputs](../new-a-workspace/experiments/README.md)

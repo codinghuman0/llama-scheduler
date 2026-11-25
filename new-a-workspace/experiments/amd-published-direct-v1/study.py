@@ -48,7 +48,7 @@ TOPICS = (
 
 
 def options():
-    command = argparse.ArgumentParser()
+    command = ArgumentParser()
     command.set_defaults(relaxed_host_checks=False)
     runtime.add_configuration(command)
     return command.parse_args(['--profile', P['profile'], '--resources', P['resources']])

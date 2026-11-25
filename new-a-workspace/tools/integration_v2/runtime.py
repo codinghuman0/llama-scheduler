@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build and run the integration-v2 CPU release with recorded source and DSO identity."""
 import argparse
+from contextlib import nullcontext
 import fcntl
 from functools import partial
 import hashlib
@@ -31,7 +32,7 @@ from intel_experiment import (MODEL_SHA, FIXTURES, clean_env, cpu_list, guard, p
 
 def guard_host(args):
     if args.relaxed_host_checks:
-        guard(min_free_mib=128 if args.action == "build" else 32, check_temperature=False)
+        guard(min_free_mib=128 if args.action in ("build", "build-scheduler") else None, check_temperature=False)
     else:
         guard()
 
@@ -356,7 +357,7 @@ def lifecycle_requests(runner, port, fixture, output):
         raise RuntimeError("Malformed grammar request succeeded")
 
 
-def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=None):
+def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=None, window_snapshot=None):
     check_conditions = check_scheduler if checkpoint else partial(guard_host, args)
     sys.path.insert(0, str(SERVING))
     runner = importlib.import_module("runner")
@@ -380,10 +381,14 @@ def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=
         command[3:3] = [str(Path(checkpoint["bundle"]) / "llama_scx_child"),
                         "--phase-register-socket", checkpoint["socket"], "--"]
     env = environment(args, effective, directory)
-    save(output / "launch.json", {"argv": command, "environment": env, "model_sha256": digest, "build": manifest})
+    visit = {"fixtures": args.fixtures, "tokens": args.tokens, "sleep_idle_s": args.sleep_idle,
+             "lifecycle": args.lifecycle, "state_log": args.state_log, "worker_log": args.worker_log}
+    save(output / "launch.json", {"argv": command, "environment": env, "model_sha256": digest,
+                                  "build": manifest, "visit": visit})
     log = output / "server.log"
     server = runner.Server(command, port, log, cleanup_timeout=15, env=env)
     results = []
+    child_pidfd = None
     try:
         server.start(120, cancel)
         pid = server.process.pid
@@ -393,6 +398,14 @@ def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=
                 require(time.monotonic() < deadline and server.process.poll() is None, "Missing selected child registration ACK")
                 time.sleep(.05)
             pid = int(ack[1])
+            fd = os.pidfd_open(pid)
+            try:
+                parent = re.search(r"^PPid:\s+(\d+)$", Path(f"/proc/{pid}/status").read_text(), re.M)
+                require(parent and int(parent[1]) == server.process.pid, "Registered child belongs to another launcher")
+            except BaseException:
+                os.close(fd)
+                raise
+            child_pidfd = fd
             require(os.sched_getscheduler(server.process.pid) == os.SCHED_OTHER, "Selected-child launcher changed policy")
             os.sched_setaffinity(server.process.pid, {checkpoint["controller_cpu"]})
         loaded = verify_loaded(directory, manifest, effective, model, pid, runner.loaded_libraries(pid))
@@ -416,16 +429,22 @@ def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=
                     while not runner.json_request(port, "GET", "/props")["is_sleeping"]:
                         require(time.monotonic() < deadline and not cancel.is_set(), "Sleep idle state not reached")
                         time.sleep(.15)
+                before = window_snapshot(pid) if window_snapshot else None
                 start = time.monotonic_ns()
                 before_cpu = runner.cpu_seconds(pid)
                 body = runner.json_request(port, "POST", "/completion", payload, timeout=180)
-                elapsed = (time.monotonic_ns() - start) / 1e9
+                end = time.monotonic_ns()
+                elapsed = (end - start) / 1e9
                 cpu = runner.cpu_seconds(pid) - before_cpu
+                after = window_snapshot(pid) if window_snapshot else None
                 save(output / f"{fixture['id']}-{role}-responses.json", body)
                 replies = validate_body(body, fixture, args.tokens)
                 tokens = [entry["tokens"] for entry in replies]
                 row[role] = {"tokens": tokens, "elapsed_s": elapsed, "cpu_s": cpu,
                              "tokens_per_s": sum(map(len, tokens)) / elapsed}
+                row[role]["request_timings"] = [entry["timings"] for entry in replies]
+                if window_snapshot:
+                    row[role]["window"] = {"before": before, "http_start_ns": start, "http_end_ns": end, "after": after}
                 check_conditions()
                 live = verify_loaded(directory, manifest, effective, model, pid, runner.loaded_libraries(pid))
                 save(output / f"{fixture['id']}-{role}-runtime.json", live)
@@ -433,8 +452,12 @@ def run_cohort(args, directory, manifest, effective, output, cancel, checkpoint=
             results.append(row)
             save(output / "cohorts.json", results)
     finally:
-        server.stop()
-        save(output / "cleanup.json", server.cleanup)
+        try:
+            if child_pidfd is not None:
+                stop_registered_child(server, child_pidfd)
+        finally:
+            server.stop()
+            save(output / "cleanup.json", server.cleanup)
     require(server.cleanup["returncode"] == 0 and not server.cleanup["forced_leader_kill"], "Server cleanup was abnormal")
     log_text = log.read_text()
     require("mode=phase_batch prefill_reference=1" in log_text, "Missing runtime R route evidence")
@@ -461,8 +484,21 @@ def check_scheduler():
             "Selected sched_ext instance is not active")
 
 
+def stop_registered_child(server, pidfd):
+    # The ordinary launcher must reap the server and return its actual exit code.
+    # The runner's final process-group cleanup also handles startup errors and timeouts.
+    try:
+        try:
+            signal.pidfd_send_signal(pidfd, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        server.process.wait(timeout=server.cleanup_timeout)
+    finally:
+        os.close(pidfd)
+
+
 def read_checkpoint(path, manifest, effective):
-    from scx import proc_start, verify_bundle
+    from scx import PREFILL_PAIR, p_representatives, proc_start, verify_bundle
     checkpoint = read(path / "checkpoint.json")
     require(checkpoint["status"] == "PREPARED_KERNEL_NOT_RUN" and checkpoint["build_id"] == manifest["build_id"],
             "Checkpoint does not identify the requested runtime")
@@ -472,8 +508,13 @@ def read_checkpoint(path, manifest, effective):
     bundle = verify_bundle(Path(checkpoint["bundle"]))
     obj = f"{checkpoint['variant']}/{checkpoint['policy']}/full_object.bpf.o"
     require(bundle["artifacts"].get(obj) == checkpoint["object_sha256"], "Checkpoint scheduler identity differs")
-    require(all(effective[key] == value for key, value in checkpoint["effective"].items() if key != "run_id"),
+    # The offline preparation guard is independent of the mandatory live SCX admission checks.
+    require(all(effective[key] == value for key, value in checkpoint["effective"].items()
+                if key not in ("run_id", "relaxed_host_checks")),
             "Checkpoint and effective runtime configuration differ")
+    if checkpoint["policy"] in PREFILL_PAIR:
+        require(checkpoint.get("p_representatives") == p_representatives(effective["topology"]["portable_plan"], effective["cpus"]),
+                "Checkpoint P-core representatives differ")
     loader_log = (path / "loader.log").read_text()
     require("waiting for selected child" in loader_log and f'"object_sha256":"{checkpoint["object_sha256"]}"' in loader_log,
             "Manual loader readiness or BPF object evidence is missing")
@@ -482,7 +523,7 @@ def read_checkpoint(path, manifest, effective):
 
 
 def verify_scx_completion(path):
-    from scx import SCHED_EXT
+    from scx import PREFILL_PAIR, SCHED_EXT, audit_prefill
     until = time.monotonic() + 20
     while not (path / "loader-exit.txt").exists() or SCHED_EXT.read_text().strip() != "disabled":
         require(time.monotonic() < until, "Loader did not finish, detach and export diagnostics")
@@ -514,7 +555,12 @@ def verify_scx_completion(path):
     run, sequence, rejected, idle, active, invalid = map(int, receiver.groups())
     require(run == checkpoint["effective"]["run_id"] and sequence and idle and not (rejected or active or invalid),
             "Invalid state-v2 delivery or cleanup")
-    return {"policy": policy, "decode_attempts": attempts[2], "decode_moves": moved[2], "locality": locality}
+    result = {"policy": policy, "decode_attempts": attempts[2], "decode_moves": moved[2], "locality": locality}
+    if policy in PREFILL_PAIR:
+        require(not any(attempts), "Decode handoff bookkeeping active in the Prefill pair")
+        result["variant"] = checkpoint["variant"]
+        result["prefill_pcore"] = audit_prefill(checkpoint, stats)
+    return result
 
 
 def add_configuration(parser):
@@ -572,14 +618,17 @@ def collect_results(result, destination):
         sidecar.write(f"{sha(destination)}  {destination.name}\n")
 
 
-def main():
+def main(argv=None, *, cohort_monitor=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.set_defaults(relaxed_host_checks=False)
     commands = parser.add_subparsers(dest="action", required=True)
     host_checks = argparse.ArgumentParser(add_help=False)
     host_checks.add_argument("--relaxed-host-checks", action="store_true",
-                             help="Skip CPU temperature checks and require >128 MiB for build or >32 MiB for doctor/run")
+                             help="Skip CPU temperature checks and require >128 MiB of free disk only for build")
     commands.add_parser("test")
+    pair = commands.add_parser("check-prefill-pair")
+    pair.add_argument("--neutral", type=Path, required=True)
+    pair.add_argument("--candidate", type=Path, required=True)
     collect = commands.add_parser("collect")
     collect.add_argument("--result", type=Path, required=True)
     collect.add_argument("--output", type=Path, required=True)
@@ -588,9 +637,9 @@ def main():
     build.add_argument("--backend", choices=("openmp", "native"), default="openmp")
     build.add_argument("--markers", choices=("all", "state-only"), default="all")
     build.add_argument("--jobs", type=int, choices=range(1, 5), default=2)
-    scheduler = commands.add_parser("build-scheduler")
+    scheduler = commands.add_parser("build-scheduler", parents=[host_checks])
     scheduler.add_argument("--output", type=Path, required=True)
-    prepare = commands.add_parser("prepare-scx")
+    prepare = commands.add_parser("prepare-scx", parents=[host_checks])
     prepare.add_argument("--build-dir", type=Path, required=True)
     prepare.add_argument("--scheduler-build", type=Path, required=True)
     prepare.add_argument("--variant", choices=("full", "lite"), required=True)
@@ -623,7 +672,11 @@ def main():
     serve.add_argument("--repetitions", type=int, choices=range(1, 5), default=1)
     serve.add_argument("--compare-research", action="store_true")
     add_configuration(serve)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if args.action == "check-prefill-pair":
+        from scx import check_pair
+        print(json.dumps(check_pair(args.neutral, args.candidate), indent=2))
+        return
     if args.action == "test":
         model_free_tests()
         return
@@ -690,7 +743,8 @@ def main():
                             environment, role_arguments, mixed_prefill_arguments, verify_loaded, verify_effective,
                             partial(guard_host, args))
             else:
-                run_cohort(args, directory, manifest, effective, output, cancel, checkpoint)
+                with (cohort_monitor(effective, output) if cohort_monitor else nullcontext()) as snapshot:
+                    run_cohort(args, directory, manifest, effective, output, cancel, checkpoint, snapshot)
         except (Exception, KeyboardInterrupt) as error:
             save(output / "failure.json", {"status": "FAILED", "error": repr(error)})
             raise

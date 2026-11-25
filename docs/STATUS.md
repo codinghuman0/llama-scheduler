@@ -1,5 +1,62 @@
 # Status
 
+## Optional Prefill P-core selection
+
+The integration-v2 scheduler includes `prefill-pcore` and a matched `neutral` control. Both use state-v2, selected-child registration and the existing guarded weighted-vtime dispatch. Only a registered task waking during active Prefill can claim an allowed, online, idle P-core representative. FULL records actual running starts per CPU and phase. Both variants export selection attempts and hits. [Intel/AMD smoke procedure](../new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md#prefill-p-core-옵션을-확인하는-짧은-실험)
+
+On AMD Ryzen 5 5500U, kernel `7.0.0-43-generic`, the six policies built in both FULL and Lite. The host tests exercised the production selector with controlled idle masks. Both new checkpoints produced zero P representatives on this six-core AMD. A real-model Linux smoke completed eight concurrent requests and one single request, four output tokens per request, with identical warmup/measurement tokens, zero cross-request cache, per-request timings, and 14 state-v2 transitions including idle. The server exited with code zero and no live process-group members. The ordinary Linux smoke is recorded in `new-a-workspace/state/integration-v2/prefill-pcore-linux-smoke-01`. Intel hardware measurement is pending.
+
+`bash scripts/integration_v2.sh test` passed 48 topology, 22 serving and 16 integration tests. The scheduler build ran the C receiver test and both production-selector host tests. `bpftool gen skeleton` opened all four new objects, and their 11 external function names were present in the running kernel BTF. The `neutral` objects have no idle-claim kfunc reference. The Intel 4P+8E fixture passed the normal resource resolver and checkpoint encoder with four preferred P representatives inside a six-CPU envelope. The AMD target encoded a zero-length preference inside its six-CPU envelope.
+
+The shipped `bash scripts/prefill-pcore-smoke.sh linux` run is in `state/integration-v2/prefill-smoke-linux.PJG86j8c/linux`. Both cohorts' throughput and request timings were checked against the raw responses. A userspace replay fed its 14 published transitions through the C receiver and production selector, with one synthetic wakeup per transition. The simulated Intel candidate chose an idle P representative on the four Prefill transitions. The AMD configuration and both neutral controls used default selection throughout. See `state/integration-v2/prefill-pcore-host-replay.json`. Both final offline checkpoints are in `state/integration-v2/prefill-smoke-prepare.juPdlTDx`. The online controller in `prefill-smoke-scx.T3wPvix4` expired waiting for its first manual loader. The host remained in `sched_ext=disabled`. A new `bash scripts/prefill-pcore-smoke.sh scx` visit generates fresh operator commands.
+
+With AC and direct loader access, both FULL objects passed the AMD selected-child smoke. Each receiver accepted 14 state transitions including four idle events. Both guards passed and both loaders detached cleanly. The two arms produced identical tokens, and `prefill-pcore` recorded zero P-core attempts and hits. The raw visit and deployment evidence are in `state/integration-v2/prefill-smoke-scx.I2XsWiIz`.
+
+The Lite campaign completed 36 visits, with six paired blocks per load condition. For eight concurrent requests, `prefill-pcore` changed throughput relative to the same runtime on default Linux by −1.12% under ambient load (95% paired interval −3.56% to +0.23%) and +0.20% under `cpu25` (−0.99% to +1.34%). Under `cpu25`, mean server CPU time fell from 81.94 to 76.42 CPU seconds. All measured arms produced identical output tokens within each block. [AMD measurement report](../new-a-workspace/experiments/amd-prefill-placement-ac-v1/result-summary.md) · [Protocol](../new-a-workspace/experiments/amd-prefill-placement-ac-v1/protocol.json)
+
+## Mixed workload overlap validation
+
+Integrated the donor [cc68058](https://github.com/hsju2021/llama.cpp-fork/commit/cc6805881aac81d48f605ca285cce9778c0aea3f)
+`/slots` parser hardening, fixture shape, regression test and API examples.
+The overlap check accepts an object or a one-element array for `next_token`
+and skips malformed snapshots. `bash scripts/integration_v2.sh test` passed
+all 77 model-free tests, including 22 serving benchmark tests. Real-model
+performance measurement is pending.
+
+## Standalone integration workspace
+
+The integration checkout now has an independent Git directory. Its branch,
+upstream and working changes were compared before removing the old worktrees
+and experiment folders. The workspace keeps the checkout, the original
+`llama.cpp` directory and `model.gguf`. The model SHA-256 still matches.
+
+After removal, a fresh OpenMP build, `doctor`, a real-model cohort smoke,
+76 model-free tests and recalculation of the saved AMD confirmation passed.
+The retained AMD results are self-contained for recalculation. Repeating the
+historical B0/A experiment requires the original benchmark runtimes.
+
+## Intel smoke host checks
+
+Intel `smoke` and `m4` use relaxed host checks. Only a fresh build checks its
+128 MiB free-space floor. Doctor and inference have no fixed disk gate.
+Temperature sensors are skipped throughout the standard smoke path. Seventy-six
+model-free tests passed. On AMD, the same OpenMP fixed6 launch and all three
+smoke fixtures passed, and syscall traces of the test, doctor, inference and
+collection stages showed no thermal sysfs reads or workspace disk checks.
+A synthetic Intel 4P+8E topology selected four P-cores and two E-cores.
+See the [Intel handoff](../new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md)
+for the Intel hardware run procedure.
+
+## 2026-11-25: published integration-v2 AMD performance
+
+The published `fcb2e08` OpenMP research profile completed two B0/A/integration
+confirmation campaigns on Ryzen 5 5500U, using the default Linux scheduler.
+All 32 primary pairs were technically valid with equal warmup and measured
+output tokens. Relative to the historical source rebuild, the integrated build
+improved cohort throughput by 17.92–18.11% in ambient and 32.88–37.43% in cpu25.
+The [AMD result and raw audit](../new-a-workspace/experiments/amd-published-direct-v1/result-summary.md)
+record the frozen workload, exact gains, and scope.
+
 ## 2026-11-24: integration-v2 development
 
 The separate integration-v2 worktree builds the R numerical path, semantic

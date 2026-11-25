@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "integrated_revision": "fcb2e082f50beb4d4f91d1b303b3240663fa0f03",
+  "original_revision": "7a2db1a0cf38e5f4eb278a58c3903d295258d0ea",
+  "model_sha256": "f3bdf9cf31dee4b57ae4e455a1cb0d01b5c2c1b50d72d3112141c195506c2840",
+  "cpus": [0, 2, 4, 6, 8, 10],
+  "controller_cpu": 11,
+  "scheduler": "SCHED_OTHER",
+  "build_backend": "openmp",
+  "profile": "integrated-runtime-research",
+  "resources": "amd-5-6",
+  "effective": {"threads": 5, "batch_threads": 6, "threads_http": 8, "policy": "pressure", "pool": "roles", "transport": "state", "mixed_prefill": "off"},
+  "request_count": 8,
+  "tokens_per_request": 128,
+  "cpu25": {"cpu": 10, "minimum": 0.22, "maximum": 0.28},
+  "reference_fixtures": ["heldout-1", "heldout-2"],
+  "new_cohorts": ["new-1", "new-2"],
+  "condition_order": [["ambient", "cpu25"], ["cpu25", "ambient"]],
+  "orders_per_cohort": [
+    [["B0", "A", "I"], ["I", "A", "B0"], ["A", "I", "B0"], ["B0", "I", "A"]],
+    [["A", "B0", "I"], ["I", "B0", "A"], ["I", "A", "B0"], ["B0", "A", "I"]]
+  ],
+  "analysis": {
+    "primary": "generated tokens / cohort HTTP wall seconds",
+    "primary_contrast": ["I", "B0"],
+    "secondary_contrasts": [["A", "B0"], ["I", "A"]],
+    "required_valid_pairs": 8,
+    "minimum_mean_gain_pct": 5,
+    "minimum_ci_lower_pct_exclusive": 0,
+    "minimum_fast_pairs": 6,
+    "bootstrap_resamples": 10000,
+    "bootstrap_seed": 20261125
+  }
+}

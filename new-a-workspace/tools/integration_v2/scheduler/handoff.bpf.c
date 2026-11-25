@@ -34,7 +34,8 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__type(key, u32);
-	__type(value, struct new_a_topology);
+	__uint(map_flags, BPF_F_RDONLY_PROG);
+	__type(value, struct newa_dispatch_topology);
 	__uint(max_entries, 1);
 } new_a_topology SEC(".maps");
 
@@ -262,41 +263,14 @@ void BPF_STRUCT_OPS(new_a_set_cpumask, struct task_struct *p, const struct cpuma
 #define observe_phase(phase) do { } while (0)
 #endif
 
-static __always_inline s32 pick_idle_from_list(struct task_struct *p, const u32 *cpus, u32 count,
-					      const struct cpumask *online)
-{
-	u32 start;
-
-	if (!count || count > NEW_A_MAX_CPUS)
-		return -1;
-	start = (u32)BPF_CORE_READ(p, pid) % count;
-#pragma clang loop unroll(disable)
-	for (u32 offset = 0; offset < NEW_A_MAX_CPUS; offset++) {
-		u32 index, cpu;
-
-		if (offset >= count)
-			break;
-		index = start + offset;
-		if (index >= count)
-			index -= count;
-		if (index >= NEW_A_MAX_CPUS)
-			break;
-		cpu = cpus[index];
-		if (cpu >= NEW_A_MAX_CPUS || !bpf_cpumask_test_cpu(cpu, p->cpus_ptr) ||
-		    !bpf_cpumask_test_cpu(cpu, online))
-			continue;
-		if (scx_bpf_test_and_clear_cpu_idle((s32)cpu))
-			return (s32)cpu;
-	}
-	return -1;
-}
-
 struct {
     __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
     __type(key, u32);
     __type(value, struct handoff_counters);
     __uint(max_entries, 1);
 } handoff_stats SEC(".maps");
+
+#include "idle-selection.h"
 
 #ifdef NEW_A_LOCALITY
 /* Reuse the archived locality-v2 restriction to the preferred tier. */
@@ -323,13 +297,17 @@ static __always_inline s32 pick_previous_idle(struct task_struct *p, s32 previou
 
 s32 BPF_STRUCT_OPS(llama_select_cpu, struct task_struct *p, s32 prev_cpu, u64 wake_flags)
 {
+#ifdef NEW_A_PREFILL_PAIR
+	return newa_pair_select(p, prev_cpu, wake_flags, NEW_A_PREFILL_PAIR);
+#else
 	u32 key = 0;
-	struct new_a_topology *topology = bpf_map_lookup_elem(&new_a_topology, &key);
+	const struct newa_dispatch_topology *config = bpf_map_lookup_elem(&new_a_topology, &key);
 	bool is_idle = false;
 	s32 cpu = -1;
 	u32 tier = 3;
 
-	if (topology && topology->enabled && !BPF_CORE_READ(p, migration_disabled)) {
+	if (config && config->tiers.enabled && !BPF_CORE_READ(p, migration_disabled)) {
+		const struct new_a_topology *topology = &config->tiers;
 		const struct cpumask *online = scx_bpf_get_online_cpumask();
 
 #ifdef NEW_A_LOCALITY
@@ -345,16 +323,16 @@ s32 BPF_STRUCT_OPS(llama_select_cpu, struct task_struct *p, s32 prev_cpu, u64 wa
 		}
 #endif
 		if (cpu < 0)
-			cpu = pick_idle_from_list(p, topology->cpus[0], topology->count[0], online);
+			cpu = pick_idle_from_list(p, topology->cpus[0], topology->count[0], online, NEW_A_MAX_CPUS);
 		if (cpu >= 0)
 			tier = 0;
 		if (cpu < 0) {
-			cpu = pick_idle_from_list(p, topology->cpus[1], topology->count[1], online);
+			cpu = pick_idle_from_list(p, topology->cpus[1], topology->count[1], online, NEW_A_MAX_CPUS);
 			if (cpu >= 0)
 				tier = 1;
 		}
 		if (cpu < 0) {
-			cpu = pick_idle_from_list(p, topology->cpus[2], topology->count[2], online);
+			cpu = pick_idle_from_list(p, topology->cpus[2], topology->count[2], online, NEW_A_MAX_CPUS);
 			if (cpu >= 0)
 				tier = 2;
 		}
@@ -368,12 +346,14 @@ s32 BPF_STRUCT_OPS(llama_select_cpu, struct task_struct *p, s32 prev_cpu, u64 wa
 	if (is_idle)
 		scx_bpf_dsq_insert(p, SCX_DSQ_LOCAL, SCX_SLICE_DFL, 0);
 	return cpu;
+#endif
 }
 
 #ifdef NEW_A_IDLE_HANDOFF
 void scx_bpf_kick_cpu(s32 cpu, u64 flags) __ksym;
 #endif
 
+#ifndef NEW_A_PREFILL_PAIR
 static __always_inline bool handoff_idle(struct task_struct *p, u64 enq_flags)
 {
     u32 key = 0, phase = control_state.current_phase;
@@ -386,10 +366,11 @@ static __always_inline bool handoff_idle(struct task_struct *p, u64 enq_flags)
     if (stats)
         stats->attempts[phase]++;
 #ifdef NEW_A_IDLE_HANDOFF
-    struct new_a_topology *topology = bpf_map_lookup_elem(&new_a_topology, &key);
-    if (topology && topology->enabled) {
+    const struct newa_dispatch_topology *config = bpf_map_lookup_elem(&new_a_topology, &key);
+    if (config && config->tiers.enabled) {
+        const struct new_a_topology *topology = &config->tiers;
         const struct cpumask *online = scx_bpf_get_online_cpumask();
-        s32 cpu = pick_idle_from_list(p, topology->cpus[0], topology->count[0], online);
+        s32 cpu = pick_idle_from_list(p, topology->cpus[0], topology->count[0], online, NEW_A_MAX_CPUS);
         scx_bpf_put_cpumask(online);
         if (cpu >= 0) {
             scx_bpf_dsq_insert(p, SCX_DSQ_LOCAL_ON | (u32)cpu, SCX_SLICE_DFL, enq_flags);
@@ -404,13 +385,16 @@ static __always_inline bool handoff_idle(struct task_struct *p, u64 enq_flags)
 #endif
     return false;
 }
+#endif
 
 void BPF_STRUCT_OPS(llama_enqueue, struct task_struct *p, u64 enq_flags)
 {
 	u64 vtime = p->scx.dsq_vtime;
 
+#ifndef NEW_A_PREFILL_PAIR
 	if (handoff_idle(p, enq_flags))
 		return;
+#endif
 
 	if (time_before(vtime, vtime_now - SCX_SLICE_DFL))
 		vtime = vtime_now - SCX_SLICE_DFL;
@@ -425,6 +409,14 @@ void BPF_STRUCT_OPS(llama_dispatch, s32 cpu, struct task_struct *prev)
 void BPF_STRUCT_OPS(llama_running, struct task_struct *p)
 {
 	observe_runtime(p, true);
+#if defined(NEW_A_PREFILL_PAIR) && !defined(NEW_A_RUNTIME_LITE)
+	if (control_state.selected_tgid && BPF_CORE_READ(p, tgid) == control_state.selected_tgid) {
+		u32 key = 0, phase = control_state.current_phase;
+		struct handoff_counters *stats = bpf_map_lookup_elem(&handoff_stats, &key);
+		if (stats && phase <= LLAMA_SCX_PHASE_MIXED)
+			stats->running_starts[phase & 3]++;
+	}
+#endif
 	if (time_before(vtime_now, p->scx.dsq_vtime))
 		vtime_now = p->scx.dsq_vtime;
 }

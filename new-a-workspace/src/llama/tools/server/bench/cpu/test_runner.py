@@ -333,6 +333,35 @@ class RunnerTests(unittest.TestCase):
                     slot["n_prompt_tokens_processed"] = config["long_prompt_tokens"]
         self.assertFalse(runner.overlap_evidence(result["requests"], result["slot_observations"])["valid"])
 
+    def test_overlap_slot_snapshot_shapes(self):
+        short = {"role": "decode_0", "payload": {"id_slot": 0},
+                 "events": [{"t_ns": t, "data": {"tokens": [42]}} for t in (1, 3)]}
+        long = {"role": "long_prefill", "payload": {"id_slot": 1, "prompt": [1, 2]},
+                "events": [{"t_ns": 2, "data": {"prompt_progress": {}}},
+                           {"t_ns": 5, "data": {"tokens": [43]}}]}
+        short_slot = {"id": 0, "is_processing": True}
+        long_slot = {"id": 1, "is_processing": True, "n_prompt_tokens_processed": 1}
+        observation = {"end_ns": 4, "slots": [short_slot, long_slot]}
+
+        def evidence():
+            return runner.overlap_evidence([short, long], [observation])
+
+        self.assertFalse(evidence()["valid"])
+        decoded = {"n_decoded": 1}
+        for next_token in (decoded, [decoded]):
+            with self.subTest(next_token=next_token):
+                short_slot["next_token"] = next_token
+                overlap = evidence()
+                self.assertTrue(overlap["valid"])
+                self.assertEqual(overlap["proofs"][0]["simultaneous_active_slot_snapshots_ns"], [4])
+        for next_token in (None, [], {}, [None], [decoded, decoded], [[decoded]], [1],
+                           {"n_decoded": 0}, {"n_decoded": True}, [{"n_decoded": "1"}]):
+            with self.subTest(next_token=next_token):
+                short_slot["next_token"] = next_token
+                overlap = evidence()
+                self.assertFalse(overlap["valid"])
+                self.assertEqual(overlap["proofs"][0]["simultaneous_active_slot_snapshots_ns"], [])
+
     def test_campaign_pre_cancel_and_manifest_failure(self):
         config = self.config()
         self.cancel.set()

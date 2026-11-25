@@ -1,9 +1,20 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include "handoff-policy.h"
 static int handoff_fd = -1;
+#ifdef NEW_A_PREFILL_PAIR
+static struct newa_dispatch_topology installed_placement;
+
+static void print_phase_counts(FILE *output, const __u64 counts[4])
+{
+    fprintf(output, "[%llu,%llu,%llu,%llu]", counts[0], counts[1], counts[2], counts[3]);
+}
+#endif
 static int handoff_prepare(struct bpf_object *object)
 {
-    int fd = bpf_object__find_map_fd_by_name(object, "handoff_stats");
+    struct bpf_map *map = bpf_object__find_map_by_name(object, "handoff_stats");
+    if (!map || bpf_map__value_size(map) != sizeof(struct handoff_counters))
+        return -EINVAL;
+    int fd = bpf_map__fd(map);
     if (fd < 0)
         return fd;
     handoff_fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
@@ -29,7 +40,31 @@ static int handoff_export(FILE *output)
             total.moved[phase] += rows[cpu].moved[phase];
             total.locality_attempts[phase] += rows[cpu].locality_attempts[phase];
             total.locality_hits[phase] += rows[cpu].locality_hits[phase];
+#ifdef NEW_A_PREFILL_PAIR
+            total.prefill_attempts[phase] += rows[cpu].prefill_attempts[phase];
+            total.prefill_hits[phase] += rows[cpu].prefill_hits[phase];
+#endif
         }
+#ifdef NEW_A_PREFILL_PAIR
+    fputs(",\"prefill_pcore\":{\"p_representatives\":[", output);
+    for (__u32 i = 0; i < installed_placement.prefill_pcore_count; i++)
+        fprintf(output, "%s%u", i ? "," : "", installed_placement.tiers.cpus[0][i]);
+    fputs("],\"attempts\":", output);
+    print_phase_counts(output, total.prefill_attempts);
+    fputs(",\"hits\":", output);
+    print_phase_counts(output, total.prefill_hits);
+#ifdef NEW_A_RUNTIME_LITE
+    fputs(",\"running_starts_by_cpu\":null}", output);
+#else
+    fputs(",\"running_starts_by_cpu\":[", output);
+    for (int cpu = 0; cpu < count; cpu++) {
+        fprintf(output, "%s{\"cpu\":%d,\"by_phase\":", cpu ? "," : "", analysis_possible_ids[cpu]);
+        print_phase_counts(output, rows[cpu].running_starts);
+        fputc('}', output);
+    }
+    fputs("]}", output);
+#endif
+#endif
     free(rows);
     fprintf(output, ",\"idle_handoff\":{\"mode\":\"" HANDOFF_MODE "\",\"attempts\":[%llu,%llu,%llu,%llu],\"moved\":[%llu,%llu,%llu,%llu]}",
         (unsigned long long)total.attempts[0], (unsigned long long)total.attempts[1],

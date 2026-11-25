@@ -33,7 +33,7 @@ bash scripts/intel-integration-v2-smoke.sh "$HOME/projects/model.gguf" intel-val
 
 스크립트는 build 입력과 doctor 결과 ZIP 하나, fixture별 실행 결과 ZIP 세 개와 SHA256 sidecar를 만듭니다. 직접 단계별로 실행할 경우 아래 명령을 사용합니다.
 
-`smoke`와 `m4` 실행 스크립트는 기본 Linux 스케줄러용 `--relaxed-host-checks`를 전달합니다. 이 모드에서는 CPU 온도 센서를 읽지 않습니다. 저장소 파일시스템의 여유 공간 기준은 빌드 시 **128 MiB 초과**, `doctor`와 추론 실행 시 **32 MiB 초과**입니다. 매우 적은 여유 공간에서는 실제 빌드·파일 저장이 실패할 수 있으며, 그 경우 도구가 보고한 오류를 확인합니다.
+`smoke`와 `m4` 실행 스크립트는 기본 Linux 스케줄러용 `--relaxed-host-checks`를 전달합니다. 빌드·`doctor`·추론 실행에서 CPU 온도 센서를 읽지 않습니다. 새 빌드에만 저장소 파일시스템의 여유 공간 **128 MiB 초과**를 요구합니다. `doctor`와 추론에는 고정 여유 공간 기준이 없습니다. 로그와 결과 ZIP을 저장할 실제 공간은 필요합니다.
 
 ```bash
 set -euo pipefail
@@ -90,6 +90,28 @@ bash scripts/intel_experiment.sh serve-bench --relaxed-host-checks --build-dir "
 동결 재현이 필요하면 이 브랜치에서 `scripts/historical-frozen.sh /absolute/path/to/preserved/new-a-workspace run ...`으로 원래 workspace에 위임합니다. GitHub main과 로컬 보존 바이너리를 연결하는 이전 지침은 1차 문서의 범위입니다.
 
 ## 선택된 child의 커널 스케줄러
+
+### Prefill P-core 옵션을 확인하는 짧은 실험
+
+`new-a-workspace`에서 아래 명령을 실행합니다. 프로젝트 상위의 `model.gguf`를 자동으로 찾으며 다른 위치는 두 번째 인자로 지정할 수 있습니다. Linux x86-64, AVX2/FMA/F16C/SSE4.2, Python 3.10 이상이 필요합니다. 커널 실험에는 호스트의 sched_ext와 BTF, clang BPF 백엔드, bpftool, libbpf·libelf·zlib 개발 파일도 필요합니다.
+
+```bash
+bash scripts/prefill-pcore-smoke.sh linux
+bash scripts/prefill-pcore-smoke.sh prepare
+bash scripts/prefill-pcore-smoke.sh scx
+```
+
+`linux`는 기본 Linux 스케줄러에서 실제 모델로 단일 요청과 8개 동시 요청을 각각 워밍업한 뒤 한 번 다시 실행합니다. 각 요청은 4개 토큰을 생성합니다. `prepare`는 이 호스트의 BTF로 스케줄러를 빌드하고 두 옵션의 CPU 목록과 체크포인트를 확인합니다. 이 단계에서 만든 체크포인트는 소유 프로세스가 종료되면 만료됩니다.
+
+`scx`는 새 체크포인트를 만들고 일반 계정 터미널에서 기다립니다. 다른 Bash 터미널에서 `sudo -v` 후 화면에 출력된 `bash …/load.sh`를 실행합니다. `neutral`의 요청과 detach가 끝나면 출력되는 `prefill-pcore`의 명령도 같은 방식으로 실행합니다. 승인 대기는 옵션당 10분이며 loader에는 540초 제한이 있습니다. 원래 셸과 컨트롤러는 Linux 정책을 사용합니다. 두 실행의 정책 7 worker, 고정 mask, PID 등록, v2 수신과 idle, loader 종료, detach를 검사합니다. 온도 센서는 이 스크립트의 세 모드에서 읽지 않습니다. 새 빌드에는 128 MiB의 여유 공간 하한이 적용됩니다. 런타임이나 커널이 바뀌어 기존 빌드 검증이 실패하면 `NEWA_BUILD_DIR`, `NEWA_SCX_BUILD`에 새 빌드 경로를 지정할 수 있습니다.
+
+Intel i5-1240P에서 `auto`는 사용 가능한 물리 코어가 충분하면 대표 CPU 여섯 개를 선택합니다. CPUID로 확인한 P-core 대표만 선호 목록에 들어갑니다. AMD Ryzen 5 5500U에서는 같은 옵션의 선호 목록이 비고 두 옵션 모두 기본 SCX CPU 선택 함수를 사용합니다. 각 옵션은 shared weighted-vtime 큐와 동일한 자원 상한을 사용합니다. 정책 판정은 등록된 서버의 유효한 active Prefill wakeup에서만 일어납니다. 각 wakeup에서 최대 32개 후보의 task mask, online, idle 여부를 확인합니다. 원 설계의 선택 규칙을 기존 state-v2 수신기와 selected-child loader에 이식했습니다. [Policy F 소스](https://github.com/sueon00/PA-IPP-LLM-Scheduler/blob/e4c74dc52f3154349b9c01d74d7658e957677caf/tools/sched_ext/llama_scx.bpf.c#L59)
+
+출력 경로 아래 `pair-metrics.json`에는 양쪽의 실제 생성 토큰 수, cohort wall time·tokens/s, CPU seconds, 요청별 Prefill·Decode 시간이 들어갑니다. 두 방문의 모델, 런타임, 설정, 요청 순서와 출력 토큰이 일치해야 생성됩니다. 요청별 시간에는 겹치는 구간이 있습니다. 전체 처리율의 분모는 cohort wall time입니다.
+
+각 `*-checkpoint/scheduler-stats.json`의 `prefill_pcore.attempts`와 `hits` 순서는 Unknown/idle, Prefill, Decode, Mixed입니다. hit는 허용된 idle P-core를 선택한 횟수입니다. FULL의 `running_starts_by_cpu`는 실제 CPU에서 등록된 작업이 실행을 시작한 순간의 phase를 셉니다. phase의 범위는 등록된 서버 프로세스 전체여서 같은 시점에 깨어나는 HTTP 스레드도 포함될 수 있습니다. Lite는 실행 시작의 CPU별 상세 항목을 `null`로 저장합니다. `NO_ELIGIBLE_WAKEUP_OBSERVED`와 `ATTEMPTED_NO_IDLE_HIT`는 모두 가능한 결과입니다. 비교 실행을 한 쌍만 수행하는 이 스크립트는 기능 확인용입니다.
+
+### 개별 정책과 FULL/Lite 수동 실행
 
 이 단계는 실제 Intel/AMD kernel BTF와 검토된 권한으로만 진행합니다. 일반 계정은 먼저 모델 조합을 검증하고 아래에서 빌드와 준비만 수행합니다. 권한을 확보한 운영자가 출력된 단일 loader 명령을 검토한 뒤 수동 실행합니다.
 

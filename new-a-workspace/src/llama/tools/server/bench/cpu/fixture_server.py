@@ -80,7 +80,7 @@ class Handler(BaseHTTPRequestHandler):
             with self.server.lock:
                 self.server.active[slot_id] = {"id": slot_id, "is_processing": True,
                                               "n_prompt_tokens_processed": len(payload["prompt"]) // 2 if is_long else len(payload["prompt"]),
-                                              "next_token": {"n_decoded": self.server.last_counts.get(slot_id, 0)}}
+                                              "next_token": [{"n_decoded": self.server.last_counts.get(slot_id, 0)}]}
             if payload.get("return_progress"):
                 self.event({"tokens": [-1], "stop": False, "id_slot": payload.get("id_slot", 0),
                             "prompt_progress": {"processed": 0, "total": len(payload["prompt"]), "cache": 0, "time_ms": 0}})
@@ -97,7 +97,7 @@ class Handler(BaseHTTPRequestHandler):
                 sent += len(ids)
                 with self.server.lock:
                     self.server.active[slot_id] = {"id": slot_id, "is_processing": True,
-                                                  "n_prompt_tokens_processed": len(payload["prompt"]), "next_token": {"n_decoded": sent}}
+                                                  "n_prompt_tokens_processed": len(payload["prompt"]), "next_token": [{"n_decoded": sent}]}
                     self.server.last_counts[slot_id] = sent
                 self.event({"content": "x" * len(ids), "tokens": ids, "stop": False,
                             "tokens_predicted": sent, "fixture_sent_ns": time.monotonic_ns()})

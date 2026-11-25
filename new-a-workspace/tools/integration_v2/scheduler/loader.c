@@ -34,7 +34,8 @@ static int analysis_monitor(void);
 
 static int new_a_object_load(struct bpf_object *object)
 {
-	struct new_a_topology topology;
+	struct newa_dispatch_topology placement = {};
+	struct new_a_topology *topology = &placement.tiers;
 	struct bpf_map *map = bpf_object__find_map_by_name(object, "new_a_topology");
 	bool seen[NEW_A_MAX_CPUS] = {};
 	FILE *input = fopen(topology_path, "rb");
@@ -48,25 +49,30 @@ static int new_a_object_load(struct bpf_object *object)
 
 	if (!input)
 		return -errno;
-	if (fread(&topology, 1, sizeof(topology), input) != sizeof(topology) || fgetc(input) != EOF || ferror(input)) {
+	if (fread(topology, sizeof(*topology), 1, input) != 1 ||
+#ifdef NEW_A_PREFILL_PAIR
+	    !state_run_id || fread(&placement.prefill_pcore_count, sizeof(__u32), 1, input) != 1 ||
+	    (placement.prefill_pcore_count && placement.prefill_pcore_count != topology->count[0]) ||
+#endif
+	    fgetc(input) != EOF || ferror(input)) {
 		fclose(input);
 		return -EINVAL;
 	}
 	fclose(input);
-	if (!map || bpf_map__value_size(map) != sizeof(topology) || topology.magic != NEW_A_MAGIC || topology.enabled > 1)
+	if (!map || bpf_map__value_size(map) != sizeof(placement) || topology->magic != NEW_A_MAGIC || topology->enabled > 1)
 		return -EINVAL;
 	for (unsigned int tier = 0; tier < 3; tier++) {
-		if (topology.count[tier] > NEW_A_MAX_CPUS)
+		if (topology->count[tier] > NEW_A_MAX_CPUS)
 			return -EINVAL;
-		for (unsigned int i = 0; i < topology.count[tier]; i++) {
-			__u32 cpu = topology.cpus[tier][i];
+		for (unsigned int i = 0; i < topology->count[tier]; i++) {
+			__u32 cpu = topology->cpus[tier][i];
 
-			if (cpu >= NEW_A_MAX_CPUS || seen[cpu] || !topology.enabled || !ug.selected[cpu])
+			if (cpu >= NEW_A_MAX_CPUS || seen[cpu] || !topology->enabled || !ug.selected[cpu])
 				return -EINVAL;
 			seen[cpu] = true;
 		}
 	}
-    if (ug_current() || !topology.enabled || !topology.count[0])
+    if (ug_current() || !topology->enabled || !topology->count[0])
         return -EINVAL;
     for (int cpu = 0; cpu < NEW_A_MAX_CPUS; cpu++) {
         if (ug.selected[cpu] != seen[cpu])
@@ -91,8 +97,13 @@ static int new_a_object_load(struct bpf_object *object)
 	error = handoff_prepare(object);
 	if (error)
 		return error;
-	if (bpf_map_update_elem(bpf_map__fd(map), &key, &topology, BPF_ANY))
+	if (bpf_map_update_elem(bpf_map__fd(map), &key, &placement, BPF_ANY))
 		return -errno;
+#ifdef NEW_A_PREFILL_PAIR
+	if (bpf_map_lookup_elem(bpf_map__fd(map), &key, &installed_placement) ||
+	    memcmp(&placement, &installed_placement, sizeof(placement)))
+		return -EIO;
+#endif
 #ifdef NEW_A_DIAGNOSTICS
 	map = bpf_object__find_map_by_name(object, "new_a_diagnostic_config");
 	if (!map || bpf_map__value_size(map) != sizeof(config) ||
@@ -106,7 +117,7 @@ static int new_a_object_load(struct bpf_object *object)
 		return -EINVAL;
 #endif
 	fprintf(stderr, "NEW_A: enabled=%u tiers=%u/%u/%u; placement policy=" HANDOFF_MODE "\n",
-		topology.enabled, topology.count[0], topology.count[1], topology.count[2]);
+		topology->enabled, topology->count[0], topology->count[1], topology->count[2]);
 	return 0;
 }
 
@@ -231,6 +242,9 @@ int main(int argc, char **argv)
 			if (handoff_export(output))
 				result = EXIT_FAILURE;
 			fprintf(output, "}\n");
+			/* The ordinary controller validates these diagnostics after detach. */
+			if (fchmod(fileno(output), 0600) || fchown(fileno(output), ug.uid, (gid_t)-1))
+				result = EXIT_FAILURE;
 			if (fclose(output))
 				result = EXIT_FAILURE;
 		}

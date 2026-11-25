@@ -1,4 +1,5 @@
 """Prepare a bounded selected-child sched_ext run. Loading is a manual checkpoint."""
+import math
 import os
 from pathlib import Path
 import shlex
@@ -14,11 +15,14 @@ HEADER = WORKSPACE / "src/llama/tools/server"
 SCHEDULER_HEADERS = WORKSPACE / "scheduler/include"
 BTF = Path("/sys/kernel/btf/vmlinux")
 SCHED_EXT = Path("/sys/kernel/sched_ext/state")
+PREFILL_PAIR = ("neutral", "prefill-pcore")
 POLICIES = {
     "observe": [],
     "decode-handoff": ["-DNEW_A_IDLE_HANDOFF"],
     "locality-decode": ["-DNEW_A_LOCALITY=1"],
     "locality-active": ["-DNEW_A_LOCALITY=2"],
+    "neutral": ["-DNEW_A_PREFILL_PAIR=0"],
+    "prefill-pcore": ["-DNEW_A_PREFILL_PAIR=1"],
 }
 
 
@@ -54,7 +58,7 @@ def build(out):
             compile_source(["clang", "-target", "bpf", "-D__TARGET_ARCH_x86", "-g", "-O2", "-Wall", "-Werror",
                             *flags, *policy_flags, "-I" + str(include), *directories, "-I/usr/include/" + multiarch,
                             "-c", str(CODE / "handoff.bpf.c"), "-o", str(obj)], f"bpf-{variant}-{policy}")
-            compile_source(["cc", "-std=gnu11", *warnings, "-Wno-misleading-indentation", *flags,
+            compile_source(["cc", "-std=gnu11", *warnings, "-Wno-misleading-indentation", *flags, *policy_flags,
                             f'-DHANDOFF_MODE="{policy}"', f'-DUNIVERSAL_OBJECT_SHA256="{sha(obj)}"', *directories,
                             str(CODE / "loader.c"), "-o", str(loader), "-lbpf", "-lelf", "-lz"], f"loader-{variant}-{policy}")
             artifacts.extend((obj, loader))
@@ -63,6 +67,11 @@ def build(out):
     compile_source(["cc", "-std=c11", *warnings, *directories, str(CODE / "test_state_receiver.c"),
                     "-o", str(out / "test_state_receiver")], "receiver-unit")
     run_logged([str(out / "test_state_receiver")], out / "receiver-test.log", timeout=10)
+    for policy in PREFILL_PAIR:
+        test = out / ("test-" + policy)
+        compile_source(["cc", "-std=gnu11", *warnings, *POLICIES[policy], *directories,
+                        str(CODE / "test_prefill_selection.c"), "-o", str(test)], "compile-test-" + policy)
+        run_logged([str(test)], out / ("test-" + policy + ".log"), timeout=10)
     artifacts.append(out / "llama_scx_child")
     require(sha(BTF) == btf_sha, "Running kernel BTF changed during scheduler build")
     require(all(sha(WORKSPACE / name) == digest for name, digest in source_ids.items()) and
@@ -91,6 +100,122 @@ def proc_start(pid):
     return int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19])
 
 
+def p_representatives(plan, selected):
+    if plan["architecture"] == "HOMOGENEOUS":
+        return []
+    require(plan["architecture"] == "INTEL_HYBRID" and plan["vendor"] == "Intel",
+            "Cannot certify P-core representatives for this architecture")
+    first = [c for c in plan["policy"]["tiers"][0] if c in selected]
+    cores = {row["representative"] for row in plan["cores"] if row["core_type"] == "P"}
+    require(set(first) == cores.intersection(selected), "CPUID core types and SMT representatives disagree")
+    return first
+
+
+def placement_input(plan, selected, policy):
+    tiers = [[c for c in group if c in selected] for group in plan["policy"]["tiers"]]
+    flat = [c for group in tiers for c in group]
+    require(tiers[0] and len(flat) == len(selected) and set(flat) == set(selected),
+            "Selected CPUs do not fit the scheduler tiers")
+    padded = [c for tier in tiers for c in tier + [0] * (1024 - len(tier))]
+    data = struct.pack("<5I3072I", 0x4e455741, 1, *map(len, tiers), *padded)
+    if policy not in PREFILL_PAIR:
+        return data, {}
+    reps = p_representatives(plan, selected)
+    return data + struct.pack("<I", len(reps)), {"p_representatives": reps}
+
+
+def audit_prefill(checkpoint, stats):
+    policy = checkpoint["policy"]
+    effective = checkpoint["effective"]
+    reps = p_representatives(effective["topology"]["portable_plan"], effective["cpus"])
+    proof = stats.get("prefill_pcore")
+    require(isinstance(proof, dict) and proof.get("p_representatives") == reps == checkpoint["p_representatives"],
+            "Installed P-core configuration differs from the detected topology")
+
+    def counts(value):
+        return isinstance(value, list) and len(value) == 4 and all(type(n) is int and n >= 0 for n in value)
+
+    attempts, hits = proof.get("attempts"), proof.get("hits")
+    enabled = policy == "prefill-pcore" and bool(reps)
+    require(counts(attempts) and counts(hits) and all(h <= a for h, a in zip(hits, attempts)) and
+            not any(attempts[i] for i in (0, 2, 3)) and
+            (enabled or not any(attempts)), "Invalid Prefill P-core counters")
+    rows = stats["cpus"]
+    require(all(counts(r["selected"]) for r in rows) and
+            [sum(r["selected"][i] for r in rows) for i in range(3)] == [hits[1], 0, 0],
+            "Selected idle tiers disagree with Prefill P-core hits")
+    running = None
+    require("running_starts_by_cpu" in proof, "Missing running callback evidence field")
+    starts = proof["running_starts_by_cpu"]
+    if checkpoint["variant"] == "full":
+        possible = effective["topology"]["portable_plan"]["snapshot"]["possible_cpus"]
+        require(isinstance(starts, list) and [r["cpu"] for r in starts] == [r["cpu"] for r in rows] == possible,
+                "Running evidence CPU domain differs")
+        for item, guard in zip(starts, rows):
+            by_phase = item["by_phase"]
+            require(counts(by_phase) and sum(by_phase) <= guard["running"] and
+                    (not any(by_phase) or item["cpu"] in effective["cpus"]), "Invalid selected-task running evidence")
+        running = {"all": [sum(r["by_phase"][i] for r in starts) for i in range(4)],
+                   "on_p_representatives": [sum(r["by_phase"][i] for r in starts if r["cpu"] in reps) for i in range(4)]}
+        require(any(running["all"]), "No registered-task running callbacks in FULL diagnostics")
+    else:
+        require(starts is None, "Unexpected running detail in Lite diagnostics")
+    if policy == "neutral":
+        status = "NEUTRAL_CONTROL"
+    elif not reps:
+        status = "NEUTRAL_FALLBACK_NO_P_REPRESENTATIVES"
+    elif hits[1]:
+        status = "PREFILL_IDLE_PCORE_SELECTED"
+    elif attempts[1]:
+        status = "ATTEMPTED_NO_IDLE_HIT"
+    else:
+        status = "NO_ELIGIBLE_WAKEUP_OBSERVED"
+    return {"status": status, "p_representatives": reps, "attempts": attempts, "hits": hits,
+            "running_starts": running}
+
+
+def check_pair(neutral, candidate):
+    identity = None
+    fixture_inputs = None
+    visits = {}
+    for policy, path in zip(PREFILL_PAIR, (neutral, candidate)):
+        summary, effective, launch = (read(path / name) for name in ("summary.json", "effective.json", "launch.json"))
+        admission = summary.get("kernel_handoff", {})
+        require(summary["status"] == "COHORT_PASS" and summary["scheduler"] == "SCHED_EXT" and
+                summary["kernel_state_delivery"] == "VALID_EVENTS_AND_IDLE_OBSERVED" and admission.get("policy") == policy,
+                "Missing completed selected-child visit for " + policy)
+        config = {k: v for k, v in effective.items() if k != "run_id"}
+        key = (config, launch["build"]["build_id"], launch["build"]["artifacts"], launch["model_sha256"],
+               launch["visit"], admission["variant"])
+        require(identity is None or key == identity, "Paired runtime, model, resources or instrumentation differ")
+        identity = key
+        fixtures = {}
+        metrics = {}
+        for row in read(path / "cohorts.json"):
+            name, measured = row["fixture"], row["measured"]
+            require(name not in fixtures and row["warmup"]["tokens"] == measured["tokens"], "Fixture or token mismatch")
+            fixtures[name] = (row["payload"], measured["tokens"])
+            generated = sum(map(len, measured["tokens"]))
+            wall = measured["elapsed_s"]
+            timings = measured["request_timings"]
+            require(generated > 0 and math.isfinite(wall) and wall > 0 and
+                    math.isfinite(measured["cpu_s"]) and measured["cpu_s"] >= 0 and
+                    math.isclose(generated / wall, measured["tokens_per_s"]) and
+                    len(timings) == len(measured["tokens"]) and
+                    all(t["prompt_n"] > 0 and math.isfinite(t["prompt_ms"]) and t["prompt_ms"] > 0 and
+                        t["predicted_n"] == len(tokens) and math.isfinite(t["predicted_ms"]) and
+                        (t["predicted_ms"] > 0 or len(tokens) == 1 and t["predicted_ms"] == 0)
+                        for t, tokens in zip(timings, measured["tokens"])), "Inconsistent cohort metrics")
+            metrics[name] = {"generated_tokens": generated, "wall_s": wall, "cpu_s": measured["cpu_s"],
+                             "cohort_tokens_per_s": generated / wall, "request_timings": timings}
+        require(fixtures and len(fixtures) == summary["cohorts"] and
+                (fixture_inputs is None or list(fixtures) == list(fixture_inputs) and fixtures == fixture_inputs),
+                "Paired fixtures, order, payloads or deterministic tokens differ")
+        fixture_inputs = fixtures
+        visits[policy] = {"placement": admission["prefill_pcore"], "metrics": metrics}
+    return {"status": "PAIR_SMOKE_PASS", "visits": visits}
+
+
 def prepare(args, directory, manifest, effective):
     require(SCHED_EXT.read_text().strip() == "disabled", "sched_ext must be disabled before preparation")
     require(effective["transport"] == "state", "The integrated SCX profiles require state-v2")
@@ -111,11 +236,9 @@ def prepare(args, directory, manifest, effective):
     require(controller, "A controller CPU outside the selected child envelope is required")
     output = args.output.resolve()
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
-    tiers = [[c for c in group if c in selected] for group in detected["policy"]["tiers"]]
-    require(tiers[0] and set(sum(tiers, [])) == selected, "Selected CPUs do not fit the scheduler tiers")
-    flat = [c for tier in tiers for c in tier + [0] * (1024 - len(tier))]
     topology = output / "scheduler-topology.bin"
-    topology.write_bytes(struct.pack("<" + "I" * (5 + 3 * 1024), 0x4e455741, 1, *map(len, tiers), *flat))
+    topology_bytes, placement = placement_input(detected, selected, args.scheduler_policy)
+    topology.write_bytes(topology_bytes)
     domain = output / "guard-domain.bin"
     domain.write_bytes(struct.pack("<6IQ", 0x4e415547, 1, max(possible)+1, len(possible),
                                    args.owner_pid, os.getuid(), proc_start(args.owner_pid)) +
@@ -141,10 +264,12 @@ def prepare(args, directory, manifest, effective):
                   "policy": policy, "object_sha256": scheduler_manifest["artifacts"][str(mode / "full_object.bpf.o")],
                   "bundle": str(bundle), "controller_cpu": controller[0], "owner_pid": args.owner_pid,
                   "owner_start_ticks": proc_start(args.owner_pid), "socket": socket, "effective": effective,
-                  "loader": loader, **guard_hashes}
+                  "loader": loader, **guard_hashes, **placement}
     save(output / "checkpoint.json", checkpoint)
     log = shlex.quote(str(output / "loader.log"))
     status = shlex.quote(str(output / "loader-exit.txt"))
-    print("(set +e; " + shlex.join(loader) + " 2>&1 | tee " + log +
-          '; codes=("${PIPESTATUS[@]}"); printf "%s %s\\n" "${codes[0]}" "${codes[1]}" > ' +
-          status + '; test "${codes[*]}" = "0 0")')
+    command = ("(set +e; " + shlex.join(loader) + " 2>&1 | tee " + log +
+               '; codes=("${PIPESTATUS[@]}"); printf "%s %s\\n" "${codes[0]}" "${codes[1]}" > ' +
+               status + '; test "${codes[*]}" = "0 0")')
+    (output / "load.sh").write_text("#!/usr/bin/env bash\n" + command + "\n")
+    print(command)

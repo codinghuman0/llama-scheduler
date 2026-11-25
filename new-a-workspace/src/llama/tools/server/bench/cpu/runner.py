@@ -507,16 +507,20 @@ def overlap_evidence(requests, observations=()):
             short_id, long_id = request["payload"]["id_slot"], long["payload"]["id_slot"]
             active = []
             for observation in observations:
-                slots = {slot["id"]: slot for slot in observation.get("slots", [])}
+                observed_slots = observation.get("slots")
+                if not isinstance(observed_slots, list):
+                    continue
+                slots = {slot["id"]: slot for slot in observed_slots
+                         if isinstance(slot, dict) and type(slot.get("id")) is int}
                 short_slot, long_slot = slots.get(short_id, {}), slots.get(long_id, {})
-                processed = long_slot.get("n_prompt_tokens_processed", -1)
-                next_token = short_slot.get("next_token", {})
-                # This server revision wraps the slot token record in a one-element array.
+                next_token = short_slot.get("next_token")
                 if isinstance(next_token, list) and len(next_token) == 1:
                     next_token = next_token[0]
-                decoded = next_token.get("n_decoded", 0) if isinstance(next_token, dict) else 0
-                if (short_slot.get("is_processing") and decoded > 0
-                        and long_slot.get("is_processing") and 0 < processed < len(long["payload"]["prompt"])):
+                decoded = next_token.get("n_decoded") if isinstance(next_token, dict) else None
+                processed = long_slot.get("n_prompt_tokens_processed")
+                if (short_slot.get("is_processing") is True and type(decoded) is int and decoded > 0
+                        and long_slot.get("is_processing") is True
+                        and type(processed) is int and 0 < processed < len(long["payload"]["prompt"])):
                     active.append(observation["end_ns"])
             proofs.append({"role": request["role"], "overlap": valid and bool(active), "admission_ns": admission,
                            "long_first_token_ns": first_output, "simultaneous_active_slot_snapshots_ns": active})

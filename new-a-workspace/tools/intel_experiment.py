@@ -111,9 +111,10 @@ def guard(*, min_free_mib=350, check_temperature=True):
     require(text('/sys/kernel/sched_ext/state', 'unsupported') in ('disabled', 'unsupported'),
             'An external sched_ext scheduler is active; leave it untouched and stop')
     require(os.sched_getscheduler(0) == os.SCHED_OTHER, 'Controller must use normal Linux policy')
-    free_mib = shutil.disk_usage(ROOT).free / 1024**2
-    require(free_mib > min_free_mib,
-            f'Free disk space is {free_mib:.1f} MiB; need more than {min_free_mib} MiB in {ROOT}')
+    if min_free_mib is not None:
+        free_mib = shutil.disk_usage(ROOT).free / 1024**2
+        require(free_mib > min_free_mib,
+                f'Free disk space is {free_mib:.1f} MiB; need more than {min_free_mib} MiB in {ROOT}')
     available = int(re.search(r'MemAvailable:\s+(\d+)', text('/proc/meminfo'))[1])
     require(available >= 2500000, 'Less than 2.5 GB available RAM')
     if check_temperature:

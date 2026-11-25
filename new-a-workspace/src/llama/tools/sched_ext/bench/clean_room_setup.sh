@@ -29,7 +29,7 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)" || {
-    echo "ERROR: run this script from a cloned Git repository" >&2
+    echo "오류: 클론한 Git 저장소에서 이 파일을 실행하세요" >&2
     exit 1
 }
 
@@ -55,20 +55,20 @@ say()  { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32mPASS\033[0m  %s\n' "$*"; PASS=$((PASS+1)); }
 warn() { printf '\033[1;33mWARN\033[0m  %s\n' "$*"; WARN=$((WARN+1)); }
 block(){ printf '\033[1;31mBLOCKED\033[0m  %s\n' "$*"; BLOCK=$((BLOCK+1)); }
-die()  { printf '\033[1;31mERROR\033[0m  %s\n' "$*" >&2; exit 1; }
+die()  { printf '\033[1;31m오류\033[0m  %s\n' "$*" >&2; exit 1; }
 
-trap 'printf "\nERROR at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
+trap 'printf "\n실행 오류가 발생한 행 %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
 cd "$REPO_ROOT"
 
-[[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]] || { block "Linux x86_64 is required"; exit 2; }
-[[ "$(id -u)" != 0 && "$(id -u)" == "$(stat -c %u "$REPO_ROOT")" ]] || die "run as the non-root repository owner"
+[[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]] || { block "x86-64 Linux가 필요합니다"; exit 2; }
+[[ "$(id -u)" != 0 && "$(id -u)" == "$(stat -c %u "$REPO_ROOT")" ]] || die "저장소 소유자의 일반 계정으로 실행하세요"
 if [[ "$INSTALL_DEPS" == "1" ]]; then
-    command -v apt-get >/dev/null 2>&1 || die "automated package installation requires apt-get; install dependencies manually and set INSTALL_DEPS=0 on other Linux hosts"
+    command -v apt-get >/dev/null 2>&1 || die "자동 패키지 설치에는 apt-get이 필요합니다. 다른 배포판은 직접 설치 후 INSTALL_DEPS=0을 지정하세요"
 fi
-command -v sudo >/dev/null 2>&1 || die "sudo is required"
-[[ -x "$DETECTOR" ]] || die "topology detector missing/not executable: $DETECTOR"
-[[ -x "$SMOKE" ]] || die "portability smoke missing/not executable: $SMOKE"
+command -v sudo >/dev/null 2>&1 || die "sudo가 필요합니다"
+[[ -x "$DETECTOR" ]] || die "토폴로지 탐지 프로그램을 실행할 수 없습니다: $DETECTOR"
+[[ -x "$SMOKE" ]] || die "이식성 smoke를 실행할 수 없습니다: $SMOKE"
 
 say "Repository identity"
 printf 'root:   %s\n' "$REPO_ROOT"
@@ -78,7 +78,7 @@ printf 'origin: %s\n' "$(git remote get-url origin 2>/dev/null || echo none)"
 
 [[ -z "$(git status --porcelain)" ]] || {
     git status --short >&2
-    die "worktree must be clean before clean-room setup"
+    die "준비하기 전에 Git 작업 트리의 변경을 보관하세요"
 }
 ok "Git worktree clean"
 
@@ -87,11 +87,11 @@ python3 -B -c 'import sys; sys.path.insert(0, "tools/sched_ext/bench"); from com
 if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
     RELEASE_COMMIT="$(git rev-parse "$RELEASE_TAG^{commit}")"
     [[ "$RELEASE_COMMIT" == "$EXPECTED_RELEASE_COMMIT" ]] || \
-        block "$RELEASE_TAG -> $RELEASE_COMMIT, expected $EXPECTED_RELEASE_COMMIT"
+        block "$RELEASE_TAG -> $RELEASE_COMMIT, 예상값 $EXPECTED_RELEASE_COMMIT"
     [[ "$RELEASE_COMMIT" == "$EXPECTED_RELEASE_COMMIT" ]] && \
         ok "immutable release tag verified"
 else
-    block "missing release tag $RELEASE_TAG"
+    block "릴리스 태그가 없습니다: $RELEASE_TAG"
 fi
 
 say "Host snapshot"
@@ -99,11 +99,10 @@ cat /etc/os-release | grep -E '^(NAME|VERSION|VERSION_ID|VERSION_CODENAME)=' || 
 printf 'kernel: %s\n' "$(uname -r)"
 printf 'arch:   %s\n' "$(uname -m)"
 printf 'nproc:  %s\n' "$(nproc)"
-df -h "$HOME" | tail -1 || true
 
 say "Model identity"
 if [[ ! -f "$MODEL" ]]; then
-    block "model not found: $MODEL"
+    block "모델을 찾을 수 없습니다: $MODEL"
 else
     MODEL_SIZE="$(stat -c '%s' "$MODEL")"
     MODEL_SHA="$(sha256sum "$MODEL" | awk '{print $1}')"
@@ -113,15 +112,15 @@ else
 
     [[ "$MODEL_SIZE" == "$EXPECTED_MODEL_SIZE" ]] \
         && ok "model byte size" \
-        || block "model size mismatch"
+        || block "모델 파일 크기가 다릅니다"
 
     [[ "$MODEL_SHA" == "$EXPECTED_MODEL_SHA256" ]] \
         && ok "model SHA256" \
-        || block "model SHA256 mismatch"
+        || block "모델 SHA-256이 일치하지 않습니다"
 fi
 
 [[ -r /sys/kernel/sched_ext/state && -r /sys/kernel/btf/vmlinux ]] || {
-    block "required sched_ext/BTF kernel interfaces missing"
+    block "필요한 커널 sched_ext/BTF 인터페이스가 없습니다"
     printf "CLEAN_ROOM_PREFLIGHT_RESULT=BLOCKED\n"
     exit 2
 }
@@ -211,7 +210,7 @@ for cmd in "${REQUIRED_CMDS[@]}"; do
         esac
         ok "$cmd available"
     else
-        block "$cmd missing"
+        block "$cmd 항목이 없습니다"
     fi
 done
 
@@ -220,13 +219,13 @@ if [[ -r /sys/kernel/sched_ext/state ]]; then
     printf 'sched_ext state: %s\n' "$(cat /sys/kernel/sched_ext/state)"
     ok "sched_ext sysfs interface"
 else
-    block "/sys/kernel/sched_ext/state missing"
+    block "/sys/kernel/sched_ext/state 항목이 없습니다"
 fi
 
 if [[ -r /sys/kernel/btf/vmlinux ]]; then
     ok "kernel BTF available"
 else
-    block "/sys/kernel/btf/vmlinux missing"
+    block "/sys/kernel/btf/vmlinux 항목이 없습니다"
 fi
 
 CONFIG_FILE="/boot/config-$(uname -r)"
@@ -235,23 +234,11 @@ if [[ -r "$CONFIG_FILE" ]]; then
         if grep -qx "${opt}=y" "$CONFIG_FILE"; then
             ok "$opt=y"
         else
-            block "$opt is not =y"
+            block "$opt 커널 설정이 y가 아닙니다"
         fi
     done
 else
     warn "running kernel config is not readable at $CONFIG_FILE"
-fi
-
-say "Disk headroom"
-FREE_KB="$(df -Pk "$HOME" | awk 'NR==2 {print $4}')"
-FREE_GIB=$(( FREE_KB / 1024 / 1024 ))
-printf 'free GiB (integer): %s\n' "$FREE_GIB"
-if (( FREE_GIB < 3 )); then
-    block "less than 3 GiB free"
-elif (( FREE_GIB < 6 )); then
-    warn "less than 6 GiB free; setup should fit, but benchmark headroom is limited"
-else
-    ok "disk headroom"
 fi
 
 if (( BLOCK > 0 )); then
@@ -260,7 +247,7 @@ if (( BLOCK > 0 )); then
 fi
 
 say "Topology detection"
-[[ "$BUILD_DIR" == "$REPO_ROOT"/build-* && ! -L "$BUILD_DIR" ]] || die "BUILD_DIR must be a repository-local build-* directory"
+[[ "$BUILD_DIR" == "$REPO_ROOT"/build-* && ! -L "$BUILD_DIR" ]] || die "BUILD_DIR은 저장소 내부의 build-* 폴더여야 합니다"
 mkdir -p "$BUILD_DIR"
 mkdir -p "$BUILD_DIR/portability"
 
@@ -269,8 +256,8 @@ TOPOLOGY_ENV="$BUILD_DIR/portability/topology.env"
 
 # shellcheck disable=SC1090
 source "$TOPOLOGY_ENV"
-[[ "${TOPOLOGY_RESULT:-}" == "PASS" ]] || die "topology detector did not PASS"
-[[ "${CPU_SELECTED_COUNT:-0}" -ge 1 ]] || die "topology detector selected no CPU"
+[[ "${TOPOLOGY_RESULT:-}" == "PASS" ]] || die "토폴로지 검증에 실패했습니다"
+[[ "${CPU_SELECTED_COUNT:-0}" -ge 1 ]] || die "토폴로지 탐지에서 CPU를 선택하지 못했습니다"
 ok "host topology resolved"
 
 say "llama-server build: HINT ON / TRACE OFF"
@@ -287,15 +274,15 @@ cmake --build "$BUILD_DIR" \
 SERVER="$BUILD_DIR/bin/llama-server"
 MARKER="$BUILD_DIR/bin/libllama-server-impl.so"
 
-[[ -x "$SERVER" ]] || die "llama-server missing after build"
-[[ -f "$MARKER" ]] || die "libllama-server-impl.so missing after build"
+[[ -x "$SERVER" ]] || die "llama-server 파일이 빌드 결과에 없습니다"
+[[ -f "$MARKER" ]] || die "libllama-server-impl.so 파일이 빌드 결과에 없습니다"
 ok "llama-server build"
 
 CACHE_HINT="$(grep -E '^LLAMA_SCX_PHASE_HINT:BOOL=' "$BUILD_DIR/CMakeCache.txt" || true)"
 CACHE_TRACE="$(grep -E '^LLAMA_SCX_PHASE_TRACE:BOOL=' "$BUILD_DIR/CMakeCache.txt" || true)"
 printf '%s\n%s\n' "$CACHE_HINT" "$CACHE_TRACE"
-[[ "$CACHE_HINT" == "LLAMA_SCX_PHASE_HINT:BOOL=ON" ]] || block "HINT cache value is not ON"
-[[ "$CACHE_TRACE" == "LLAMA_SCX_PHASE_TRACE:BOOL=OFF" ]] || block "TRACE cache value is not OFF"
+[[ "$CACHE_HINT" == "LLAMA_SCX_PHASE_HINT:BOOL=ON" ]] || block "HINT 캐시 값이 ON이어야 합니다"
+[[ "$CACHE_TRACE" == "LLAMA_SCX_PHASE_TRACE:BOOL=OFF" ]] || block "TRACE 캐시 값이 OFF여야 합니다"
 
 # Do not use grep -q in a pipe under pipefail: grep -q may close the pipe early
 # and make nm receive SIGPIPE, creating a false negative.
@@ -308,12 +295,12 @@ if [[ -n "$MARKER_MATCH" ]]; then
     printf '%s\n' "$MARKER_MATCH"
     ok "llama_scx_phase_v1 dynamic export"
 else
-    block "llama_scx_phase_v1 dynamic export missing"
+    block "llama_scx_phase_v1 동적 심볼이 없습니다"
 fi
 
 say "Fresh lightweight sched_ext build"
 if ! make -B -C "$REPO_ROOT/tools/sched_ext" -j"$BUILD_JOBS"; then
-    block "neutral scheduler build failed; check matching kernel UAPI headers and compiler/libbpf support"
+    block "중립 스케줄러 빌드에 실패했습니다. 실행 커널의 UAPI 헤더, 컴파일러와 libbpf를 확인하세요"
     printf 'CLEAN_ROOM_BUILD_RESULT=BLOCKED\n'
     exit 2
 fi
@@ -322,9 +309,9 @@ SCHED="$REPO_ROOT/tools/sched_ext/build/bin/llama_scx"
 CHILD="$REPO_ROOT/tools/sched_ext/build/bin/llama_scx_child"
 BPF_OBJ="$REPO_ROOT/tools/sched_ext/build/llama_scx.bpf.o"
 
-[[ -x "$SCHED" ]] || block "scheduler loader missing"
-[[ -x "$CHILD" ]] || block "child launcher missing"
-[[ -f "$BPF_OBJ" ]] || block "BPF object missing"
+[[ -x "$SCHED" ]] || block "scheduler loader 항목이 없습니다"
+[[ -x "$CHILD" ]] || block "child launcher 항목이 없습니다"
+[[ -f "$BPF_OBJ" ]] || block "BPF object 항목이 없습니다"
 (( BLOCK == 0 )) && ok "fresh sched_ext build"
 
 if (( BLOCK > 0 )); then
@@ -361,7 +348,7 @@ printf 'build dir:     %s\n' "$BUILD_DIR"
 
 if [[ -n "$(git status --short)" ]]; then
     git status --short >&2
-    die "worktree is not clean at end of setup"
+    die "준비 종료 시 Git 작업 트리에 변경이 있습니다"
 fi
 
 printf '\nPASS checks:    %d\n' "$PASS"

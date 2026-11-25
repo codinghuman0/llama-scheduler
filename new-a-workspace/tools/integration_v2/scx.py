@@ -73,9 +73,9 @@ def build(out):
                         str(CODE / "test_prefill_selection.c"), "-o", str(test)], "compile-test-" + policy)
         run_logged([str(test)], out / ("test-" + policy + ".log"), timeout=10)
     artifacts.append(out / "llama_scx_child")
-    require(sha(BTF) == btf_sha, "Running kernel BTF changed during scheduler build")
+    require(sha(BTF) == btf_sha, "빌드 중 커널 BTF가 변경됐습니다.")
     require(all(sha(WORKSPACE / name) == digest for name, digest in source_ids.items()) and
-            sha(HEADER / "newa-state-abi.h") == abi_sha, "Scheduler source changed during compilation")
+            sha(HEADER / "newa-state-abi.h") == abi_sha, "컴파일 중 스케줄러 소스가 바뀌었습니다.")
     save(out / "scheduler-manifest.json", {
         "schema": 3, "status": "COMPILED_NOT_LOADED", "kernel": os.uname().release, "btf_sha256": btf_sha,
         "source_sha256": source_ids, "shared_abi_sha256": abi_sha, "commands": commands,
@@ -85,14 +85,14 @@ def build(out):
 
 def verify_bundle(bundle):
     manifest = read(bundle / "scheduler-manifest.json")
-    require(manifest.get("schema") == 3, "Rebuild the scheduler bundle with the current source seal")
+    require(manifest.get("schema") == 3, "현재 소스로 스케줄러 번들을 재빌드하세요.")
     require(manifest["status"] == "COMPILED_NOT_LOADED" and manifest["kernel"] == os.uname().release and
-            manifest["btf_sha256"] == sha(BTF), "Scheduler was built for a different kernel/BTF")
-    require(manifest["shared_abi_sha256"] == sha(HEADER / "newa-state-abi.h"), "Publisher/receiver wire source changed")
+            manifest["btf_sha256"] == sha(BTF), "스케줄러 번들이 현재 커널 또는 BTF와 다릅니다. 이 커널에서 다시 빌드하세요.")
+    require(manifest["shared_abi_sha256"] == sha(HEADER / "newa-state-abi.h"), "상태 발행기와 수신기의 전송 규약 소스가 바뀌었습니다.")
     for rel, digest in manifest["source_sha256"].items():
-        require(sha(WORKSPACE / rel) == digest, "Scheduler source changed: " + rel)
+        require(sha(WORKSPACE / rel) == digest, "스케줄러 소스가 바뀌었습니다: " + rel)
     for rel, digest in manifest["artifacts"].items():
-        require(sha(bundle / rel) == digest, "Scheduler artifact changed: " + rel)
+        require(sha(bundle / rel) == digest, "스케줄러 산출물이 바뀌었습니다: " + rel)
     return manifest
 
 
@@ -104,10 +104,10 @@ def p_representatives(plan, selected):
     if plan["architecture"] == "HOMOGENEOUS":
         return []
     require(plan["architecture"] == "INTEL_HYBRID" and plan["vendor"] == "Intel",
-            "Cannot certify P-core representatives for this architecture")
+            "이 CPU 구조에서 P코어 대표를 검증할 수 없습니다.")
     first = [c for c in plan["policy"]["tiers"][0] if c in selected]
     cores = {row["representative"] for row in plan["cores"] if row["core_type"] == "P"}
-    require(set(first) == cores.intersection(selected), "CPUID core types and SMT representatives disagree")
+    require(set(first) == cores.intersection(selected), "CPUID 코어 유형과 SMT 대표 CPU가 일치하지 않습니다.")
     return first
 
 
@@ -115,7 +115,7 @@ def placement_input(plan, selected, policy):
     tiers = [[c for c in group if c in selected] for group in plan["policy"]["tiers"]]
     flat = [c for group in tiers for c in group]
     require(tiers[0] and len(flat) == len(selected) and set(flat) == set(selected),
-            "Selected CPUs do not fit the scheduler tiers")
+            "선택된 CPU가 스케줄러 배치 계층과 일치하지 않습니다.")
     padded = [c for tier in tiers for c in tier + [0] * (1024 - len(tier))]
     data = struct.pack("<5I3072I", 0x4e455741, 1, *map(len, tiers), *padded)
     if policy not in PREFILL_PAIR:
@@ -130,7 +130,7 @@ def audit_prefill(checkpoint, stats):
     reps = p_representatives(effective["topology"]["portable_plan"], effective["cpus"])
     proof = stats.get("prefill_pcore")
     require(isinstance(proof, dict) and proof.get("p_representatives") == reps == checkpoint["p_representatives"],
-            "Installed P-core configuration differs from the detected topology")
+            "적용한 P코어 구성이 감지한 토폴로지와 다릅니다.")
 
     def counts(value):
         return isinstance(value, list) and len(value) == 4 and all(type(n) is int and n >= 0 for n in value)
@@ -139,27 +139,27 @@ def audit_prefill(checkpoint, stats):
     enabled = policy == "prefill-pcore" and bool(reps)
     require(counts(attempts) and counts(hits) and all(h <= a for h, a in zip(hits, attempts)) and
             not any(attempts[i] for i in (0, 2, 3)) and
-            (enabled or not any(attempts)), "Invalid Prefill P-core counters")
+            (enabled or not any(attempts)), "Prefill P코어 카운터가 올바르지 않습니다.")
     rows = stats["cpus"]
     require(all(counts(r["selected"]) for r in rows) and
             [sum(r["selected"][i] for r in rows) for i in range(3)] == [hits[1], 0, 0],
-            "Selected idle tiers disagree with Prefill P-core hits")
+            "유휴 CPU 선택 수와 Prefill P코어 적중 수가 다릅니다.")
     running = None
-    require("running_starts_by_cpu" in proof, "Missing running callback evidence field")
+    require("running_starts_by_cpu" in proof, "실행 콜백 증빙 항목이 없습니다.")
     starts = proof["running_starts_by_cpu"]
     if checkpoint["variant"] == "full":
         possible = effective["topology"]["portable_plan"]["snapshot"]["possible_cpus"]
         require(isinstance(starts, list) and [r["cpu"] for r in starts] == [r["cpu"] for r in rows] == possible,
-                "Running evidence CPU domain differs")
+                "실행 증빙의 CPU 범위가 다릅니다.")
         for item, guard in zip(starts, rows):
             by_phase = item["by_phase"]
             require(counts(by_phase) and sum(by_phase) <= guard["running"] and
-                    (not any(by_phase) or item["cpu"] in effective["cpus"]), "Invalid selected-task running evidence")
+                    (not any(by_phase) or item["cpu"] in effective["cpus"]), "대상 프로세스의 실행 증빙이 잘못됐습니다.")
         running = {"all": [sum(r["by_phase"][i] for r in starts) for i in range(4)],
                    "on_p_representatives": [sum(r["by_phase"][i] for r in starts if r["cpu"] in reps) for i in range(4)]}
-        require(any(running["all"]), "No registered-task running callbacks in FULL diagnostics")
+        require(any(running["all"]), "FULL 진단에 등록된 작업의 실행 콜백이 없습니다.")
     else:
-        require(starts is None, "Unexpected running detail in Lite diagnostics")
+        require(starts is None, "Lite 진단에 예상 밖의 실행 상세 카운터가 있습니다.")
     if policy == "neutral":
         status = "NEUTRAL_CONTROL"
     elif not reps:
@@ -183,17 +183,17 @@ def check_pair(neutral, candidate):
         admission = summary.get("kernel_handoff", {})
         require(summary["status"] == "COHORT_PASS" and summary["scheduler"] == "SCHED_EXT" and
                 summary["kernel_state_delivery"] == "VALID_EVENTS_AND_IDLE_OBSERVED" and admission.get("policy") == policy,
-                "Missing completed selected-child visit for " + policy)
+                "정상 완료된 자식 실행 기록이 없습니다: " + policy)
         config = {k: v for k, v in effective.items() if k != "run_id"}
         key = (config, launch["build"]["build_id"], launch["build"]["artifacts"], launch["model_sha256"],
                launch["visit"], admission["variant"])
-        require(identity is None or key == identity, "Paired runtime, model, resources or instrumentation differ")
+        require(identity is None or key == identity, "비교 실행의 런타임, 모델, CPU 또는 계측 설정이 다릅니다.")
         identity = key
         fixtures = {}
         metrics = {}
         for row in read(path / "cohorts.json"):
             name, measured = row["fixture"], row["measured"]
-            require(name not in fixtures and row["warmup"]["tokens"] == measured["tokens"], "Fixture or token mismatch")
+            require(name not in fixtures and row["warmup"]["tokens"] == measured["tokens"], "실험 입력 또는 토큰이 일치하지 않습니다.")
             fixtures[name] = (row["payload"], measured["tokens"])
             generated = sum(map(len, measured["tokens"]))
             wall = measured["elapsed_s"]
@@ -205,24 +205,24 @@ def check_pair(neutral, candidate):
                     all(t["prompt_n"] > 0 and math.isfinite(t["prompt_ms"]) and t["prompt_ms"] > 0 and
                         t["predicted_n"] == len(tokens) and math.isfinite(t["predicted_ms"]) and
                         (t["predicted_ms"] > 0 or len(tokens) == 1 and t["predicted_ms"] == 0)
-                        for t, tokens in zip(timings, measured["tokens"])), "Inconsistent cohort metrics")
+                        for t, tokens in zip(timings, measured["tokens"])), "요청 그룹의 토큰 및 시간 측정값이 일치하지 않습니다.")
             metrics[name] = {"generated_tokens": generated, "wall_s": wall, "cpu_s": measured["cpu_s"],
                              "cohort_tokens_per_s": generated / wall, "request_timings": timings}
         require(fixtures and len(fixtures) == summary["cohorts"] and
                 (fixture_inputs is None or list(fixtures) == list(fixture_inputs) and fixtures == fixture_inputs),
-                "Paired fixtures, order, payloads or deterministic tokens differ")
+                "비교 실행의 입력·순서·요청 본문 또는 생성 토큰이 다릅니다.")
         fixture_inputs = fixtures
         visits[policy] = {"placement": admission["prefill_pcore"], "metrics": metrics}
     return {"status": "PAIR_SMOKE_PASS", "visits": visits}
 
 
 def prepare(args, directory, manifest, effective):
-    require(SCHED_EXT.read_text().strip() == "disabled", "sched_ext must be disabled before preparation")
-    require(effective["transport"] == "state", "The integrated SCX profiles require state-v2")
-    require(not effective["role_options"], "Role mask, polling and priority experiments are excluded from selected-child admission")
-    require(effective["native_barrier"] != "park", "Park barrier admission with the kernel scheduler is pending")
-    require(args.owner_pid > 1 and os.sched_getscheduler(args.owner_pid) == os.SCHED_OTHER, "Owner shell must use normal policy")
-    require(Path(f"/proc/{args.owner_pid}").stat().st_uid == os.getuid(), "Owner shell UID differs")
+    require(SCHED_EXT.read_text().strip() == "disabled", "준비 전에 sched_ext가 비활성 상태여야 합니다.")
+    require(effective["transport"] == "state", "통합 커널 프로파일에는 state-v2가 필요합니다.")
+    require(not effective["role_options"], "선택된 자식의 커널 실험에서는 별도 역할 마스크·폴링·우선순위 옵션을 해제하세요.")
+    require(effective["native_barrier"] != "park", "커널 스케줄러에서 park barrier 조합은 아직 검증되지 않았습니다.")
+    require(args.owner_pid > 1 and os.sched_getscheduler(args.owner_pid) == os.SCHED_OTHER, "제어 셸은 기본 Linux 스케줄링 정책이어야 합니다.")
+    require(Path(f"/proc/{args.owner_pid}").stat().st_uid == os.getuid(), "제어 셸 소유자가 다릅니다.")
     bundle = args.scheduler_build.resolve(strict=True)
     scheduler_manifest = verify_bundle(bundle)
     detected = effective["topology"]["portable_plan"]
@@ -231,9 +231,9 @@ def prepare(args, directory, manifest, effective):
     online = snapshot["online_cpus"]
     allowed = snapshot["process_allowed_cpus"]
     selected = set(effective["cpus"])
-    require(set(os.sched_getaffinity(args.owner_pid)) == set(allowed), "Owner shell changed CPU envelope")
+    require(set(os.sched_getaffinity(args.owner_pid)) == set(allowed), "제어 셸의 허용 CPU 범위가 변경됐습니다.")
     controller = sorted((set(online) & set(allowed)) - selected)
-    require(controller, "A controller CPU outside the selected child envelope is required")
+    require(controller, "선택한 자식의 CPU 범위 밖에 제어용 논리 CPU가 하나 필요합니다.")
     output = args.output.resolve()
     output.mkdir(parents=True, mode=0o700, exist_ok=False)
     topology = output / "scheduler-topology.bin"
@@ -252,7 +252,7 @@ def prepare(args, directory, manifest, effective):
     mode = Path(variant) / policy
     binary = directory / "bin/llama-server"
     marker = directory / "bin/libllama-server-impl.so"
-    require(sha(marker) == manifest["artifacts"].get(marker.resolve().name), "Wrong marker DSO")
+    require(sha(marker) == manifest["artifacts"].get(marker.resolve().name), "마커 공유 라이브러리가 빌드와 다릅니다.")
     loader = ["sudo", "timeout", "--signal=TERM", "--kill-after=15s", "540s",
               "taskset", "-c", str(controller[0]), str(bundle / mode / "loader"),
               "--guard-config", str(domain), "--topology", str(topology),
@@ -271,5 +271,6 @@ def prepare(args, directory, manifest, effective):
     command = ("(set +e; " + shlex.join(loader) + " 2>&1 | tee " + log +
                '; codes=("${PIPESTATUS[@]}"); printf "%s %s\\n" "${codes[0]}" "${codes[1]}" > ' +
                status + '; test "${codes[*]}" = "0 0")')
-    (output / "load.sh").write_text("#!/usr/bin/env bash\n" + command + "\n")
+    (output / "load.sh").write_text("#!/usr/bin/env bash\n" + command +
+                                   " || { echo '오류: 커널 loader가 실패했습니다. loader.log를 확인하세요.' >&2; exit 1; }\n")
     print(command)

@@ -1,5 +1,13 @@
 # Status
 
+## Intel and AMD release entry point
+
+`scripts/run-cpu-experiment.sh` clones the shallow `integration-v2` branch or fast-forwards an existing checkout and runs the requested experiment. The CPU smoke, native m4 comparison, FULL kernel smoke and Lite placement comparison discover the local CPU envelope. The public modes use Korean diagnostics and have no temperature sensor, free-disk, free-RAM or AC admission threshold. An available external power reading is recorded in portable placement results. The fixed original AMD protocol still requires AC when invoked explicitly for historical reproduction.
+
+The original 5500U placement study and historical baseline campaigns are published with their compact aggregate results. The release removes 8,986 historical entries (161,989,120 uncompressed bytes) from the checkout. The release also excludes 44 workspace-migration files (5,371,688 bytes). The files are preserved at `25ab433140eafc6cbb3b259b017c2a9252b37900`. [Launch instructions](../README.md#intelamd-cpu-실험) · [Archive and current inputs](../new-a-workspace/experiments/README.md)
+
+Ryzen 5 5500U completed all three Linux smoke fixtures with the shared state-only OpenMP build. File syscall tracing during the test, verified build reuse, doctor, inference and ZIP collection observed zero thermal sysfs opens and zero workspace statfs calls. The host BPF build prepared both FULL checkpoints without a kernel load. The 4P+8E Intel fixture, 8-core AMD fixture, no-SMT AMD and CPU-quota tests passed. Physical Intel and a second AMD desktop are pending.
+
 ## Optional Prefill P-core selection
 
 The integration-v2 scheduler includes `prefill-pcore` and a matched `neutral` control. Both use state-v2, selected-child registration and the existing guarded weighted-vtime dispatch. Only a registered task waking during active Prefill can claim an allowed, online, idle P-core representative. FULL records actual running starts per CPU and phase. Both variants export selection attempts and hits. [Intel/AMD smoke procedure](../new-a-workspace/experiments/team-integration-v2/INTEL_HANDOFF.md#prefill-p-core-옵션을-확인하는-짧은-실험)

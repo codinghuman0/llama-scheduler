@@ -1,5 +1,8 @@
 # Intel 실험 오류 조사용 Codex 프롬프트
 
+이 문서는 과거 B0/A 비교의 보존 기록입니다. 현재 배포본의 실행 명령, 폴더 구조와 결과 위치는 공용 실행 안내에서 확인하세요. [현재 Intel·AMD 실험](../../README.md#intelamd-cpu-실험) · [과거 전체 원본](https://github.com/codinghuman0/llama-scheduler/tree/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace)
+
+
 아래 내용을 팀원 장비의 Codex에 붙여 넣으세요. 마지막에 실제 경로와 오류를 덧붙이세요.
 
 ---

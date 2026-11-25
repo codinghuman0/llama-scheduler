@@ -1,5 +1,8 @@
 # Intel 전달 전 로컬 호환성 점검
 
+이 문서는 과거 B0/A 비교의 보존 기록입니다. 현재 배포본의 실행 명령, 폴더 구조와 결과 위치는 공용 실행 안내에서 확인하세요. [현재 Intel·AMD 실험](../../README.md#intelamd-cpu-실험) · [과거 전체 원본](https://github.com/codinghuman0/llama-scheduler/tree/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace)
+
+
 2026-11-23 결과: **LOCAL_AVX2_BUILD_AND_SMOKE_PASS**.
 
 대상은 Intel i5-1240P / Ubuntu이며 실제 점검 호스트는 AMD Ryzen 5 5500U다. Intel에서 사용할 공통 ISA로 소스를 다시 빌드하고 실제 모델 실행까지 확인했다. **Intel 하드웨어 실행·Intel 성능·Intel 커널 sched_ext 적용은 NOT_RUN**이다. Intel 성능 개선이나 완전한 시스템 이식 성공으로 확대 해석하지 않는다.
@@ -26,7 +29,7 @@
 
 새 빌드 ID는 `e611172cc7a6a518`이다. 첫 시도에서는 B0에 복사한 고정 UI가 `ui.h`를 찾지 못해 실패했다. recipe 2에서 alias header까지 양쪽에 동일하게 포함해 해결했다. 실패 로그와 두 번째 빌드의 전체 입력·컴파일 명령을 보존했다. 기존 source와 검증 runtime을 고친 것이 아니다.
 
-증빙: [verification.json](../experiments/intel-portability-check-v1/verification.json), [전체 로컬 검증 폴더](../experiments/intel-portability-check-v1/README.md). raw HTTP 응답, policy 재계산, CPU/load, DSO, cleanup, build 로그와 artifact SHA256가 포함된다.
+증빙: [verification.json](../experiments/intel-portability-check-v1/verification.json), [전체 로컬 검증 폴더](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/intel-portability-check-v1/README.md). raw HTTP 응답, policy 재계산, CPU/load, DSO, cleanup, build 로그와 artifact SHA256가 포함된다.
 
 이번 측정은 짧은 기능 smoke이며 **성능 gain 판정이나 full pilot/confirmation은 하지 않았다**. pilot의 paired 분석·불균등 부하 거부 경로는 unit test로 점검했다. 실제 Intel에서 128 tokens/request pilot을 실행할 방법은 [실험 안내](INTEL_EXPERIMENT.ko.md)에 있다. 새 B0/A AVX2 바이너리는 보관된 AMD runtime과 바이트가 같은 것으로 주장하지 않는다.
 

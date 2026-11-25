@@ -39,7 +39,6 @@ SCHED = REPO / 'tools/sched_ext/build'
 SERVER_CPUS = set()
 HOUSE_CPUS = set()
 PORT = 8096
-MIN_FREE = 512 * 1024 * 1024
 BOOT_ID = Path('/proc/sys/kernel/random/boot_id')
 BASE = 'A small public library stands beside the town square. Its shelves hold stories, science books, travel guides, and local history. Every morning the librarian opens the windows, checks returned books, and prepares a quiet room for readers. Children visit after school to choose books and ask questions. Older residents use newspapers and share memories of the town. Visitors find maps and learn about nearby walking routes. A reading group meets once a week. Each person explains one idea from a book and listens to the other readers. The library supports curiosity, patient learning, and friendly conversation.'
 PROMPT = 'Read the following notes and continue with a concise description of the library.\n\n' + '\n\n'.join([BASE] * 8) + '\n\nContinue this sentence: The library is useful because'

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Serial, paired AMD measurements of the published integration-v2 runtime."""
 
-import argparse
 from contextlib import nullcontext
 import copy
 import fcntl
@@ -24,7 +23,8 @@ BUILD = WORKSPACE / 'state/integration-v2/builds/amd-published-direct-v1'
 DATA = WORKSPACE / 'state/integration-v2/amd-published-direct-v1'
 MODEL = PROJECTS / 'model.gguf'
 sys.path[:0] = [str(WORKSPACE / 'tools/integration_v2'), str(WORKSPACE / 'tools')]
-sys.path.append(str(OLD / 'code'))
+sys.path.append(str(WORKSPACE / 'experiments/a-b0-direct-confirmation-v1/code'))
+from cli_ko import ArgumentParser, main_entry
 import contention
 import runtime
 from intel_experiment import clean_env, guard, payload_for, read, require, sha, temperatures, validate_body
@@ -289,7 +289,7 @@ def run(identity, name, plan):
 
 
 def main():
-    cli = argparse.ArgumentParser(description=__doc__)
+    cli = ArgumentParser(description="기존 AMD 장비의 원본 런타임 비교 실험")
     cli.add_argument('action', choices=('prepare', 'smoke', 'confirm-1', 'confirm-2'))
     action = cli.parse_args().action
 
@@ -298,6 +298,7 @@ def main():
         raise KeyboardInterrupt
 
     signal.signal(signal.SIGTERM, stop)
+    require((PRESERVED / 'state/.measurement.lock').is_file(), '원본 AMD 캠페인은 보존된 B0/A 런타임이 필요합니다. 새 장비에서는 공통 스크립트를 실행하세요.')
     with (PRESERVED / 'state/.measurement.lock').open('r') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         guard()
@@ -323,4 +324,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main_entry(main)

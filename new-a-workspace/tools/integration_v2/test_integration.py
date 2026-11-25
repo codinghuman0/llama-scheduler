@@ -19,51 +19,22 @@ import scx
 
 
 class HostGuardTests(unittest.TestCase):
-    def setUp(self):
-        self.disk = SimpleNamespace(free=400 * 1024**2)
-        self.sensors = {"coretemp:temp1_input": 85.0}
-        readings = {"/sys/kernel/sched_ext/state": "disabled", "/proc/meminfo": "MemAvailable: 4000000 kB"}
-        for item in (
-            patch.object(intel_experiment.os, "getuid", return_value=1000),
-            patch.object(intel_experiment.os, "sched_getscheduler", return_value=runtime.os.SCHED_OTHER),
-            patch.object(intel_experiment.shutil, "disk_usage", return_value=self.disk),
-            patch.object(intel_experiment, "text", side_effect=lambda path, *_: readings[path]),
-            patch.object(intel_experiment, "temperatures", return_value=self.sensors),
-        ):
-            item.start()
-            self.addCleanup(item.stop)
+    def test_guard_does_not_use_disk_ram_or_sensors(self):
+        with patch.object(intel_experiment.os, "getuid", return_value=1000), \
+             patch.object(intel_experiment.os, "sched_getscheduler", return_value=os.SCHED_OTHER), \
+             patch.object(intel_experiment, "text", side_effect=lambda p, *_: {"/sys/kernel/sched_ext/state": "disabled"}[p]), \
+             patch.object(intel_experiment.shutil, "disk_usage", side_effect=AssertionError), \
+             patch.object(intel_experiment, "temperatures", side_effect=AssertionError):
+            intel_experiment.guard()
 
-    def check(self, action="serve-bench", relaxed=True):
-        runtime.guard_host(SimpleNamespace(action=action, relaxed_host_checks=relaxed))
-
-    def test_relaxed_host_checks_do_not_read_temperature_sensors(self):
-        with patch.object(intel_experiment, "temperatures", side_effect=AssertionError("Sensor read")) as sensors:
-            for action in ("build", "build-scheduler", "prepare-scx", "doctor", "run", "serve-bench"):
-                self.check(action)
-            sensors.assert_not_called()
-
-    def test_relaxed_disk_floor_applies_only_to_build(self):
-        self.disk.free = 64 * 1024**2
-        for action in ("build", "build-scheduler"):
-            with self.assertRaisesRegex(RuntimeError, "more than 128 MiB"):
-                self.check(action)
-        self.disk.free = 129 * 1024**2
-        self.check("build")
-        with patch.object(intel_experiment.shutil, "disk_usage", side_effect=AssertionError("Disk precheck")):
-            for action in ("prepare-scx", "doctor", "run", "serve-bench"):
-                self.check(action)
-
-    def test_default_retains_thermal_and_disk_limits(self):
-        self.disk.free = 349 * 1024**2
-        with self.assertRaisesRegex(RuntimeError, "more than 350 MiB"):
-            self.check(relaxed=False)
-        self.disk.free = 400 * 1024**2
-        self.sensors["coretemp:temp1_input"] = 90.0
-        with self.assertRaisesRegex(RuntimeError, "90 C limit"):
-            self.check(relaxed=False)
-        self.sensors.clear()
-        with self.assertRaisesRegex(RuntimeError, "sensor unavailable"):
-            self.check(relaxed=False)
+    def test_external_scheduler_and_root_remain_ineligible(self):
+        with patch.object(intel_experiment.os, "getuid", return_value=1000), \
+             patch.object(intel_experiment, "text", return_value="enabled"):
+            with self.assertRaises(RuntimeError):
+                intel_experiment.guard()
+        with patch.object(intel_experiment.os, "getuid", return_value=0):
+            with self.assertRaises(RuntimeError):
+                intel_experiment.guard()
 
 
 class ManifestTests(unittest.TestCase):
@@ -71,16 +42,16 @@ class ManifestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "llama-server"
             path.write_text("#!/bin/false\n")
-            with self.assertRaisesRegex(RuntimeError, "Expected x86-64 ELF"):
+            with self.assertRaisesRegex(RuntimeError, "x86-64 ELF"):
                 runtime.elf_identity(path)
             path.write_bytes(b"\x7fELF\x02\x01" + bytes(12) + b"\xb7\x00")
-            with self.assertRaisesRegex(RuntimeError, "Expected x86-64 ELF"):
+            with self.assertRaisesRegex(RuntimeError, "x86-64 ELF"):
                 runtime.elf_identity(path)
 
     def test_seal_detects_stale_libggml(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            inputs = {"backend": "openmp", "markers": "all"}
+            inputs = {"backend": "openmp", "markers": "all", "revision": "test-revision"}
             runtime.save(root / "inputs.json", inputs)
             runtime.save(root / "compile_commands.json", [])
             binary = root / "bin/libggml-cpu.so"
@@ -94,18 +65,18 @@ class ManifestTests(unittest.TestCase):
             with patch.object(runtime, "source_inputs", return_value=inputs):
                 self.assertEqual(runtime.verify_build(root), manifest)
                 binary.write_bytes(binary.read_bytes() + b"changed")
-                with self.assertRaisesRegex(RuntimeError, "Build artifact changed"):
+                with self.assertRaisesRegex(RuntimeError, "빌드 산출물"):
                     runtime.verify_build(root)
                 manifest["r_route"] = "pre-R"
                 runtime.save(root / "manifest.json", manifest)
-                with self.assertRaisesRegex(RuntimeError, "Build source seal differs"):
+                with self.assertRaisesRegex(RuntimeError, "빌드 소스 해시"):
                     runtime.verify_build(root)
 
     def test_effective_mismatch_rejects_disabled_pool(self):
         profile = {"pool": "roles", "threads": 5, "batch_threads": 6, "transport": "state",
                    "role_affinity": [[0, 2, 4, 6, 8, 10]]*2, "role_polls": [None, None],
                    "role_priorities": ["normal", "normal"]}
-        with self.assertRaisesRegex(RuntimeError, "startup configuration differs"):
+        with self.assertRaisesRegex(RuntimeError, "시작 설정"):
             runtime.verify_effective("NEWA_INTEGRATION_V2 pool=off attached=0 separate=0 transport=state generation=5 batch=6", profile)
 
     def test_collect_seals_both_failed_and_successful_raw_results(self):
@@ -121,7 +92,7 @@ class ManifestTests(unittest.TestCase):
                 hashes = json.loads(archive.read("artifact-sha256.json"))
                 self.assertEqual(hashes["failure.json"], runtime.sha(failure))
             (run / "model.gguf").write_bytes(b"GGUF")
-            with self.assertRaisesRegex(RuntimeError, "Unexpected result artifact"):
+            with self.assertRaisesRegex(RuntimeError, "결과 파일"):
                 runtime.collect_results(run, root / "bad.zip")
 
 
@@ -160,7 +131,7 @@ class PrefillPlacementTests(unittest.TestCase):
                 self.assertEqual(metadata["p_representatives"], reps)
                 if reps:
                     self.assertEqual(struct.unpack_from("<4I", raw, 20), tuple(reps))
-        with self.assertRaisesRegex(RuntimeError, "tiers"):
+        with self.assertRaisesRegex(RuntimeError, "배치 계층"):
             scx.placement_input(self.intel, [0, 400], "prefill-pcore")
 
     def test_full_distinguishes_selected_cpu_and_actual_running_cpu(self):
@@ -190,6 +161,28 @@ class PrefillPlacementTests(unittest.TestCase):
         self.assertEqual(metadata["p_representatives"], [0, 2, 4, 6])
         limited = detect(allowed=[1, 3, 5, 7, 8, 9])["portable_plan"]
         self.assertEqual(scx.p_representatives(limited, [1, 3, 5, 7, 8, 9]), [1, 3, 5, 7])
+
+    def test_other_amd_desktop_quota_and_controller(self):
+        with patch.object(sys, "path", [str(runtime.TOPOLOGY), *sys.path]):
+            from test_hybrid import detect
+        parser = argparse.ArgumentParser()
+        runtime.add_configuration(parser)
+        args = parser.parse_args(["--reserve-controller"])
+        args.action, args.relaxed_host_checks = "doctor", False
+        manifest = {"backend": "openmp", "markers": "state-only", "r_route": "semantic-prefill-reference"}
+        cpuinfo = "\n\n".join(f"processor: {i}\nflags: avx avx2 fma f16c sse4_2" for i in range(16))
+        for n, smt, quota, expected in ((8, True, "max 100000", 6), (6, False, "max 100000", 5),
+                                       (8, True, "300000 100000", 3)):
+            with self.subTest(physical=n, smt=smt, quota=quota):
+                host = detect(p=n, e=0, vendor="AuthenticAMD", hybrid=False, smt=smt)
+                host["hardware"]["cgroup"]["cpu_max"] = quota
+                with patch.object(runtime, "detect", return_value=(host, None)), patch.object(Path, "read_text", return_value=cpuinfo):
+                    profile = runtime.resolve(args, manifest)
+                self.assertEqual(len(profile["cpus"]), expected)
+                self.assertEqual(profile["batch_threads"], expected)
+                plan = host["portable_plan"]
+                self.assertTrue(set(plan["snapshot"]["usable_cpus"]) - set(profile["cpus"]))
+                self.assertEqual(scx.p_representatives(plan, profile["cpus"]), [])
 
     def test_zero_activity_is_reported_and_lite_has_no_residence_claim(self):
         for policy, amd, status in (("neutral", False, "NEUTRAL_CONTROL"),

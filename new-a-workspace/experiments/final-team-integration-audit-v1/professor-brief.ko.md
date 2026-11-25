@@ -25,7 +25,7 @@
 | runtime phase와 커널 실행 연결 여부 불분명 | scalar uprobe, selected child, FULL 진단과 정리 검증 | observe scheduler/loader | 정책7, loaded object/ELF, phase bit, monitor, moved0 | phase-dependent placement·일관된 추가 gain 없음 |
 | pool 연결의 소유·재사용·해제 검증 필요 | donor owner를 P에 선택 이식, padding guard 최소 수정 | P 서버 전용 | steady512 graph attached, 생성6/해제6, cancel/error/sleep-resume | 최종 A에는 미포함, n4 pilot 방향 엇갈림 |
 
-파일/행번호/전체 SHA는 [통합 경로](runtime-integration-map.md)와 [기능별 표](integration-matrix.json)에 있다.
+파일/행번호/전체 SHA는 [통합 경로](runtime-integration-map.md)와 [기능별 표](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/integration-matrix.json)에 있다.
 
 ## 팀원 저장소와 연결 작업
 

@@ -73,7 +73,7 @@ python3 -B experiments/amd-prefill-placement-ac-v1/analyze.py \
   state/integration-v2/amd-prefill-placement-ac-20261125-01
 ```
 
-같은 AMD 장비에서 새 결과 디렉터리로 반복하는 명령이다. 일반 계정에서 실행하며, 개별 SCX 방문은 체크포인트가 지정한 제한시간·선택 child loader에 sudo를 사용한다. 처음 사용하는 체크아웃에서는 `bash scripts/prefill-pcore-smoke.sh prepare`로 이 실험이 확인하는 런타임과 스케줄러 번들을 빌드한다.
+아래는 원래 AMD 장비의 보존 빌드와 프로토콜로 반복하는 명령이다. 새 Intel 또는 AMD 장비는 저장소 루트에서 `bash scripts/run-cpu-experiment.sh placement`를 실행한다. 일반 계정에서 실행하며, 개별 SCX 방문은 체크포인트가 지정한 제한시간·선택 child loader에 sudo를 사용한다. 보존 빌드의 경로가 다르면 `--build-dir`와 `--scheduler-build`를 지정한다.
 
 ```bash
 python3 -B experiments/amd-prefill-placement-ac-v1/measure.py run \

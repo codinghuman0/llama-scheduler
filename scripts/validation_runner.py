@@ -21,6 +21,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "new-a-workspace/tools"))
+from cli_ko import ArgumentParser
+
 SCHEMA_VERSION = 1
 STATE_PATH = "/sys/kernel/sched_ext/state"
 OPS_PATH = "/sys/kernel/sched_ext/root/ops"
@@ -430,7 +433,7 @@ def write_summary(path: Path, records: list[dict[str, Any]]) -> None:
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description=__doc__)
+    result = ArgumentParser(description=__doc__)
     result.add_argument("--dry-run", action="store_true", help="test-only; never changes a child policy")
     result.add_argument("--state-path", default=STATE_PATH, help="sched_ext state file; custom path requires --dry-run")
     result.add_argument("--ops-path", default=OPS_PATH, help="sched_ext ops name file; custom path requires --dry-run")
@@ -448,14 +451,14 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     if args.duration <= 0 or args.max_children <= 0:
-        parser().error("--duration and --max-children must be positive")
+        parser().error("--duration과 --max-children 값은 양수여야 합니다")
     if args.state_path != STATE_PATH and not args.dry_run:
-        parser().error("--state-path is test-only and requires --dry-run")
+        parser().error("--state-path 옵션은 --dry-run에서만 사용할 수 있습니다")
     if args.ops_path != OPS_PATH and not args.dry_run:
-        parser().error("--ops-path is test-only and requires --dry-run")
+        parser().error("--ops-path 옵션은 --dry-run에서만 사용할 수 있습니다")
     for executable in (args.launcher, args.cpu_burn, args.sleep_wake):
         if not executable.is_file() or not os.access(executable, os.X_OK):
-            parser().error(f"missing executable: {executable}")
+            parser().error(f"실행 파일이 없습니다: {executable}")
     allowed = allowed_cpus()
     run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = args.output_dir or Path("results/validation") / run_id
@@ -466,21 +469,21 @@ def main(argv: list[str] | None = None) -> int:
         try:
             args.scheduler_name = active_scheduler_name(args.ops_path)
         except (OSError, RuntimeError) as error:
-            print(str(error), file=sys.stderr)
+            print(f"오류: 허용 CPU를 확인할 수 없습니다. {error}", file=sys.stderr)
             return 1
     if args.check_inactive:
         if args.dry_run:
-            parser().error("--check-inactive is a real safe check and cannot use --dry-run")
+            parser().error("--check-inactive는 실제 상태를 확인하므로 --dry-run과 함께 사용할 수 없습니다")
         if args.scheduler_state == "enabled":
-            print("refusing inactive-scheduler check while sched_ext is enabled; unload it manually first", file=sys.stderr)
+            print("오류: sched_ext가 활성 상태입니다. 비활성화한 후 다시 실행하세요.", file=sys.stderr)
             return 1
         records = [inactive_check(args, run_dir, run_id, allowed)]
     else:
         if args.scheduler_state != "enabled":
-            print(f"refusing validation: sched_ext scheduler is not active (state: {args.scheduler_state})", file=sys.stderr)
+            print(f"오류: sched_ext가 활성 상태가 아닙니다 (상태: {args.scheduler_state})", file=sys.stderr)
             return 1
         if (not args.dry_run or args.ops_path != OPS_PATH) and args.scheduler_name != "llama_simple":
-            print(f"refusing validation: expected scheduler name llama_simple, got {args.scheduler_name!r}", file=sys.stderr)
+            print(f"오류: 검증에는 llama_simple이 필요합니다. 현재 스케줄러: {args.scheduler_name!r}", file=sys.stderr)
             return 1
         selected = args.scenario or ["single_cpu_bound", "under_subscribed", "over_subscribed", "affinity", "mixed_sleep_wake", "expected_exec_failure", "expected_timeout"]
         definitions = scenarios(args, allowed)
@@ -500,7 +503,10 @@ def main(argv: list[str] | None = None) -> int:
         write_jsonl(run_dir / "results.jsonl", records[0])
     write_summary(run_dir / "summary.txt", records)
     print(f"validation results: {run_dir}")
-    return 0 if all(record["pass"] for record in records) else 1
+    if not all(record["pass"] for record in records):
+        print(f"오류: 검증에 실패한 시나리오가 있습니다. {run_dir}/summary.txt를 확인하세요.", file=sys.stderr)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

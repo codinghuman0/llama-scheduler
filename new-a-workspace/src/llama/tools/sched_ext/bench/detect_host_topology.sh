@@ -14,7 +14,7 @@ set -Eeuo pipefail
 #   * Detect/report SMT/Hyper-Threading and heterogeneous-core hints.
 #   * Produce shell-safe env output that benchmark/smoke scripts can reuse.
 #
-# Usage:
+# 사용법:
 #   ./detect_host_topology.sh
 #   ./detect_host_topology.sh --env /tmp/llama-topology.env
 #
@@ -25,7 +25,7 @@ JSON_OUT=""
 
 usage() {
     cat <<'EOF'
-Usage: detect_host_topology.sh [--env FILE] [--json FILE]
+사용법: detect_host_topology.sh [--env FILE] [--json FILE]
 
   --env FILE   Also write the resolved topology as shell-safe KEY=VALUE lines.
   --json FILE  Also write machine-readable topology.
@@ -36,12 +36,12 @@ EOF
 while (($#)); do
     case "$1" in
         --env)
-            (($# >= 2)) || { echo "ERROR: --env requires a file" >&2; exit 2; }
+            (($# >= 2)) || { echo "오류: --env에 파일 경로가 필요합니다" >&2; exit 2; }
             ENV_OUT="$2"
             shift 2
             ;;
         --json)
-            (($# >= 2)) || { echo "ERROR: --json requires a file" >&2; exit 2; }
+            (($# >= 2)) || { echo "오류: --json에 파일 경로가 필요합니다" >&2; exit 2; }
             JSON_OUT="$2"
             shift 2
             ;;
@@ -50,7 +50,7 @@ while (($#)); do
             exit 0
             ;;
         *)
-            echo "ERROR: unknown argument: $1" >&2
+            echo "오류: 알 수 없는 인수: $1" >&2
             usage >&2
             exit 2
             ;;
@@ -58,7 +58,7 @@ while (($#)); do
 done
 
 command -v python3 >/dev/null 2>&1 || {
-    echo "ERROR: python3 is required" >&2
+    echo "오류: python3가 필요합니다" >&2
     exit 1
 }
 

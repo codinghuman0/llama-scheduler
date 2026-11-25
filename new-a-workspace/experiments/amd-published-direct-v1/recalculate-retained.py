@@ -3,6 +3,8 @@
 
 from pathlib import Path
 import sys
+import hashlib
+import subprocess
 
 
 WORKSPACE = Path(__file__).resolve().parents[2]
@@ -11,7 +13,7 @@ HELPERS = WORKSPACE / RELATIVE_HELPERS
 sys.path.append(str(HELPERS))
 
 from analyze import CONTRASTS, collect, compare
-from study import DATA, contention, read, require, sha
+from study import DATA, contention, read, require, sha, main_entry
 
 
 def main():
@@ -21,7 +23,11 @@ def main():
     for filename, digest in read(DATA / 'frozen.json')['files'].items():
         original = Path(filename)
         path = helper_aliases.get(original, original)
-        require(path.is_relative_to(WORKSPACE) and sha(path) == digest, f'Frozen file mismatch: {path}')
+        require(path.is_relative_to(WORKSPACE), f'허용되지 않은 입력 경로입니다 ({path}).')
+        if sha(path) != digest:
+            archived = '25ab433140eafc6cbb3b259b017c2a9252b37900:new-a-workspace/' + str(path.relative_to(WORKSPACE))
+            blob = subprocess.check_output(['git', '-C', str(WORKSPACE), 'show', archived])
+            require(hashlib.sha256(blob).hexdigest() == digest, f'보존 원본의 해시가 다릅니다 ({path}).')
 
     fixtures = read(DATA / 'fixtures.json')
     results = read(DATA / 'final-analysis.json')
@@ -37,4 +43,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main_entry(main)

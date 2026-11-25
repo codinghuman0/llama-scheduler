@@ -20,6 +20,9 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "new-a-workspace/tools"))
+from cli_ko import ArgumentParser
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERSIONS_FILE = REPO_ROOT / "config" / "versions.env"
 SCX_STATE = Path("/sys/kernel/sched_ext/state")
@@ -927,7 +930,7 @@ def positive_u64(value: str) -> int:
 
 def parse_arguments(argv: list[str]) -> argparse.Namespace:
     timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d%H%M%S")
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
         description="Reproduce the M11 semantic llama-server to sched_ext observation path."
     )
     parser.add_argument("--model", required=True, type=Path, help="readable CPU-runnable GGUF model")
@@ -994,7 +997,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         result_dir = make_result_dir(args)
     except ValidationError as error:
-        print(f"ERROR: {error}", file=sys.stderr)
+        print(f"오류: 검증을 시작하지 못했습니다. {error}", file=sys.stderr)
         return 1
     logger = RunLogger(result_dir / "validation.log")
 
@@ -1007,6 +1010,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except (ValidationError, TerminationRequested) as error:
         ensure_failure_summary(result_dir, str(error))
+        print(f"오류: 커널 검증을 마치지 못했습니다. 상세 진단은 {result_dir}/validation.log에 있습니다.", file=sys.stderr)
         logger.log(f"semantic_acceptance=FAIL error={error}")
         logger.log(f"result_dir={result_dir}")
         return 1

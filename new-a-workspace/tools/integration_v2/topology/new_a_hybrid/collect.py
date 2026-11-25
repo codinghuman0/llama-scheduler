@@ -89,44 +89,44 @@ def extras(snapshot, cpu_root=Path('/sys/devices/system/cpu'), constraints=None)
             if level not in ['2', '3']:
                 continue
             if kind not in ['Unified', 'Data', 'Instruction'] or not shared:
-                raise Unsupported('Incomplete L2/L3 cache topology')
+                raise Unsupported('L2/L3 캐시 토폴로지 정보가 누락됐습니다.')
             members = portable.cpulist(shared)
-            require(cpu in members and set(members) <= set(snapshot['possible_cpus']), 'Cache sharing CPU set is inconsistent')
+            require(cpu in members and set(members) <= set(snapshot['possible_cpus']), '캐시를 공유하는 CPU 목록이 일치하지 않습니다.')
             caches.append(dict(level=int(level), type=kind, shared_cpus=members,
                                id=optional(index / 'id'), size=optional(index / 'size')))
         nodes = sorted(int(x.name[4:]) for x in path.glob('node[0-9]*') if x.name[4:].isdigit())
-        require(len(nodes) <= 1, 'CPU belongs to multiple NUMA nodes')
+        require(len(nodes) <= 1, '한 CPU가 여러 NUMA 노드에 속해 있습니다.')
         rows[str(cpu)] = dict(caches=caches, numa_node=nodes[0] if nodes else None,
                              cpuinfo_max_freq_khz=optional(path / 'cpufreq/cpuinfo_max_freq'),
                              base_frequency_khz=optional(path / 'cpufreq/base_frequency'))
     constraints = cgroup_constraints() if constraints is None else constraints
     effective = constraints['cpuset_cpus_effective']
-    require(effective is None or set(snapshot['usable_cpus']) <= set(effective), 'CPUID scope contradicts current cpuset')
+    require(effective is None or set(snapshot['usable_cpus']) <= set(effective), 'CPUID 검사 범위와 현재 cpuset이 일치하지 않습니다.')
     # Check every visible member, including allowed-out SMT siblings.
     for cpu, info in rows.items():
         for cache in info['caches']:
             for other in set(cache['shared_cpus']) & set(snapshot['online_cpus']):
                 matching = [x for x in rows[str(other)]['caches'] if x['level'] == cache['level'] and x['type'] == cache['type']]
-                require(any(x['shared_cpus'] == cache['shared_cpus'] for x in matching), 'Cache sharing is not reciprocal')
+                require(any(x['shared_cpus'] == cache['shared_cpus'] for x in matching), 'CPU 간 캐시 공유 정보가 서로 일치하지 않습니다.')
     return dict(cpus=rows, cgroup=constraints, smt_control=optional(Path(cpu_root) / 'smt/control'), smt_active=optional(Path(cpu_root) / 'smt/active'))
 
 
 def inspect(probe, requested=None):
-    require(platform.system() == 'Linux' and platform.machine() == 'x86_64', 'Linux x86_64 required')
+    require(platform.system() == 'Linux' and platform.machine() == 'x86_64', 'x86-64 Linux가 필요합니다.')
     from build_probe import verify_probe
     binary_sha = verify_probe(probe)
     before = portable.snapshot(requested=requested)
     extra_before = extras(before)
     evidence = portable.probe(before, probe)
     after = portable.snapshot(requested=requested)
-    require(before == after and extra_before == extras(after), 'Topology/affinity/cache/cgroup changed during detection; no retry')
+    require(before == after and extra_before == extras(after), '감지하는 동안 토폴로지·CPU 범위·캐시 또는 cgroup이 바뀌었습니다. 장비 상태를 확인하세요.')
     return detection(before, evidence, extra_before, probe_sha256=binary_sha, requested=requested)
 
 
 def detection(snapshot, evidence, extra, *, probe_sha256='SYNTHETIC_NOT_HARDWARE', requested=None):
-    require(set(extra['cpus']) == set(snapshot['cpus']), 'Cache/NUMA coverage missing')
+    require(set(extra['cpus']) == set(snapshot['cpus']), '캐시 또는 NUMA 정보가 누락됐습니다.')
     effective = extra['cgroup']['cpuset_cpus_effective']
-    require(effective is None or set(snapshot['usable_cpus']) <= set(effective), 'Usable CPUs outside cpuset')
+    require(effective is None or set(snapshot['usable_cpus']) <= set(effective), '선택한 CPU가 허용 cpuset 밖에 있습니다.')
     plan = portable.plan(snapshot, evidence)
     online_cores = {(x['package'], x['die'], x['core']) for x in snapshot['cpus'].values()}
     summary = dict(cpu_model=plan['cpu_model'], vendor=plan['vendor'], architecture=plan['architecture'],
@@ -154,6 +154,6 @@ def environment():
                 ac_online=any(p['type'] == 'Mains' and p['online'] == '1' for p in supplies), power_supply=supplies,
                 no_turbo=optional(cpu / 'intel_pstate/no_turbo'), boost=optional(cpu / 'cpufreq/boost'),
                 power_profile=profile, governors=governors, sched_ext=optional('/sys/kernel/sched_ext/state'),
-                temperature_millic=[dict(sensor=optional(p / 'type'), value=optional(p / 'temp')) for p in Path('/sys/class/thermal').glob('thermal_zone*')],
+                temperature_millic=[],
                 read_only=True, boot_and_host_ids='NOT_COLLECTED', host_profile='NEW_PROFILE_REQUIRED', runtime_baseline='NEW_BASELINE_REQUIRED',
                 execution_admitted=False, STRICT_ACCEPTANCE='FAILED', safety_verdict='FAIL', OVERHEAD_REVIEW_REQUIRED=True)

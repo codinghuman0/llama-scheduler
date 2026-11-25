@@ -1,6 +1,6 @@
 # 기능별 통합·기여 감사표
 
-JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 축이며 퍼센트나 점수로 합치지 않는다. A_L은 연구상 기본 역할, A_S는 평가 역할, P는 미채택 후보다. 전체 source SHA와 행번호는 JSON 및 [source anchors](evidence/source-anchors.json)에 있다.
+JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 축이며 퍼센트나 점수로 합치지 않는다. A_L은 연구상 기본 역할, A_S는 평가 역할, P는 미채택 후보다. 전체 source SHA와 행번호는 JSON 및 [source anchors](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/evidence/source-anchors.json)에 있다.
 
 ## semantic-origin — 요청 token-origin과 semantic phase
 
@@ -10,7 +10,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](sources/excerpts/semantic-origin.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-phase.h:24 / SHA256 9b6165627fbb8f775a50fbc574a08d30914aae9ee3ca6679b3450ec3f79f459b / [발췌](sources/excerpts/phase-classifier.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/semantic-origin.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-phase.h:24 / SHA256 9b6165627fbb8f775a50fbc574a08d30914aae9ee3ca6679b3450ec3f79f459b / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/phase-classifier.txt)
 - **change**: prompt 삽입 Prefill, sampled token Decode; 실제 off/view 구간에서 Unknown 우선, 양쪽 있으면 Mixed. retry split마다 재분류.
 - **ancestry**: SHARED_ANCESTRY
 - **build_flags**: HINT ON; profile mode phase
@@ -35,7 +35,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-phase.h:24 / SHA256 9b6165627fbb8f775a50fbc574a08d30914aae9ee3ca6679b3450ec3f79f459b / [발췌](sources/excerpts/phase-classifier.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](sources/excerpts/semantic-origin.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-phase.h:24 / SHA256 9b6165627fbb8f775a50fbc574a08d30914aae9ee3ca6679b3450ec3f79f459b / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/phase-classifier.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/semantic-origin.txt)
 - **change**: 기존 의미 분류를 경량 scalar transition 상태로 연결; 동일 phase 재방출 생략.
 - **ancestry**: BORROWED_MODIFIED
 - **build_flags**: LLAMA_SCX_PHASE_HINT=ON; TRACE undefined
@@ -60,7 +60,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: YES; legacy defaults AUTO
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/include/llama.h:221 / SHA256 9d5a18d731237f25111e1772eb0546690497b8a25ec2ad299910f6f7234f172b / [발췌](sources/excerpts/profile-header.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.h:38 / SHA256 af5f558d5e4e1ce38c0e541f60181053291ac8e9355f4e63eeb59a9f8caef9e5 / [발췌](sources/excerpts/profile-resolve.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](sources/excerpts/profile-engine.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/include/llama.h:221 / SHA256 9d5a18d731237f25111e1772eb0546690497b8a25ec2ad299910f6f7234f172b / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/profile-header.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.h:38 / SHA256 af5f558d5e4e1ce38c0e541f60181053291ac8e9355f4e63eeb59a9f8caef9e5 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/profile-resolve.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/profile-engine.txt)
 - **change**: AUTO는 physical ubatch 토큰 수, GENERATION/BATCH는 명시 선택; default_options와 validation 유지.
 - **ancestry**: SHARED_ANCESTRY
 - **build_flags**: 동결 libllama; archived O3/OpenMP build
@@ -85,7 +85,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: OpenMP/threads already YES; override NO
 - **already_in_B1**: YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](sources/excerpts/profile-engine.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.cpp:256 / SHA256 8ab6ed68e2c0eea05090368d7788636500d146851298685276d7a9302c03c5c1 / [발췌](sources/excerpts/CPU-registry.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](sources/excerpts/CPU-graph.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/profile-engine.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.cpp:256 / SHA256 8ab6ed68e2c0eea05090368d7788636500d146851298685276d7a9302c03c5c1 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/CPU-registry.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/CPU-graph.txt)
 - **change**: profile이 generation5/batch6 선택, thread setter, graph의 omp team에 전달.
 - **ancestry**: BORROWED_MODIFIED
 - **build_flags**: GGML_USE_OPENMP; -fopenmp; libgomp; OMP_DYNAMIC=FALSE
@@ -110,7 +110,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-scx.h:11 / SHA256 655e62843596e98e66920b6b8d12e868ea0a01df96a5020c0ee6cc86d26f303f / [발췌](sources/excerpts/phase-bridge.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](sources/excerpts/semantic-origin.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](sources/excerpts/profile-engine.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](sources/excerpts/CPU-graph.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-scx.h:11 / SHA256 655e62843596e98e66920b6b8d12e868ea0a01df96a5020c0ee6cc86d26f303f / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/phase-bridge.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/semantic-origin.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/profile-engine.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/CPU-graph.txt)
 - **change**: begin/end TRACE, profile clocks/logging 조건부; context/team debug 제거. 실제 marker는 scalar HINT.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: LLAMA_SCX_PHASE_HINT defined; LLAMA_SCX_PHASE_TRACE absent
@@ -135,7 +135,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-scx.h:11 / SHA256 655e62843596e98e66920b6b8d12e868ea0a01df96a5020c0ee6cc86d26f303f / [발췌](sources/excerpts/phase-bridge.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.cpp:256 / SHA256 8ab6ed68e2c0eea05090368d7788636500d146851298685276d7a9302c03c5c1 / [발췌](sources/excerpts/CPU-registry.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](sources/excerpts/CPU-graph.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-scx.h:11 / SHA256 655e62843596e98e66920b6b8d12e868ea0a01df96a5020c0ee6cc86d26f303f / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/phase-bridge.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.cpp:256 / SHA256 8ab6ed68e2c0eea05090368d7788636500d146851298685276d7a9302c03c5c1 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/CPU-registry.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/CPU-graph.txt)
 - **change**: 등록 함수 한번 lookup 후 phase atomic setter; uprobe 유무와 독립.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: HINT ON; CPU registry export
@@ -160,7 +160,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: NO in runtime/B1; pre-R E sibling YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](sources/excerpts/E.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/E.txt)
 - **change**: 선택 6 CPU /proc/stat user+nice+system 차이에서 process CPU·tick round 보정; margin .02, threshold .125.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: NEWA_DECODE_RESOURCE=pressure/fixed6
@@ -185,7 +185,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: NO in B1; E sibling YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](sources/excerpts/E.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](sources/excerpts/semantic-origin.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/E.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/semantic-origin.txt)
 - **change**: 첫 Decode age<=10초, 8-task 시작, 위치 연속, tail은 subset, <=256 적격 calls; idle/reset; 실패 미commit. Unknown/Mixed6, singleton Decode5.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: threads5/batch6, fixed 6 physical-core envelope
@@ -210,7 +210,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: NO in B1; E sibling YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](sources/excerpts/E.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](sources/excerpts/semantic-origin.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](sources/excerpts/profile-engine.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/E.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/semantic-origin.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/profile-engine.txt)
 - **change**: same sensor/guards의 fixed6와 pressure 비교. condition명/답변내용 입력 없음.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: pressure 대 fixed6; 나머지 env와 binary 동일
@@ -235,7 +235,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: reference body YES
 - **already_in_B1**: custom Prefill route previously YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](sources/excerpts/Q4-R.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q4-R.txt)
 - **change**: Prefill custom path만 차단; 정확 Q4 Decode/Mixed와 Q6 유지.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: R CPU DSO 45ddfa4d...; Q4=phase_batch
@@ -260,7 +260,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: reference arithmetic YES; this batching NO
 - **already_in_B1**: YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q4-decode-exact.h:3 / SHA256 20d7bdc052650a53b6b5b7fabf81ec23d96aff4283c393ca3b9a23dcc98be62b / [발췌](sources/excerpts/Q4-exact.txt); /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](sources/excerpts/Q4-R.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q4-decode-exact.h:3 / SHA256 20d7bdc052650a53b6b5b7fabf81ec23d96aff4283c393ca3b9a23dcc98be62b / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q4-exact.txt); /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q4-R.txt)
 - **change**: 두 4-row activation group에 동일 weight 준비 공유; 누적 순서 exact 경로. phase2/3, nr4..15 중 원래 4배수 shape.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: phase_batch; AVX2/native archived flags; retained R CPU
@@ -285,7 +285,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: original Q6 YES; expanded path NO
 - **already_in_B1**: YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q6-policy.h:39 / SHA256 605cf933b96dc6ee4af7c635bdddb4dcdb04429d215b538bf0e59849f30b6d42 / [발췌](sources/excerpts/Q6-policy.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](sources/excerpts/CPU-graph.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q6-policy.h:39 / SHA256 605cf933b96dc6ee4af7c635bdddb4dcdb04429d215b538bf0e59849f30b6d42 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q6-policy.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/CPU-graph.txt)
 - **change**: pure Prefill와 phase_batch Decode/Mixed에서 적격 4-column 연산 사용.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: GGML_NEWA_Q6_BATCH=phase_batch
@@ -310,7 +310,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO custom policy
 - **already_in_B1**: source PRESENT; OpenMP inactive
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](sources/excerpts/CPU-graph.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/ggml-cpu.c:481 / SHA256 cc4366fb2ed1fa466958557e8d631eda1a73b4d144498b98d969a9b5e0fdd13e / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/CPU-graph.txt)
 - **change**: native custom barrier는 OpenMP compile branch에서 배제. OpenMP barrier는 유지.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: GGML_USE_OPENMP defined
@@ -335,7 +335,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO explicit advice
 - **already_in_B1**: YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-repack-pages.h:30 / SHA256 69da9db393e937a15535b86255570e30290a116fb294a4c5d62f8ab9007a95c8 / [발췌](sources/excerpts/repack-pages.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-repack-pages.h:30 / SHA256 69da9db393e937a15535b86255570e30290a116fb294a4c5d62f8ab9007a95c8 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/repack-pages.txt)
 - **change**: 정렬된 repack mapping에 madvise; 반환 log와 실제 huge page는 구분.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: GGML_NEWA_REPACK_PAGES=huge
@@ -435,7 +435,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: scheduler separate
-- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/loader.c:48 / SHA256 005f9f2a5b6d740c300bc60668af4cb1af6eb051d40dca8d6466bca33dbbc6c1 / [발췌](sources/excerpts/scheduler-loader.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/loader.c:48 / SHA256 005f9f2a5b6d740c300bc60668af4cb1af6eb051d40dca8d6466bca33dbbc6c1 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler-loader.txt)
 - **change**: 탐지 계열 참조, 최종 실험은 고정 6 physical CPU config를 로드/검증; 전체 자동 설정 optimizer 사용 아님.
 - **ancestry**: SHARED_ANCESTRY
 - **build_flags**: topology enabled1, counts6/0/0
@@ -460,7 +460,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: separate existing scheduler foundation
-- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/llama_scx_child.c:168 / SHA256 93638218e23ccacd061b35594e69c4900fef382918ec715fda55278cb263ba11 / [발췌](sources/excerpts/selected-child.txt); /home/codinghuman/projects/new-a-workspace/scheduler/neutral_lifecycle.c:344 / SHA256 65ab6db95be1c94faa6bcd38de9d3d9c4c2b95408ee14221b6b3ccb51f2709b5 / [발췌](sources/excerpts/scheduler-lifecycle.txt); /home/codinghuman/projects/new-a-workspace/scheduler/loader.c:48 / SHA256 005f9f2a5b6d740c300bc60668af4cb1af6eb051d40dca8d6466bca33dbbc6c1 / [발췌](sources/excerpts/scheduler-loader.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/llama_scx_child.c:168 / SHA256 93638218e23ccacd061b35594e69c4900fef382918ec715fda55278cb263ba11 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/selected-child.txt); /home/codinghuman/projects/new-a-workspace/scheduler/neutral_lifecycle.c:344 / SHA256 65ab6db95be1c94faa6bcd38de9d3d9c4c2b95408ee14221b6b3ccb51f2709b5 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler-lifecycle.txt); /home/codinghuman/projects/new-a-workspace/scheduler/loader.c:48 / SHA256 005f9f2a5b6d740c300bc60668af4cb1af6eb051d40dca8d6466bca33dbbc6c1 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler-loader.txt)
 - **change**: 선택 child만 SCHED_EXT, UID1000 inference; loader/launcher ordinary Linux; marker ELF에 scalar uprobe.
 - **ancestry**: SHARED_ANCESTRY
 - **build_flags**: SCX_OPS_SWITCH_PARTIAL; selected TGID registration
@@ -485,7 +485,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO research scheduler
 - **already_in_B1**: existing scheduler foundation
-- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](sources/excerpts/scheduler.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler.txt)
 - **change**: bounded online/affinity tier scan; idle local, 나머지 shared DSQ; slice*100/weight vtime.
 - **ancestry**: SHARED_ANCESTRY
 - **build_flags**: observe; fixed affinity; SCX_OPS_SWITCH_PARTIAL
@@ -510,7 +510,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: separate scheduler foundation
-- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](sources/excerpts/scheduler.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-scx.h:11 / SHA256 655e62843596e98e66920b6b8d12e868ea0a01df96a5020c0ee6cc86d26f303f / [발췌](sources/excerpts/phase-bridge.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler.txt); /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-scx.h:11 / SHA256 655e62843596e98e66920b6b8d12e868ea0a01df96a5020c0ee6cc86d26f303f / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/phase-bridge.txt)
 - **change**: phase는 state/bitmap과 Decode attempt counter로 전달; CPU placement는 phase-independent.
 - **ancestry**: BORROWED_MODIFIED
 - **build_flags**: NEW_A_DIAGNOSTICS; no NEW_A_IDLE_HANDOFF
@@ -535,7 +535,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: not B1 runtime
-- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](sources/excerpts/scheduler.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler.txt)
 - **change**: source 조건부 이동 분기 존재; observe compilation에는 빠짐. attempt는 셀 수 있으나 moved0.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: NEW_A_IDLE_HANDOFF absent; FG_GUARD absent
@@ -560,7 +560,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: separate existing full diagnostics
-- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](sources/excerpts/scheduler.txt); /home/codinghuman/projects/new-a-workspace/scheduler/loader.c:48 / SHA256 005f9f2a5b6d740c300bc60668af4cb1af6eb051d40dca8d6466bca33dbbc6c1 / [발췌](sources/excerpts/scheduler-loader.txt); /home/codinghuman/projects/new-a-workspace/scheduler/monitor.h:71 / SHA256 0a0f0c0257c3e551cb741214d26ed71d19431a931a0057681dd476eeebe1832d / [발췌](sources/excerpts/monitor.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler.txt); /home/codinghuman/projects/new-a-workspace/scheduler/loader.c:48 / SHA256 005f9f2a5b6d740c300bc60668af4cb1af6eb051d40dca8d6466bca33dbbc6c1 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler-loader.txt); /home/codinghuman/projects/new-a-workspace/scheduler/monitor.h:71 / SHA256 0a0f0c0257c3e551cb741214d26ed71d19431a931a0057681dd476eeebe1832d / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/monitor.txt)
 - **change**: 최종 FULL BPF와 loader; Lite나 plain 객체 아님.
 - **ancestry**: SHARED_ANCESTRY
 - **build_flags**: NEW_A_DIAGNOSTICS defined; HANDOFF_MODE=observe
@@ -585,7 +585,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: existing safety foundation
-- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/monitor.h:71 / SHA256 0a0f0c0257c3e551cb741214d26ed71d19431a931a0057681dd476eeebe1832d / [발췌](sources/excerpts/monitor.txt); /home/codinghuman/projects/new-a-workspace/scheduler/neutral_lifecycle.c:344 / SHA256 65ab6db95be1c94faa6bcd38de9d3d9c4c2b95408ee14221b6b3ccb51f2709b5 / [발췌](sources/excerpts/scheduler-lifecycle.txt); /home/codinghuman/projects/new-a-workspace/scheduler/llama_scx_child.c:168 / SHA256 93638218e23ccacd061b35594e69c4900fef382918ec715fda55278cb263ba11 / [발췌](sources/excerpts/selected-child.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/scheduler/monitor.h:71 / SHA256 0a0f0c0257c3e551cb741214d26ed71d19431a931a0057681dd476eeebe1832d / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/monitor.txt); /home/codinghuman/projects/new-a-workspace/scheduler/neutral_lifecycle.c:344 / SHA256 65ab6db95be1c94faa6bcd38de9d3d9c4c2b95408ee14221b6b3ccb51f2709b5 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler-lifecycle.txt); /home/codinghuman/projects/new-a-workspace/scheduler/llama_scx_child.c:168 / SHA256 93638218e23ccacd061b35594e69c4900fef382918ec715fda55278cb263ba11 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/selected-child.txt)
 - **change**: worker mask/policy 검사, kernel monitor와 owned-child 정리; dynamic-affinity 미해결 경계 유지.
 - **ancestry**: BORROWED_MODIFIED
 - **build_flags**: FULL loader monitor; absence of FG_GUARD macro does not disable this monitor
@@ -610,7 +610,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: NO
-- **final_source**: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-threadpool.h:8 / SHA256 61a61c12907cf122ed5de90ef1fb9acb80531e39a86b56b9ccd314d0736fde58 / [발췌](sources/excerpts/P-owner.txt); /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-context.cpp:1280 / SHA256 378d0f745e44b4da887820fc85bef3c143170bb5a949c3c5633ac198809a7410 / [발췌](sources/excerpts/P-context.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-threadpool.h:8 / SHA256 61a61c12907cf122ed5de90ef1fb9acb80531e39a86b56b9ccd314d0736fde58 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/P-owner.txt); /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-context.cpp:1280 / SHA256 378d0f745e44b4da887820fc85bef3c143170bb5a949c3c5633ac198809a7410 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/P-context.txt)
 - **change**: header는 donor byte-identical; P server ownership/attach/teardown는 local adaptation. A server에는 donor owner 미포함.
 - **ancestry**: BORROWED_EXACT
 - **build_flags**: P donor: generation5/batch6, poll50, normal, unrestricted; final A off
@@ -635,7 +635,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: NO
-- **final_source**: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-context.cpp:1280 / SHA256 378d0f745e44b4da887820fc85bef3c143170bb5a949c3c5633ac198809a7410 / [발췌](sources/excerpts/P-context.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/P-padding-fix/overlay/tools/server/server-context.cpp:1280 / SHA256 378d0f745e44b4da887820fc85bef3c143170bb5a949c3c5633ac198809a7410 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/P-context.txt)
 - **change**: donor owner와 context 해제 순서; parser의 null4096 항목을 실제 override와 구분. 원래 실패 보존.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: P-only full server link; arithmetic DSOs byte-identical A
@@ -660,7 +660,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: YES optional
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](sources/excerpts/semantic-origin.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/server-context.cpp:541 / SHA256 85a9650aada34a5b0b726ac427dbe268ac625442f15ec68a7674c1520d455685 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/semantic-origin.txt)
 - **change**: max threads 하나/poll0로 두 역할 연결하는 old on 경로; donor 두 role poll50과 다름.
 - **ancestry**: LOCAL_NEW
 - **build_flags**: GGML_NEWA_POOL=off final
@@ -785,7 +785,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO bundle
 - **already_in_B1**: partially YES
-- **final_source**: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](sources/excerpts/Q4-R.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q4-decode-exact.h:3 / SHA256 20d7bdc052650a53b6b5b7fabf81ec23d96aff4283c393ca3b9a23dcc98be62b / [발췌](sources/excerpts/Q4-exact.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q6-policy.h:39 / SHA256 605cf933b96dc6ee4af7c635bdddb4dcdb04429d215b538bf0e59849f30b6d42 / [발췌](sources/excerpts/Q6-policy.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](sources/excerpts/profile-engine.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q4-R.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q4-decode-exact.h:3 / SHA256 20d7bdc052650a53b6b5b7fabf81ec23d96aff4283c393ca3b9a23dcc98be62b / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q4-exact.txt); /home/codinghuman/projects/new-a-workspace/src/llama/ggml/src/ggml-cpu/newa-q6-policy.h:39 / SHA256 605cf933b96dc6ee4af7c635bdddb4dcdb04429d215b538bf0e59849f30b6d42 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q6-policy.txt); /home/codinghuman/projects/new-a-workspace/src/llama/src/llama-context.cpp:2457 / SHA256 5e7b81b3ddcc851fcb0e9dbf49b6ba1cb663b677d25de2a2b8eca31d42670f0a / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/profile-engine.txt)
 - **change**: F6_L도 E sensor/guards/phase를 유지하며 eligible multi Decode만 fixed6.
 - **ancestry**: BORROWED_MODIFIED
 - **build_flags**: same A binary; fixed6 mode
@@ -810,7 +810,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: NO R compatibility/E combined
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](sources/excerpts/E.txt); /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](sources/excerpts/Q4-R.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/E.txt); /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q4-R.txt)
 - **change**: Linux default 역할의 A; workspace run.sh 기본 경로와 다름.
 - **ancestry**: BORROWED_MODIFIED
 - **build_flags**: pressure + Linux
@@ -835,7 +835,7 @@ JSON/CSV와 동일한 34개 행이다. 출처·채택·실행·성능은 독립 
 - **upstream_shared_ancestor**: 5219055a578fd741e029e81fefef6f3a5695086d for shared phase/profile; Linux scx_simple where stated; local base 59abec45fe0919de20550ce7cdcf363d9f7bbe5a
 - **already_in_B0**: NO
 - **already_in_B1**: NO combined
-- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](sources/excerpts/E.txt); /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](sources/excerpts/Q4-R.txt); /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](sources/excerpts/scheduler.txt)
+- **final_source**: /home/codinghuman/projects/new-a-workspace/src/llama/tools/server/newa-prefill-pressure.h:22 / SHA256 944b2b546427fb97b7e5584c0a383ad97cbea04a987cf1a303fa69a4c01afe4d / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/E.txt); /home/codinghuman/projects/new-a-workspace/experiments/r-pool-validation-v1/candidates/R/overlay/ggml/src/ggml-cpu/newa-q4-policy.h:38 / SHA256 014ec3787142838295cb9e8193453ea504cf7a27f18c14a0fa6b8799fcd93029 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/Q4-R.txt); /home/codinghuman/projects/new-a-workspace/scheduler/handoff.bpf.c:249 / SHA256 c54dfa5b73e9eb09c981be8e9608b1c62c51ed950ed0468aa79a1f982520c736 / [발췌](https://github.com/codinghuman0/llama-scheduler/blob/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace/experiments/final-team-integration-audit-v1/sources/excerpts/scheduler.txt)
 - **change**: A runtime + selected observe/FULL 평가 구성; donor pool 없음.
 - **ancestry**: BORROWED_MODIFIED
 - **build_flags**: pressure + observe/FULL

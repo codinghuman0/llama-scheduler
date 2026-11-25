@@ -1,5 +1,8 @@
 # Intel i5-1240P / Ubuntu 실행 안내
 
+이 문서는 과거 B0/A 비교의 보존 기록입니다. 현재 배포본의 실행 명령, 폴더 구조와 결과 위치는 공용 실행 안내에서 확인하세요. [현재 Intel·AMD 실험](../../README.md#intelamd-cpu-실험) · [과거 전체 원본](https://github.com/codinghuman0/llama-scheduler/tree/25ab433140eafc6cbb3b259b017c2a9252b37900/new-a-workspace)
+
+
 이 경로는 **동일한 모델로 B0, 최종 A의 fixed6, 최종 A의 pressure 정책을 Intel에서 새로 빌드하고 비교**한다. 모두 기본 Linux 스케줄러를 사용한다. AMD의 보관 바이너리나 CPU 번호를 재사용하지 않는다. Intel 실측 전에는 Intel 성능 개선을 주장하지 않는다.
 
 ## 1. 범위와 준비

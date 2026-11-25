@@ -1,6 +1,6 @@
 # NEW_A integration-v2
 
-이 브랜치의 기본 진입점은 `build.sh`와 `run.sh`입니다. CPU 전용 `src/llama`에서 실행 파일과 라이브러리를 함께 빌드하고 소스, 빌드 옵션, ELF 및 실제 로드된 라이브러리를 확인합니다. 기본 수치 경로에는 R의 semantic Prefill reference가 포함됩니다. 모델은 팀에서 배포한 원본 `model.gguf`를 사용합니다.
+팀원은 저장소 루트의 `scripts/run-cpu-experiment.sh`로 업데이트와 실험을 한 번에 수행합니다. 개별 빌드·실행은 이 폴더의 `build.sh`와 `run.sh`에서 제공합니다. [모드와 실행 명령](../README.md#intelamd-cpu-실험) CPU 전용 `src/llama`에서 실행 파일과 라이브러리를 함께 빌드하고 소스, 빌드 옵션, ELF 및 실제 로드된 라이브러리를 확인합니다. 기본 수치 경로에는 R의 semantic Prefill reference가 포함됩니다. 모델은 팀에서 배포한 원본 `model.gguf`를 사용합니다.
 
 ## CPU 빌드와 확인
 
@@ -23,7 +23,7 @@ bash run.sh --build-dir "$build_dir" --model "$model" --output state/integration
 
 ## 동결 실험 재현
 
-이전 runtime과 결과는 원본 workspace에 보존되어 있습니다. 아래 위임 명령은 그 workspace의 기존 run 진입점을 사용합니다.
+이전 캠페인의 자료 위치와 보존 커밋은 실험 목록에 있습니다. [실험 자료](experiments/README.md) 아래 위임 명령은 그 workspace의 기존 run 진입점을 사용합니다.
 
 ```bash
 bash scripts/historical-frozen.sh "$HOME/projects/new-a-workspace" run --describe

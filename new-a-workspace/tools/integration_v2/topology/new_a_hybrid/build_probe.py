@@ -22,10 +22,10 @@ def verify_probe(path):
     path = Path(path).resolve()
     info = path.stat()
     if info.st_uid != os.getuid() or info.st_mode & (stat.S_ISUID | stat.S_ISGID | 0o022):
-        raise ValueError('Use a user-owned probe without setid/group/world write permissions')
+        raise ValueError('CPU probe는 사용자 소유여야 하며 setid 및 그룹·다른 사용자 쓰기 권한이 없어야 합니다.')
     proof = json.loads(path.with_name('probe-build.json').read_text())
     if proof != dict(schema=1, binary=path.name, binary_sha256=sha(path), source_sha256=sha(SOURCE), header_sha256=sha(HEADER), bpf='NOT_BUILT_OR_LOADED'):
-        raise ValueError('Probe build/source integrity mismatch')
+        raise ValueError('CPU probe 빌드와 소스의 해시가 일치하지 않습니다.')
     return proof['binary_sha256']
 
 

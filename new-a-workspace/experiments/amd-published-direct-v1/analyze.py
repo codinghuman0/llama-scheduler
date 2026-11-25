@@ -7,7 +7,7 @@ from pathlib import Path
 import random
 from statistics import fmean
 
-from study import CPUS, DATA, P, TOKENS, read, require, runner, schedule, sha, validate_body
+from study import main_entry, CPUS, DATA, P, TOKENS, read, require, runner, schedule, sha, validate_body
 
 
 CONTRASTS = (P['analysis']['primary_contrast'], *P['analysis']['secondary_contrasts'])
@@ -151,4 +151,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main_entry(main)
